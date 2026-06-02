@@ -1024,6 +1024,85 @@ fun DownloadsTabScreen(
             }
         }
 
+        // Paste external link to download
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+            border = BorderStroke(1.dp, SurfaceVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "Скачать по внешней ссылке (yt-dlp)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                var urlInput by remember { mutableStateOf("") }
+                var titleInput by remember { mutableStateOf("") }
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = urlInput,
+                    onValueChange = { urlInput = it },
+                    label = { Text("Ссылка (Rutube, MP4, HLS/M3U8, Youtube...)", fontSize = 11.sp) },
+                    placeholder = { Text("https://example.com/video.mp4", fontSize = 11.sp) },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = SurfaceVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = titleInput,
+                    onValueChange = { titleInput = it },
+                    label = { Text("Название видео (необязательно)", fontSize = 11.sp) },
+                    placeholder = { Text("Например: Мой Любимый Клип", fontSize = 11.sp) },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = SurfaceVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                Button(
+                    onClick = {
+                        if (urlInput.isNotBlank()) {
+                            viewModel.startManualYtDlpDownload(urlInput, titleInput)
+                            urlInput = ""
+                            titleInput = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = urlInput.isNotBlank()
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text("Запустить закачку", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // Active downloads section
         if (activeDownloads.isNotEmpty()) {
             Text(
@@ -1775,9 +1854,23 @@ fun SleekPlayerDetailOverlay(
 
     val formattedElapsed = viewModel.getFormattedElapsedTime(video.duration, progress)
 
-    var isFullscreen by remember { mutableStateOf(false) }
-    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
+    var isFullscreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var selectedAspectRatio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(VlcAspectRatio.FIT) }
     var showDownloadOptionsDialog by remember { mutableStateOf(false) }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions: Map<String, Boolean> ->
+        val readGranted = permissions[android.Manifest.permission.READ_EXTERNAL_STORAGE] ?: false
+        val writeGranted = permissions[android.Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false
+        if (readGranted || writeGranted || android.os.Build.VERSION.SDK_INT >= 29) {
+            viewModel.saveToDevice(video, context) { success, message ->
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+            }
+        } else {
+            android.widget.Toast.makeText(context, "Разрешение на работу с файлами отклонено", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Immersive mode orientation and system bar control
     val activity = context as? android.app.Activity
@@ -1840,6 +1933,7 @@ fun SleekPlayerDetailOverlay(
             RutubeVideoPlayer(
                 videoId = video.id,
                 viewModel = viewModel,
+                videoTitle = video.title,
                 aspectMode = selectedAspectRatio,
                 isFullscreen = true,
                 onToggleFullscreen = { isFullscreen = !isFullscreen },
@@ -1897,6 +1991,7 @@ fun SleekPlayerDetailOverlay(
                     RutubeVideoPlayer(
                         videoId = video.id,
                         viewModel = viewModel,
+                        videoTitle = video.title,
                         aspectMode = selectedAspectRatio,
                         isFullscreen = false,
                         onToggleFullscreen = { isFullscreen = !isFullscreen },
@@ -2061,8 +2156,17 @@ fun SleekPlayerDetailOverlay(
                                 Button(
                                     onClick = {
                                         showDownloadOptionsDialog = false
-                                        viewModel.saveToDevice(video, context) { success, message ->
-                                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                        if (android.os.Build.VERSION.SDK_INT >= 29) {
+                                            viewModel.saveToDevice(video, context) { success, message ->
+                                                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                            }
+                                        } else {
+                                            permissionLauncher.launch(
+                                                arrayOf(
+                                                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                                                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                                )
+                                            )
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Primary),
@@ -2179,114 +2283,7 @@ fun SleekPlayerDetailOverlay(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Comments segment header
-            Text(
-                text = "Комментарии",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-
-            val commentsList by viewModel.comments.collectAsStateWithLifecycle()
-            val isCommentsLoading by viewModel.isCommentsLoading.collectAsStateWithLifecycle()
-
-            if (isCommentsLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = Primary,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            } else if (commentsList.isEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground)
-                ) {
-                    Text(
-                        text = "Комментариев пока нет. Будьте первым!",
-                        fontSize = 11.sp,
-                        color = GreyText,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-            } else {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    commentsList.forEach { comment ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = comment.author,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Primary
-                                    )
-                                    comment.date?.let { dt ->
-                                        Text(
-                                            text = dt,
-                                            fontSize = 9.sp,
-                                            color = GreyText
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = comment.text,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.End,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ThumbUp,
-                                        contentDescription = "Лайк",
-                                        tint = GreyText,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${comment.likes}",
-                                        fontSize = 10.sp,
-                                        color = GreyText
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
     }
@@ -2342,6 +2339,7 @@ fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
 fun RutubeVideoPlayer(
     videoId: String,
     viewModel: VideoViewModel,
+    videoTitle: String = "",
     aspectMode: VlcAspectRatio = VlcAspectRatio.FIT,
     isFullscreen: Boolean = false,
     onToggleFullscreen: () -> Unit = {},
@@ -2414,6 +2412,7 @@ fun RutubeVideoPlayer(
                     if (dur > 0L) {
                         totalDuration = dur
                     }
+                    viewModel.saveVideoPosition(videoId, currentPos)
                 }
             }
             kotlinx.coroutines.delay(250)
@@ -2506,6 +2505,11 @@ fun RutubeVideoPlayer(
                             updateVideoSize(mediaPlayer.videoWidth, mediaPlayer.videoHeight)
                             mediaPlayer.isLooping = false
                             totalDuration = mediaPlayer.duration.toLong()
+                            val savedPos = viewModel.getVideoPosition(videoId)
+                            if (savedPos > 0L && savedPos < totalDuration) {
+                                seekTo(savedPos.toInt())
+                                currentPos = savedPos
+                            }
                             start()
                         }
                         
@@ -2576,10 +2580,13 @@ fun RutubeVideoPlayer(
                                 }
                             }
                             Text(
-                                text = if (offlineFile.exists()) "Локальный файл • Offline" else "Rutube Онлайн-превью",
+                                text = if (offlineFile.exists()) "$videoTitle • Offline" else videoTitle.ifBlank { "Rutube Онлайн-превью" },
                                 color = Color.White,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                         }
 
