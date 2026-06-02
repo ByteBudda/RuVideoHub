@@ -1127,7 +1127,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         }
 
                         val client = okhttp3.OkHttpClient.Builder().connectTimeout(20, TimeUnit.SECONDS).build()
-                        val request = okhttp3.Request.Builder().url(trimmedUrl).build()
+                        val request = okhttp3.Request.Builder()
+                            .url(trimmedUrl)
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                            .header("Accept", "*/*")
+                            .header("Referer", "https://rutube.ru/")
+                            .build()
                         client.newCall(request).execute().use { response ->
                             if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
                             val body = response.body ?: throw Exception("Response body is null")
@@ -1213,6 +1218,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             val jsonBody = org.json.JSONObject().apply {
                                 put("url", trimmedUrl)
                                 put("videoQuality", "720")
+                                put("isUrlTunnel", true)
                             }
 
                             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
@@ -1294,7 +1300,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             .connectTimeout(25, TimeUnit.SECONDS)
                             .readTimeout(25, TimeUnit.SECONDS)
                             .build()
-                        val request = okhttp3.Request.Builder().url(finalDownloadUrl).build()
+                        val request = okhttp3.Request.Builder()
+                            .url(finalDownloadUrl)
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                            .header("Accept", "*/*")
+                            .header("Connection", "keep-alive")
+                            .build()
                         client.newCall(request).execute().use { response ->
                             if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
                             val body = response.body ?: throw Exception("Response body is null")
