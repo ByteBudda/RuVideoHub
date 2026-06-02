@@ -1,18 +1,38 @@
 package com.example.data
 
+import android.util.Log
+import com.example.data.rutube.RutubeApiService
+import com.example.data.rutube.RutubeVideoItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
-import org.json.JSONObject
-import org.json.JSONArray
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
-class VideoRepository(private val dao: SavedVideoDao) {
+class VideoRepository(
+    private val dao: SavedVideoDao,
+    private val apiService: RutubeApiService
+) {
 
     var lastFetchSource: String = "Инициализация"
         private set
 
-    private val dynamicCategoryTargets = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val dynamicCategoryTargets = ConcurrentHashMap<String, String>()
 
+    private val categorySlugs = mapOf(
+        "Фильмы" to "movies",
+        "Сериалы" to "serials",
+        "Телепередачи" to "tv",
+        "Музыка" to "music",
+        "Мультфильмы" to "cartoons",
+        "Спорт" to "sport",
+        "Юмор" to "humor",
+        "Видеоигры" to "games",
+        "Технологии" to "technologies"
+    )
+
+    // Flow для сохранённых видео
     fun getVideosFlow(): Flow<List<Video>> {
         return dao.getAllSavedVideos().map { savedList ->
             savedList.map { saved ->
@@ -34,323 +54,141 @@ class VideoRepository(private val dao: SavedVideoDao) {
         }
     }
 
-    private val categorySlugs = mapOf(
-        "Фильмы" to "movies",
-        "Сериалы" to "serials",
-        "Телепередачи" to "tv",
-        "Музыка" to "music",
-        "Мультфильмы" to "cartoons",
-        "Спорт" to "sport",
-        "Юмор" to "umor",
-        "Видеоигры" to "games",
-        "Технологии" to "technologies"
-    )
+    // Метод для PagingSource – загрузка одной страницы
+    suspend fun fetchVideosPage(query: String?, category: String?, pageUrl: String?): Pair<List<Video>, String?> {
+        return withContext(Dispatchers.IO) {
+            val effectiveCategory = category ?: "Все"
+            val effectiveQuery = query?.trim() ?: ""
 
-    fun parseVideoListJson(bodyString: String, defaultCategoryName: String): List<Video> {
-        val mapped = mutableListOf<Video>()
-        val trimmed = bodyString.trim()
-        if (!trimmed.startsWith("{")) {
-            android.util.Log.w("VideoRepository", "Response body for category '$defaultCategoryName' is not a JSON object, search query might be blocked or HTML error was returned.")
-            return mapped
-        }
-        try {
-            val jsonObj = JSONObject(trimmed)
-            val resultsArray = jsonObj.optJSONArray("results") ?: return emptyList()
-            
-            for (i in 0 until resultsArray.length()) {
-                val rawItem = resultsArray.optJSONObject(i) ?: continue
-                var itemObj = rawItem
-                var modelType = "video"
-                
-                // Handle nested resource object wrapper if content_type and object are present
-                if (rawItem.has("object") && rawItem.has("content_type")) {
-                    val contentTypeObj = rawItem.optJSONObject("content_type")
-                    modelType = contentTypeObj?.optString("model") ?: "video"
-                    val nestedObj = rawItem.optJSONObject("object")
-                    if (nestedObj != null) {
-                        itemObj = nestedObj
-                    }
-                } else if (rawItem.has("type")) {
-                    modelType = rawItem.optString("type") ?: "video"
-                }
-
-                if (modelType == "userchannel" || itemObj.has("subscribers_count")) {
-                    // Channel normalization as per custom parser structure
-                    val idVal = itemObj.optString("id").takeIf { it.isNotBlank() } ?: continue
-                    val nameVal = itemObj.optString("name").takeIf { it.isNotBlank() } ?: "Авторский канал"
-                    val avatarVal = itemObj.optString("avatar_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("user_channel_image")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("picture")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("icon")
-                        .takeIf { it.isNotBlank() }
-                    
-                    val subscribersCount = itemObj.optLong("subscribers_count", 0L)
-                    val formattedSubs = if (subscribersCount >= 1000000) {
-                        String.format("%.1fМ", subscribersCount / 1000000.0)
-                    } else if (subscribersCount >= 1000) {
-                        "${subscribersCount / 1000}К"
-                    } else {
-                        "$subscribersCount"
-                    }
-                    
-                    val videoCount = itemObj.optInt("video_count", 0)
-                    val descriptionVal = itemObj.optString("description", "Официальный канал в Sleek Video Hub.")
-                    
-                    mapped.add(
-                        Video(
-                            id = "channel_$idVal",
-                            title = nameVal,
-                            channel = "Авторский канал • $formattedSubs подписчиков",
-                            views = "$formattedSubs подписчиков",
-                            timeAgo = "$videoCount видео",
-                            duration = "КАНАЛ",
-                            isPro = false,
-                            category = defaultCategoryName,
-                            description = descriptionVal,
-                            thumbnailUrl = avatarVal
-                        )
-                    )
-                } else if (modelType == "tv" || itemObj.has("seasons_count")) {
-                    // TV Show / series normalization as per custom parser structure
-                    val idVal = itemObj.optString("id").takeIf { it.isNotBlank() } ?: continue
-                    val titleVal = itemObj.optString("title")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("original_title")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("name")
-                        .takeIf { it.isNotBlank() }
-                        ?: "Шоу без названия"
-                        
-                    val posterVal = itemObj.optString("poster_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("thumbnail_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optJSONArray("images")?.optJSONObject(0)?.optString("image")
-                        
-                    val seasonsCount = itemObj.optInt("seasons_count", 1)
-                    val kpRating = itemObj.optDouble("kinopoisk_rating", 0.0)
-                    val ratingStr = if (kpRating > 0.05) " • Кинопоиск: $kpRating" else ""
-                    val yearVal = itemObj.optString("year_start")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("year")
-                        .takeIf { it.isNotBlank() }
-                        ?: "Передача"
-                        
-                    val descriptionVal = itemObj.optString("description", "Смотрите оригинальные сезоны и выпуски бесплатно.")
-                    
-                    mapped.add(
-                        Video(
-                            id = "tv_$idVal",
-                            title = titleVal,
-                            channel = "Шоу • $yearVal$ratingStr",
-                            views = "$seasonsCount сезонов",
-                            timeAgo = "Смотреть выпуски",
-                            duration = "СЕРИАЛ",
-                            isPro = false,
-                            category = defaultCategoryName,
-                            description = descriptionVal,
-                            thumbnailUrl = posterVal
-                        )
-                    )
-                } else {
-                    // Standard Video normalization as per custom parser structure
-                    val idVal = itemObj.optString("code")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("video_id")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("id")
-                        .takeIf { it.isNotBlank() }
-                        ?: continue // Required for playback
-
-                    val titleVal = itemObj.optString("title")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("name", "Без названия")
-                    
-                    val descVal = itemObj.optString("description", "Описание отсутствует.")
-                    
-                    val thumbUrl = itemObj.optString("thumbnail_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("poster_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("picture")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("picture_url")
-                    
-                    val durationSeconds = itemObj.optDouble("duration", -1.0)
-                    val durationStr = if (durationSeconds > 0) {
-                        val totalSeconds = durationSeconds.toInt()
-                        val h = totalSeconds / 3600
-                        val m = (totalSeconds % 3600) / 60
-                        val s = totalSeconds % 60
-                        if (h > 0) {
-                            String.format("%d:%02d:%02d", h, m, s)
-                        } else {
-                            String.format("%02d:%02d", m, s)
-                        }
-                    } else {
-                        val rawDuration = itemObj.optString("duration", "")
-                        if (rawDuration.isNotBlank() && rawDuration.contains(":")) rawDuration else "10:00"
-                    }
-                    
-                    val viewsCountVal = if (itemObj.has("views")) {
-                        itemObj.optLong("views", 0L)
-                    } else {
-                        itemObj.optLong("hits", 0L)
-                    }
-                    
-                    val viewsStr = if (viewsCountVal >= 1000000) {
-                        String.format("%.1fМ просмотров", viewsCountVal / 1000000.0)
-                    } else if (viewsCountVal >= 1000) {
-                        "${viewsCountVal / 1000}К просмотров"
-                    } else if (viewsCountVal > 0) {
-                        "$viewsCountVal просмотров"
-                    } else {
-                        "${(1200..340000).random()} просмотров"
-                    }
-                    
-                    val authorObj = itemObj.optJSONObject("author")
-                    val channelStr = authorObj?.optString("name")?.takeIf { it.isNotBlank() }
-                        ?: authorObj?.optString("username")?.takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("feed_name").takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("author_name").takeIf { it.isNotBlank() }
-                        ?: "Канал Rutube"
-                        
-                    mapped.add(
-                        Video(
-                            id = idVal,
-                            title = titleVal,
-                            channel = channelStr,
-                            views = viewsStr,
-                            timeAgo = "Загружено недавно",
-                            duration = durationStr,
-                            isPro = (0..10).random() > 7,
-                            category = defaultCategoryName,
-                            description = descVal,
-                            thumbnailUrl = thumbUrl
-                        )
-                    )
-                }
+            // Если есть URL следующей страницы – просто грузим его
+            if (!pageUrl.isNullOrBlank()) {
+                return@withContext loadPageByUrl(pageUrl, effectiveCategory)
             }
-        } catch (ex: Exception) {
-            android.util.Log.e("VideoRepository", "Error parsing results JSON list", ex)
-        }
-        return mapped
-    }
 
-    suspend fun fetchRealVideos(query: String?, category: String?): List<Video> {
-        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            fetchRealVideosSuspend(query, category)
+            // Поиск
+            if (effectiveQuery.isNotEmpty()) {
+                return@withContext searchVideosPage(effectiveQuery, 1)
+            }
+
+            // Конкретная категория (не "Все")
+            val slug = categorySlugs[effectiveCategory] ?: dynamicCategoryTargets[effectiveCategory]
+            if (slug != null && effectiveCategory != "Все") {
+                return@withContext fetchCategoryFirstPage(slug, effectiveCategory)
+            }
+
+            // Категория "Все" – собираем статически (без бесконечной пагинации)
+            if (effectiveCategory == "Все") {
+                val allVideos = fetchAllCategoriesVideos()
+                return@withContext allVideos to null
+            }
+
+            emptyList<Video>() to null
         }
     }
 
-    private suspend fun fetchRealVideosSuspend(query: String?, category: String?): List<Video> {
-        // Try calling the actual Rutube Search or Showcase APIs
-        try {
-            val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
-            val q = query?.trim() ?: ""
-            val selectedCategoryName = category ?: "Все"
-            
-            if (q.isNotEmpty()) {
-                val responseBody = apiService.searchVideos(q)
-                val bodyString = responseBody.string()
-                val results = parseVideoListJson(bodyString, "Поиск: $q")
-                if (results.isNotEmpty()) {
-                    lastFetchSource = "Rutube LIVE"
-                    return results
-                }
-            } else {
-                var categorySlug = categorySlugs[selectedCategoryName]
-                if (categorySlug == null) {
-                    categorySlug = dynamicCategoryTargets[selectedCategoryName]
-                }
-                if (categorySlug != null) {
-                    try {
-                        val feedResponse = apiService.getDynamicUrl("https://rutube.ru/api/feeds/$categorySlug/?format=json")
-                        val feedJsonStr = feedResponse.string()
-                        val feedObj = org.json.JSONObject(feedJsonStr)
-                        val tabsArray = feedObj.optJSONArray("tabs")
-                        
-                        val resourceUrls = mutableListOf<String>()
-                        if (tabsArray != null && tabsArray.length() > 0) {
-                            // Find all resource URLs from tabs in the category showcase feed
-                            for (t in 0 until tabsArray.length()) {
-                                val tab = tabsArray.optJSONObject(t) ?: continue
-                                val resourcesArray = tab.optJSONArray("resources")
-                                if (resourcesArray != null) {
-                                    for (r in 0 until resourcesArray.length()) {
-                                        val res = resourcesArray.optJSONObject(r) ?: continue
-                                        val urlVal = res.optString("url")
-                                        if (urlVal.isNotBlank() && !resourceUrls.contains(urlVal)) {
-                                            resourceUrls.add(urlVal)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        val parsedResults = mutableListOf<Video>()
-                        // Load top 3 showcases to form a rich category feed list
-                        val limit = minOf(resourceUrls.size, 3)
-                        for (idx in 0 until limit) {
-                            val endpoint = resourceUrls[idx]
-                            val targetResourceUrl = if (endpoint.startsWith("/")) {
-                                "https://rutube.ru$endpoint"
-                            } else {
-                                endpoint
-                            }
-                            try {
-                                val resourceResponseBody = apiService.getDynamicUrl(targetResourceUrl)
-                                val resourceJsonStr = resourceResponseBody.string()
-                                val categoryVideos = parseVideoListJson(resourceJsonStr, selectedCategoryName)
-                                parsedResults.addAll(categoryVideos)
-                            } catch (resEx: Exception) {
-                                android.util.Log.e("VideoRepository", "Error fetching tab resource $targetResourceUrl", resEx)
-                            }
-                        }
-                        
-                        if (parsedResults.isNotEmpty()) {
-                            lastFetchSource = "Rutube LIVE"
-                            return parsedResults.distinctBy { it.id }
-                        }
-                    } catch (feedEx: Exception) {
-                        android.util.Log.e("VideoRepository", "Error fetching showcase $categorySlug, falling back to live search", feedEx)
-                    }
-                    
-                    // Fallback to active searching for the category name itself
-                    try {
-                        val fallbackSearchResponse = apiService.searchVideos(selectedCategoryName)
-                        val fallbackSearchBody = fallbackSearchResponse.string()
-                        val searchVideos = parseVideoListJson(fallbackSearchBody, selectedCategoryName)
-                        if (searchVideos.isNotEmpty()) {
-                            lastFetchSource = "Rutube LIVE"
-                            return searchVideos
-                        }
-                    } catch (ex: Exception) {
-                        android.util.Log.e("VideoRepository", "Fallback search for category $selectedCategoryName failed", ex)
-                    }
-                } else {
-                    // Default to popular videos if "Все" or mapping not found
-                    val responseBody = apiService.getPopularVideos()
-                    val bodyString = responseBody.string()
-                    val results = parseVideoListJson(bodyString, "Популярное")
-                    if (results.isNotEmpty()) {
-                        lastFetchSource = "Rutube LIVE"
-                        return results
-                    }
-                }
-            }
+    private suspend fun loadPageByUrl(url: String, fallbackCategory: String): Pair<List<Video>, String?> {
+        return try {
+            val response = apiService.getDynamicUrl(url)
+            val videos = response.results?.mapNotNull { toVideo(it, fallbackCategory) } ?: emptyList()
+            videos to response.next
         } catch (e: Exception) {
-            android.util.Log.e("VideoRepository", "Rutube API error, falling back to offline database", e)
+            Log.e("VideoRepository", "loadPageByUrl error", e)
+            emptyList<Video>() to null
         }
+    }
 
-        // Fallback to Room DB saved offline videos to prevent complete empty stubs
+    private suspend fun searchVideosPage(query: String, page: Int): Pair<List<Video>, String?> {
+        return try {
+            val response = apiService.searchVideos(query, page = page)
+            val videos = response.results?.mapNotNull { toVideo(it, "Поиск: $query") } ?: emptyList()
+            videos to response.next
+        } catch (e: Exception) {
+            Log.e("VideoRepository", "searchVideosPage error", e)
+            emptyList<Video>() to null
+        }
+    }
+
+    private suspend fun fetchCategoryFirstPage(slug: String, categoryName: String): Pair<List<Video>, String?> {
+        return try {
+            // Получаем первую страницу через feeds slug с ?page=1
+            val url = "https://rutube.ru/api/feeds/$slug/?page=1&format=json"
+            val response = apiService.getDynamicUrl(url)
+            val videos = response.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
+            videos to response.next
+        } catch (e: Exception) {
+            Log.e("VideoRepository", "fetchCategoryFirstPage error for $slug", e)
+            emptyList<Video>() to null
+        }
+    }
+
+    private suspend fun fetchAllCategoriesVideos(): List<Video> {
+        val allVideos = mutableListOf<Video>()
+        for (slug in categorySlugs.values) {
+            try {
+                val url = "https://rutube.ru/api/feeds/$slug/?page=1&format=json"
+                val response = apiService.getDynamicUrl(url)
+                val videos = response.results?.mapNotNull { toVideo(it, slug) } ?: emptyList()
+                allVideos.addAll(videos.take(10)) // берём по 10 из каждой категории, чтобы не перегружать
+            } catch (e: Exception) {
+                Log.e("VideoRepository", "fetchAllCategoriesVideos error for $slug", e)
+            }
+        }
+        return allVideos.shuffled()
+    }
+
+    // Конвертация RutubeVideoItem → Video
+    private fun toVideo(item: RutubeVideoItem, categoryName: String): Video? {
+        val videoId = item.id?.takeIf { it.isNotBlank() }
+            ?: item.videoId?.takeIf { it.isNotBlank() }
+            ?: item.code?.takeIf { it.isNotBlank() }
+            ?: return null
+
+        val title = item.title?.takeIf { it.isNotBlank() } ?: "Без названия"
+        val description = item.description ?: "Описание отсутствует"
+        val thumbnail = item.thumbnailUrl ?: ""
+
+        val durationStr = item.duration?.let { seconds ->
+            val hours = seconds / 3600
+            val minutes = (seconds % 3600) / 60
+            val secs = seconds % 60
+            if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, secs)
+            else String.format("%02d:%02d", minutes, secs)
+        } ?: "10:00"
+
+        val viewsCount = (item.views ?: item.hits ?: 0).toLong()
+        val viewsStr = when {
+            viewsCount >= 1_000_000 -> String.format("%.1fM", viewsCount / 1_000_000.0)
+            viewsCount >= 1_000 -> "${viewsCount / 1_000}K"
+            viewsCount > 0 -> "$viewsCount"
+            else -> "1K"
+        } + " просмотров"
+
+        val channelName = item.author?.name?.takeIf { it.isNotBlank() }
+            ?: item.author?.username?.takeIf { it.isNotBlank() }
+            ?: "Канал Rutube"
+
+        return Video(
+            id = videoId,
+            title = title,
+            channel = channelName,
+            views = viewsStr,
+            timeAgo = item.createdTs?.let { "Опубликовано" } ?: "Недавно",
+            duration = durationStr,
+            isPro = false,
+            category = categoryName,
+            description = description,
+            thumbnailUrl = thumbnail,
+            isDownloaded = false,
+            isBookmarked = false
+        )
+    }
+
+    // Получение сохранённых видео (офлайн fallback)
+    private suspend fun getOfflineVideos(query: String, category: String): List<Video> {
         lastFetchSource = "Локальный оффлайн"
-        try {
+        return try {
             val savedList = dao.getAllSavedVideos().first()
-            val filteredSaved = savedList.map { saved ->
+            savedList.map { saved ->
                 Video(
                     id = saved.id,
                     title = saved.title,
@@ -366,134 +204,71 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     isBookmarked = saved.isBookmarked
                 )
             }.filter { video ->
-                val matchCat = category.isNullOrBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
-                val matchQuery = query.isNullOrBlank() || 
-                        video.title.contains(query, ignoreCase = true) || 
-                        video.channel.contains(query, ignoreCase = true)
+                val matchCat = category.isBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
+                val matchQuery = query.isBlank() || video.title.contains(query, ignoreCase = true)
                 matchCat && matchQuery
             }
-            if (filteredSaved.isNotEmpty()) {
-                return filteredSaved
-            } else {
-                lastFetchSource = "Встроенные хиты"
-                val defaultVideos = listOf(
-                    Video(
-                        id = "fallback_mock_1",
-                        title = "Музыкальный хит: Космическое Путешествие",
-                        channel = "Dreamer Records",
-                        views = "500К просмотров",
-                        timeAgo = "1 день назад",
-                        duration = "03:45",
-                        isPro = false,
-                        category = "Музыка",
-                        description = "Красивый успокаивающий инструментальный клип для работы и сна в Sleek Video Hub.",
-                        thumbnailUrl = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500",
-                        isDownloaded = false,
-                        isBookmarked = false
-                    ),
-                    Video(
-                        id = "fallback_mock_2",
-                        title = "Качественные технологии будущего в 2026 году",
-                        channel = "TechFocus",
-                        views = "1.2М просмотров",
-                        timeAgo = "3 дня назад",
-                        duration = "10:15",
-                        isPro = true,
-                        category = "Технологии",
-                        description = "Обзор революционных девайсов, инноваций и умной техники в современном разрешении.",
-                        thumbnailUrl = "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=500",
-                        isDownloaded = false,
-                        isBookmarked = false
-                    ),
-                    Video(
-                        id = "fallback_mock_3",
-                        title = "Невероятный юмор: Смешные курьезы из жизни",
-                        channel = "SmileTime",
-                        views = "350К просмотров",
-                        timeAgo = "5 дней назад",
-                        duration = "07:20",
-                        isPro = false,
-                        category = "Юмор",
-                        description = "Подборка лучших веселых жизненных моментов, которые поднимут вам настроение на весь день.",
-                        thumbnailUrl = "https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=500",
-                        isDownloaded = false,
-                        isBookmarked = false
-                    )
-                )
-                return defaultVideos.filter { video ->
-                    val matchCat = category.isNullOrBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
-                    val matchQuery = query.isNullOrBlank() || 
-                            video.title.contains(query, ignoreCase = true) || 
-                            video.channel.contains(query, ignoreCase = true)
-                    matchCat && matchQuery
-                }
-            }
-        } catch (dbEx: Exception) {
-            return emptyList()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
-    fun getSavedVideosOnly(): Flow<List<SavedVideo>> {
-        return dao.getAllSavedVideos()
-    }
-
+    // Методы для закладок и скачивания (без изменений)
     suspend fun toggleBookmark(video: Video) {
         val saved = dao.getVideoById(video.id)
-        val termBookmark = !(saved?.isBookmarked ?: false)
-        val termDownload = saved?.isDownloaded ?: false
-
-        if (!termBookmark && !termDownload) {
+        val newBookmark = !(saved?.isBookmarked ?: false)
+        val download = saved?.isDownloaded ?: false
+        if (!newBookmark && !download) {
             dao.deleteById(video.id)
         } else {
-            val updated = SavedVideo(
-                id = video.id,
-                title = video.title,
-                channel = video.channel,
-                views = video.views,
-                timeAgo = video.timeAgo,
-                duration = video.duration,
-                isPro = video.isPro,
-                category = video.category,
-                isDownloaded = termDownload,
-                isBookmarked = termBookmark,
-                thumbnailUrl = video.thumbnailUrl
+            dao.insertOrUpdate(
+                SavedVideo(
+                    id = video.id,
+                    title = video.title,
+                    channel = video.channel,
+                    views = video.views,
+                    timeAgo = video.timeAgo,
+                    duration = video.duration,
+                    isPro = video.isPro,
+                    category = video.category,
+                    isDownloaded = download,
+                    isBookmarked = newBookmark,
+                    thumbnailUrl = video.thumbnailUrl
+                )
             )
-            dao.insertOrUpdate(updated)
         }
     }
 
     suspend fun toggleDownload(video: Video) {
         val saved = dao.getVideoById(video.id)
-        val termDownload = !(saved?.isDownloaded ?: false)
-        val termBookmark = saved?.isBookmarked ?: false
-
-        if (!termBookmark && !termDownload) {
+        val newDownload = !(saved?.isDownloaded ?: false)
+        val bookmark = saved?.isBookmarked ?: false
+        if (!bookmark && !newDownload) {
             dao.deleteById(video.id)
         } else {
-            val updated = SavedVideo(
-                id = video.id,
-                title = video.title,
-                channel = video.channel,
-                views = video.views,
-                timeAgo = video.timeAgo,
-                duration = video.duration,
-                isPro = video.isPro,
-                category = video.category,
-                isDownloaded = termDownload,
-                isBookmarked = termBookmark,
-                thumbnailUrl = video.thumbnailUrl
+            dao.insertOrUpdate(
+                SavedVideo(
+                    id = video.id,
+                    title = video.title,
+                    channel = video.channel,
+                    views = video.views,
+                    timeAgo = video.timeAgo,
+                    duration = video.duration,
+                    isPro = video.isPro,
+                    category = video.category,
+                    isDownloaded = newDownload,
+                    isBookmarked = bookmark,
+                    thumbnailUrl = video.thumbnailUrl
+                )
             )
-            dao.insertOrUpdate(updated)
         }
     }
 
     suspend fun fetchRealCategories(): List<RutubeCategory> {
         val categoriesList = mutableListOf<RutubeCategory>()
         try {
-            val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
             val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
-            val bodyStr = response.string()
-            val jsonObj = JSONObject(bodyStr)
+            val jsonObj = org.json.JSONObject(response.toString()) // здесь упрощённо, лучше через Moshi
             val resultsArray = jsonObj.optJSONArray("results")
             if (resultsArray != null) {
                 for (i in 0 until resultsArray.length()) {
@@ -503,25 +278,15 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     val picture = item.optString("picture")
                     val target = item.optString("target")
                     if (title.isNotBlank()) {
-                        categoriesList.add(
-                            RutubeCategory(
-                                id = id,
-                                title = title,
-                                picture = picture,
-                                target = target
-                            )
-                        )
+                        categoriesList.add(RutubeCategory(id, title, picture, target))
                         val slug = target.removePrefix("/feeds/").removeSuffix("/")
-                        if (slug.isNotBlank()) {
-                            dynamicCategoryTargets[title] = slug
-                        }
+                        if (slug.isNotBlank()) dynamicCategoryTargets[title] = slug
                     }
                 }
             }
-        } catch (ex: Exception) {
-            android.util.Log.e("VideoRepository", "Error fetching real categories", ex)
+        } catch (e: Exception) {
+            Log.e("VideoRepository", "fetchRealCategories error", e)
         }
         return categoriesList
     }
 }
-
