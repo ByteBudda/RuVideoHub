@@ -324,6 +324,72 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteDownload(video: Video) {
+        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val targetFile = File(downloadFolder, "${video.id}.mp4")
+        viewModelScope.launch {
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            if (video.isDownloaded) {
+                repository.toggleDownload(video)
+                if (_currentSelectedVideo.value?.id == video.id) {
+                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
+                }
+            }
+        }
+    }
+
+    fun saveToDevice(video: Video, context: android.content.Context, onResult: (Boolean, String) -> Unit) {
+        val inputFolder = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val inputFile = File(inputFolder, "${video.id}.mp4")
+        if (!inputFile.exists()) {
+            onResult(false, "Сначала скачайте видео в приложение.")
+            return
+        }
+
+        try {
+            val resolver = context.contentResolver
+            val contentValues = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "${video.title}.mp4".replace("[\\\\/:*?\"<>|]".toRegex(), "_"))
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                }
+            }
+
+            var uri: android.net.Uri? = null
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            }
+
+            if (uri != null) {
+                resolver.openOutputStream(uri)?.use { outputStream ->
+                    inputFile.inputStream().use { inputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                onResult(true, "Файл успешно сохранен в папку 'Загрузки' устройства!")
+            } else {
+                // Fallback for older Android versions
+                val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                if (!publicDownloads.exists()) {
+                    publicDownloads.mkdirs()
+                }
+                val outputFile = File(publicDownloads, "${video.title}.mp4".replace("[\\\\/:*?\"<>|]".toRegex(), "_"))
+                inputFile.inputStream().use { inputStream ->
+                    outputFile.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                onResult(true, "Файл успешно сохранен в папку 'Загрузки': ${outputFile.name}")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("VideoViewModel", "Error saving file to public downloads", e)
+            onResult(false, "Ошибка сохранения: ${e.localizedMessage ?: e.message}")
+        }
+    }
+
     private fun startYtDlpDownload(video: Video) {
         val id = video.id
         viewModelScope.launch(Dispatchers.IO) {

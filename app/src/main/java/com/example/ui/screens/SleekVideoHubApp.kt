@@ -1768,155 +1768,335 @@ fun SleekPlayerDetailOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val progress by viewModel.playProgress.collectAsStateWithLifecycle()
     val allVideos by viewModel.allVideos.collectAsStateWithLifecycle()
 
     val formattedElapsed = viewModel.getFormattedElapsedTime(video.duration, progress)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // Player header bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player")) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Закрыть плеер",
-                    tint = MaterialTheme.colorScheme.onBackground
-                )
+    var isFullscreen by remember { mutableStateOf(false) }
+    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
+    var showDownloadOptionsDialog by remember { mutableStateOf(false) }
+
+    // Immersive mode orientation and system bar control
+    val activity = context as? android.app.Activity
+    LaunchedEffect(isFullscreen) {
+        val window = activity?.window
+        if (isFullscreen) {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            window?.let {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    it.insetsController?.hide(
+                        android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.decorView.systemUiVisibility = (
+                        android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                }
             }
-
-            Text(
-                text = "${video.category} • Воспроизведение",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Primary,
-                letterSpacing = 0.5.sp
-            )
-
-            Box(modifier = Modifier.size(24.dp)) // empty spacer for symmetry
+        } else {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            window?.let {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    it.insetsController?.show(
+                        android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                }
+            }
         }
+    }
 
-        // Active Player Canvas Render Box (16:9 Aspect ratio)
+    DisposableEffect(Unit) {
+        onDispose {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            val window = activity?.window
+            window?.let {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    it.insetsController?.show(
+                        android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                }
+            }
+        }
+    }
+
+    if (isFullscreen) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .fillMaxSize()
                 .background(Color.Black)
         ) {
-            if (isPlaying) {
-                RutubeVideoPlayer(
-                    videoId = video.id,
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                VideoThumbnail(
-                    id = video.id,
-                    duration = video.duration,
-                    thumbnailUrl = video.thumbnailUrl,
-                    hasPlayOverlay = true,
-                    isPlaying = false,
-                    onPlayClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            RutubeVideoPlayer(
+                videoId = video.id,
+                viewModel = viewModel,
+                aspectMode = selectedAspectRatio,
+                isFullscreen = true,
+                onToggleFullscreen = { isFullscreen = !isFullscreen },
+                onChangeAspectRatio = { selectedAspectRatio = it },
+                onShare = { shareVideo(context, video) },
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Detail descriptions and channels metadata
+        androidx.activity.compose.BackHandler {
+            isFullscreen = false
+        }
+    } else {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Title descriptor
-            Text(
-                text = video.title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                lineHeight = 22.sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            // Stats info
-            Text(
-                text = "${video.channel} • ${video.views} • ${video.timeAgo}",
-                fontSize = 11.sp,
-                color = GreyText,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-            )
-
-            // Direct active action layout pills
+            // Player header bar
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Download action state button
-                Button(
-                    onClick = { viewModel.toggleDownload(video) },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (video.isDownloaded) Color(0xFF10B981) else PrimaryContainer,
-                        contentColor = if (video.isDownloaded) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .testTag("player_action_download")
-                ) {
+                IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player")) {
                     Icon(
-                        imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (video.isDownloaded) "Скачано" else "Скачать",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Закрыть плеер",
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
-                // Bookmark action state button
-                Button(
-                    onClick = { viewModel.toggleBookmark(video) },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (video.isBookmarked) Primary else SurfaceVariant,
-                        contentColor = if (video.isBookmarked) Color.White else GreyText
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .testTag("player_action_bookmark")
-                ) {
-                    Icon(
-                        imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                Text(
+                    text = "${video.category} • Воспроизведение",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Primary,
+                    letterSpacing = 0.5.sp
+                )
+
+                Box(modifier = Modifier.size(24.dp)) // empty spacer for symmetry
+            }
+
+            // Active Player Canvas Render Box (16:9 Aspect ratio)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(Color.Black)
+            ) {
+                if (isPlaying) {
+                    RutubeVideoPlayer(
+                        videoId = video.id,
+                        viewModel = viewModel,
+                        aspectMode = selectedAspectRatio,
+                        isFullscreen = false,
+                        onToggleFullscreen = { isFullscreen = !isFullscreen },
+                        onChangeAspectRatio = { selectedAspectRatio = it },
+                        onShare = { shareVideo(context, video) },
+                        modifier = Modifier.fillMaxSize()
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (video.isBookmarked) "Сохранено" else "В закладки",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                } else {
+                    VideoThumbnail(
+                        id = video.id,
+                        duration = video.duration,
+                        thumbnailUrl = video.thumbnailUrl,
+                        hasPlayOverlay = true,
+                        isPlaying = false,
+                        onPlayClick = { viewModel.togglePlayPause() },
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Detail descriptions and channels metadata
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                // Title descriptor
+                Text(
+                    text = video.title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                // Stats info
+                Text(
+                    text = "${video.channel} • ${video.views} • ${video.timeAgo}",
+                    fontSize = 11.sp,
+                    color = GreyText,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                )
+
+                // Direct active action layout pills
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Download action state button
+                    Button(
+                        onClick = {
+                            if (video.isDownloaded) {
+                                showDownloadOptionsDialog = true
+                            } else {
+                                viewModel.toggleDownload(video)
+                            }
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (video.isDownloaded) Color(0xFF10B981) else PrimaryContainer,
+                            contentColor = if (video.isDownloaded) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("player_action_download")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (video.isDownloaded) "Скачано" else "Скачать",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Bookmark action state button
+                    Button(
+                        onClick = { viewModel.toggleBookmark(video) },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (video.isBookmarked) Primary else SurfaceVariant,
+                            contentColor = if (video.isBookmarked) Color.White else GreyText
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("player_action_bookmark")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (video.isBookmarked) "Сохранено" else "В закладки",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Share action state button
+                    Button(
+                        onClick = { shareVideo(context, video) },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SurfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("player_action_share")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Поделиться",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Поделиться",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Download options Alert Dialog
+                if (showDownloadOptionsDialog) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showDownloadOptionsDialog = false },
+                        title = {
+                            Text(
+                                "Управление скачанным файлом",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Text(
+                                "Файл сохранен во внутреннем медиа-кэше приложения. Вы можете экспортировать его в папку 'Загрузки' вашего устройства или очистить кэш.",
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                color = GreyText
+                            )
+                        },
+                        confirmButton = {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        showDownloadOptionsDialog = false
+                                        viewModel.saveToDevice(video, context) { success, message ->
+                                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Сохранить на устройство", fontSize = 11.sp)
+                                }
+
+                                androidx.compose.material3.TextButton(
+                                    onClick = {
+                                        showDownloadOptionsDialog = false
+                                        viewModel.deleteDownload(video)
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Удалить из кэша", fontSize = 11.sp)
+                                }
+
+                                androidx.compose.material3.TextButton(
+                                    onClick = { showDownloadOptionsDialog = false },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Отмена", fontSize = 11.sp)
+                                }
+                            }
+                        },
+                        dismissButton = {}
+                    )
+                }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -2109,6 +2289,7 @@ fun SleekPlayerDetailOverlay(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -2161,40 +2342,37 @@ fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
 fun RutubeVideoPlayer(
     videoId: String,
     viewModel: VideoViewModel,
+    aspectMode: VlcAspectRatio = VlcAspectRatio.FIT,
+    isFullscreen: Boolean = false,
+    onToggleFullscreen: () -> Unit = {},
+    onChangeAspectRatio: (VlcAspectRatio) -> Unit = {},
+    onShare: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val downloadFolder = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
     val offlineFile = java.io.File(downloadFolder, "$videoId.mp4")
 
-    if (offlineFile.exists()) {
-        AndroidView(
-            factory = { ctx ->
-                android.widget.VideoView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    val mediaController = android.widget.MediaController(ctx)
-                    mediaController.setAnchorView(this)
-                    setMediaController(mediaController)
-                    setVideoPath(offlineFile.absolutePath)
-                    start()
-                }
-            },
-            update = { videoView ->
-                if (!videoView.isPlaying) {
-                    videoView.start()
-                }
-            },
-            modifier = modifier
-        )
-    } else {
-        var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
-        var isLoading by remember(videoId) { mutableStateOf(true) }
-        var loadError by remember(videoId) { mutableStateOf<String?>(null) }
+    var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
+    var isLoading by remember(videoId) { mutableStateOf(true) }
+    var loadError by remember(videoId) { mutableStateOf<String?>(null) }
 
-        LaunchedEffect(videoId) {
+    // Position & duration states for custom controls
+    var videoViewRef by remember { mutableStateOf<VlcVideoView?>(null) }
+    var isPlayingState by remember { mutableStateOf(true) }
+    var currentPos by remember { mutableLongStateOf(0L) }
+    var totalDuration by remember { mutableLongStateOf(0L) }
+    var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var controlsVisible by remember { mutableStateOf(true) }
+
+    // HUD message for aspect ratio cycle
+    var hudMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(videoId) {
+        if (offlineFile.exists()) {
+            hlsUrl = offlineFile.absolutePath
+            isLoading = false
+        } else {
             isLoading = true
             loadError = null
             val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId)
@@ -2206,95 +2384,534 @@ fun RutubeVideoPlayer(
                 isLoading = false
             }
         }
+    }
 
-        Box(
-            modifier = modifier.background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isLoading) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = Primary,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Получение видеопотока...",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            } else if (loadError != null) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Ошибка",
-                        tint = Color.Red,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = loadError ?: "Ошибка воспроизведения",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            isLoading = true
-                            loadError = null
-                            hlsUrl = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Повторить", fontSize = 11.sp)
-                    }
-                }
-            } else if (hlsUrl != null) {
-                AndroidView(
-                    factory = { ctx ->
-                        android.widget.VideoView(ctx).apply {
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            val mediaController = android.widget.MediaController(ctx)
-                            mediaController.setAnchorView(this)
-                            setMediaController(mediaController)
-                            setVideoURI(android.net.Uri.parse(hlsUrl))
-                            
-                            setOnPreparedListener { mediaPlayer ->
-                                mediaPlayer.isLooping = false
-                                mediaPlayer.setVideoScalingMode(android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
-                                start()
-                            }
-                            
-                            setOnErrorListener { _, _, _ ->
-                                loadError = "Ошибка медиаплеера при воспроизведении потока."
-                                true
-                            }
-                        }
-                    },
-                    update = { videoView ->
-                        // update call if url changes
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+    // Auto-hide controls after 4 seconds of inactivity
+    LaunchedEffect(controlsVisible, lastInteractionTime) {
+        if (controlsVisible) {
+            kotlinx.coroutines.delay(4000)
+            if (System.currentTimeMillis() - lastInteractionTime >= 4000) {
+                controlsVisible = false
             }
         }
     }
+
+    // Clear HUD message after 1.5 seconds
+    LaunchedEffect(hudMessage) {
+        if (hudMessage != null) {
+            kotlinx.coroutines.delay(1500)
+            hudMessage = null
+        }
+    }
+
+    // Progress update loop
+    LaunchedEffect(videoViewRef, isPlayingState) {
+        while (isPlayingState && videoViewRef != null) {
+            videoViewRef?.let { view ->
+                if (view.isPlaying) {
+                    currentPos = view.currentPosition.toLong()
+                    val dur = view.duration.toLong()
+                    if (dur > 0L) {
+                        totalDuration = dur
+                    }
+                }
+            }
+            kotlinx.coroutines.delay(250)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .background(Color.Black)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) {
+                lastInteractionTime = System.currentTimeMillis()
+                controlsVisible = !controlsVisible
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (isLoading) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator(
+                    color = Primary,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Получение видеопотока...",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        } else if (loadError != null) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Ошибка",
+                    tint = Color.Red,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = loadError ?: "Ошибка воспроизведения",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 15.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        isLoading = true
+                        loadError = null
+                        hlsUrl = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Повторить", fontSize = 11.sp)
+                }
+            }
+        } else if (hlsUrl != null) {
+            // Video View Container
+            AndroidView(
+                factory = { ctx ->
+                    VlcVideoView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        this.aspectMode = aspectMode
+                        
+                        // Check if online or local URI
+                        if (offlineFile.exists()) {
+                            setVideoPath(offlineFile.absolutePath)
+                        } else {
+                            setVideoURI(android.net.Uri.parse(hlsUrl))
+                        }
+                        
+                        setOnPreparedListener { mediaPlayer ->
+                            updateVideoSize(mediaPlayer.videoWidth, mediaPlayer.videoHeight)
+                            mediaPlayer.isLooping = false
+                            totalDuration = mediaPlayer.duration.toLong()
+                            start()
+                        }
+                        
+                        setOnErrorListener { _, _, _ ->
+                            loadError = "Ошибка медиаплеера при воспроизведении потока."
+                            true
+                        }
+                        videoViewRef = this
+                    }
+                },
+                update = { videoView ->
+                    if (videoView.aspectMode != aspectMode) {
+                        videoView.aspectMode = aspectMode
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Transparent overlay for Controls
+            androidx.compose.animation.AnimatedVisibility(
+                visible = controlsVisible,
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            lastInteractionTime = System.currentTimeMillis()
+                            controlsVisible = false
+                        }
+                ) {
+                    // Top Bar Controls
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent)
+                                )
+                            )
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (isFullscreen) {
+                                IconButton(
+                                    onClick = {
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        onToggleFullscreen()
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowBack,
+                                        contentDescription = "Выйти из полного экрана",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (offlineFile.exists()) "Локальный файл • Offline" else "Rutube Онлайн-превью",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Right actions (Aspect ratio & Share)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Cycle Aspect Ratio option like VLC
+                            Button(
+                                onClick = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    val nextMode = aspectMode.next()
+                                    hudMessage = "Соотношение: ${nextMode.displayName}"
+                                    onChangeAspectRatio(nextMode)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(aspectMode.displayName, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            // Share video link
+                            IconButton(
+                                onClick = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    onShare()
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Поделиться",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Center playback buttons (Rewind, Play/Pause, Forward)
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) {}, // consume clicks to avoid hiding controls
+                        horizontalArrangement = Arrangement.spacedBy(28.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                videoViewRef?.let { view ->
+                                    val newPos = (view.currentPosition - 10000).coerceAtLeast(0)
+                                    view.seekTo(newPos.toInt())
+                                    currentPos = newPos.toLong()
+                                }
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FastRewind,
+                                contentDescription = "Назад 10с",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                videoViewRef?.let { view ->
+                                    if (view.isPlaying) {
+                                        view.pause()
+                                        isPlayingState = false
+                                    } else {
+                                        view.start()
+                                        isPlayingState = true
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(Primary.copy(alpha = 0.9f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = if (isPlayingState) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = "Пауза/Пуск",
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                videoViewRef?.let { view ->
+                                    val newPos = (view.currentPosition + 10000).coerceAtMost(view.duration)
+                                    view.seekTo(newPos.toInt())
+                                    currentPos = newPos.toLong()
+                                }
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FastForward,
+                                contentDescription = "Вперед 10с",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    // Bottom Bar Controls with Slider
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                                )
+                            )
+                            .padding(bottom = if (isFullscreen) 16.dp else 6.dp)
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) {} // Consume touch events
+                    ) {
+                        // Progress Slider Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = formatMillis(currentPos),
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            androidx.compose.material3.Slider(
+                                value = currentPos.toFloat().coerceIn(0f, totalDuration.toFloat().coerceAtLeast(1f)),
+                                onValueChange = { newValue ->
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    currentPos = newValue.toLong()
+                                    videoViewRef?.seekTo(newValue.toInt())
+                                },
+                                valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
+                                colors = androidx.compose.material3.SliderDefaults.colors(
+                                    thumbColor = Primary,
+                                    activeTrackColor = Primary,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(28.dp)
+                            )
+
+                            Text(
+                                text = formatMillis(totalDuration),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            // Fullscreen Toggle action
+                            IconButton(
+                                onClick = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    onToggleFullscreen()
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isFullscreen) Icons.Default.Close else Icons.Default.AspectRatio,
+                                    contentDescription = "Во весь экран",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // HUD notification for Aspect Ratio cycles
+            hudMessage?.let { msg ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.75f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(text = msg, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+// VLC-style aspect ratios enum
+enum class VlcAspectRatio(val displayName: String) {
+    FIT("Вписать"),
+    FILL("Заполнить"),
+    STRETCH("Растянуть"),
+    RATIO_16_9("16:9"),
+    RATIO_4_3("4:3");
+
+    fun next(): VlcAspectRatio {
+        val entries = values()
+        return entries[(ordinal + 1) % entries.size]
+    }
+}
+
+// Custom VideoView subclass to force measurements according to dynamic scaling configurations
+class VlcVideoView(context: android.content.Context) : android.widget.VideoView(context) {
+    var aspectMode: VlcAspectRatio = VlcAspectRatio.FIT
+        set(value) {
+            field = value
+            requestLayout()
+        }
+    private var vWidth: Int = 0
+    private var vHeight: Int = 0
+
+    fun updateVideoSize(w: Int, h: Int) {
+        vWidth = w
+        vHeight = h
+        requestLayout()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val defaultWidth = getDefaultSize(vWidth, widthMeasureSpec)
+        val defaultHeight = getDefaultSize(vHeight, heightMeasureSpec)
+        if (vWidth == 0 || vHeight == 0) {
+            setMeasuredDimension(defaultWidth, defaultHeight)
+            return
+        }
+
+        when (aspectMode) {
+            VlcAspectRatio.STRETCH -> {
+                // Ignore aspects completely, fill layout
+                setMeasuredDimension(defaultWidth, defaultHeight)
+            }
+            VlcAspectRatio.FIT -> {
+                // Default fit-to-inside logic
+                var width = vWidth
+                var height = vHeight
+                val viewWidth = defaultWidth
+                val viewHeight = defaultHeight
+
+                if (width * viewHeight < viewWidth * height) {
+                    width = viewWidth * height / viewHeight
+                    setMeasuredDimension(width, viewHeight)
+                } else if (width * viewHeight > viewWidth * height) {
+                    height = viewWidth * height / width
+                    setMeasuredDimension(viewWidth, height)
+                } else {
+                    setMeasuredDimension(viewWidth, viewHeight)
+                }
+            }
+            VlcAspectRatio.FILL -> {
+                // Zoom-crop center fill
+                val viewWidth = defaultWidth
+                val viewHeight = defaultHeight
+                val scaleX = viewWidth.toFloat() / vWidth.toFloat()
+                val scaleY = viewHeight.toFloat() / vHeight.toFloat()
+                val scale = Math.max(scaleX, scaleY)
+                setMeasuredDimension((vWidth * scale).toInt(), (vHeight * scale).toInt())
+            }
+            VlcAspectRatio.RATIO_16_9 -> {
+                val viewWidth = defaultWidth
+                val viewHeight = defaultHeight
+                val targetRatio = 16f / 9f
+                val containerRatio = viewWidth.toFloat() / viewHeight.toFloat()
+                if (containerRatio > targetRatio) {
+                    setMeasuredDimension((viewHeight * targetRatio).toInt(), viewHeight)
+                } else {
+                    setMeasuredDimension(viewWidth, (viewWidth / targetRatio).toInt())
+                }
+            }
+            VlcAspectRatio.RATIO_4_3 -> {
+                val viewWidth = defaultWidth
+                val viewHeight = defaultHeight
+                val targetRatio = 4f / 3f
+                val containerRatio = viewWidth.toFloat() / viewHeight.toFloat()
+                if (containerRatio > targetRatio) {
+                    setMeasuredDimension((viewHeight * targetRatio).toInt(), viewHeight)
+                } else {
+                    setMeasuredDimension(viewWidth, (viewWidth / targetRatio).toInt())
+                }
+            }
+        }
+    }
+}
+
+// Share Video Intent launcher
+fun shareVideo(context: android.content.Context, video: Video) {
+    val sendIntent = android.content.Intent().apply {
+        action = android.content.Intent.ACTION_SEND
+        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Rutube Hub: \"${video.title}\"\n\nПосмотреть на Rutube: https://rutube.ru/video/${video.id}/")
+        type = "text/plain"
+    }
+    val shareIntent = android.content.Intent.createChooser(sendIntent, "Поделиться видео")
+    context.startActivity(shareIntent)
+}
+
+// Format duration helper
+fun formatMillis(ms: Long): String {
+    val totalSec = ms / 1000
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return String.format("%02d:%02d", min, sec)
 }
 
