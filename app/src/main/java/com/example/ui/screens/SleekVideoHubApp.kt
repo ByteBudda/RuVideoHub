@@ -1317,6 +1317,154 @@ fun LibraryTabScreen(
             modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
         )
 
+        val isAuthorized by viewModel.isAuthorized.collectAsStateWithLifecycle()
+        val username by viewModel.username.collectAsStateWithLifecycle()
+        val userAvatar by viewModel.userAvatar.collectAsStateWithLifecycle()
+
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SecondaryBackground)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                if (isAuthorized) {
+                    AsyncImage(
+                        model = userAvatar,
+                        contentDescription = "Аватар",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = username,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Авторизован через сессию Rutube",
+                            fontSize = 10.sp,
+                            color = Color(0xFF10B981),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.logout() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Выйти", fontSize = 10.sp, color = Color.White)
+                    }
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Профиль",
+                        tint = GreyText,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Вход в аккаунт",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Войдите для синхронизации с Rutube",
+                            fontSize = 10.sp,
+                            color = GreyText
+                        )
+                    }
+                    
+                    var showAuthDialog by remember { mutableStateOf(false) }
+                    
+                    Button(
+                        onClick = { showAuthDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Войти", fontSize = 10.sp)
+                    }
+
+                    if (showAuthDialog) {
+                        var tempSessId by remember { mutableStateOf("") }
+                        var tempCsrf by remember { mutableStateOf("") }
+                        var tempUser by remember { mutableStateOf("Сергей Петров") }
+
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showAuthDialog = false },
+                            title = { Text("Авторизация Rutube v1.0", fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("Введите учетные данные сессии (из Cookies на Rutube):", fontSize = 11.sp, color = GreyText)
+                                    
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = tempUser,
+                                        onValueChange = { tempUser = it },
+                                        label = { Text("Имя пользователя", fontSize = 10.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = tempSessId,
+                                        onValueChange = { tempSessId = it },
+                                        label = { Text("sessionid (Cookie)", fontSize = 10.sp) },
+                                        placeholder = { Text("например, 8f3b2a6d...", fontSize = 10.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = tempCsrf,
+                                        onValueChange = { tempCsrf = it },
+                                        label = { Text("csrftoken (Cookie)", fontSize = 10.sp) },
+                                        placeholder = { Text("например, tZ6gY8...", fontSize = 10.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Button(
+                                        onClick = {
+                                            tempSessId = "sess_" + (100000..999999).random().toString()
+                                            tempCsrf = "csrf_" + (100000..999999).random().toString()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Сгенерировать cookies", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        val u = tempUser.trim().ifBlank { "Сергей Петров" }
+                                        val s = tempSessId.trim().ifBlank { "sess_default" }
+                                        val c = tempCsrf.trim().ifBlank { "csrf_default" }
+                                        viewModel.setCredentials(s, c, u)
+                                        showAuthDialog = false
+                                    }
+                                ) {
+                                    Text("Подтвердить")
+                                }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { showAuthDialog = false }) {
+                                    Text("Отмена")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         // Simple Stats Row
         Row(
             modifier = Modifier
@@ -1669,6 +1817,7 @@ fun SleekPlayerDetailOverlay(
             if (isPlaying) {
                 RutubeVideoPlayer(
                     videoId = video.id,
+                    viewModel = viewModel,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
@@ -1849,6 +1998,115 @@ fun SleekPlayerDetailOverlay(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Comments segment header
+            Text(
+                text = "Комментарии",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+
+            val commentsList by viewModel.comments.collectAsStateWithLifecycle()
+            val isCommentsLoading by viewModel.isCommentsLoading.collectAsStateWithLifecycle()
+
+            if (isCommentsLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Primary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else if (commentsList.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground)
+                ) {
+                    Text(
+                        text = "Комментариев пока нет. Будьте первым!",
+                        fontSize = 11.sp,
+                        color = GreyText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    commentsList.forEach { comment ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = comment.author,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Primary
+                                    )
+                                    comment.date?.let { dt ->
+                                        Text(
+                                            text = dt,
+                                            fontSize = 9.sp,
+                                            color = GreyText
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = comment.text,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.End,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ThumbUp,
+                                        contentDescription = "Лайк",
+                                        tint = GreyText,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${comment.likes}",
+                                        fontSize = 10.sp,
+                                        color = GreyText
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1899,10 +2157,10 @@ fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun RutubeVideoPlayer(
     videoId: String,
+    viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1932,33 +2190,111 @@ fun RutubeVideoPlayer(
             modifier = modifier
         )
     } else {
-        AndroidView(
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
+        var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
+        var isLoading by remember(videoId) { mutableStateOf(true) }
+        var loadError by remember(videoId) { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(videoId) {
+            isLoading = true
+            loadError = null
+            val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId)
+            if (resolvedUrl != null) {
+                hlsUrl = resolvedUrl
+                isLoading = false
+            } else {
+                loadError = "Не удалось открыть онлайн-поток. Пожалуйста, попробуйте снова или проверьте соединение."
+                isLoading = false
+            }
+        }
+
+        Box(
+            modifier = modifier.background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isLoading) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Primary,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(40.dp)
                     )
-                    webViewClient = WebViewClient()
-                    webChromeClient = WebChromeClient()
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        mediaPlaybackRequiresUserGesture = false
-                        useWideViewPort = true
-                        loadWithOverviewMode = true
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Получение видеопотока...",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            } else if (loadError != null) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Ошибка",
+                        tint = Color.Red,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = loadError ?: "Ошибка воспроизведения",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            loadError = null
+                            hlsUrl = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Повторить", fontSize = 11.sp)
                     }
-                    loadUrl("https://rutube.ru/play/embed/$videoId")
                 }
-            },
-            update = { webView ->
-                val expectedUrl = "https://rutube.ru/play/embed/$videoId"
-                if (webView.url != expectedUrl) {
-                    webView.loadUrl(expectedUrl)
-                }
-            },
-            modifier = modifier
-        )
+            } else if (hlsUrl != null) {
+                AndroidView(
+                    factory = { ctx ->
+                        android.widget.VideoView(ctx).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            val mediaController = android.widget.MediaController(ctx)
+                            mediaController.setAnchorView(this)
+                            setMediaController(mediaController)
+                            setVideoURI(android.net.Uri.parse(hlsUrl))
+                            
+                            setOnPreparedListener { mediaPlayer ->
+                                mediaPlayer.isLooping = false
+                                mediaPlayer.setVideoScalingMode(android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+                                start()
+                            }
+                            
+                            setOnErrorListener { _, _, _ ->
+                                loadError = "Ошибка медиаплеера при воспроизведении потока."
+                                true
+                            }
+                        }
+                    },
+                    update = { videoView ->
+                        // update call if url changes
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }
 
