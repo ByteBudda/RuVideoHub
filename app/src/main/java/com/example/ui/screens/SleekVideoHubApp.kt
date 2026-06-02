@@ -1104,6 +1104,7 @@ fun DownloadsTabScreen(
     modifier: Modifier = Modifier
 ) {
     val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
+    val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -1138,14 +1139,178 @@ fun DownloadsTabScreen(
             }
         }
 
-        if (downloadedVideos.isEmpty()) {
+        // Active downloads section
+        if (activeDownloads.isNotEmpty()) {
+            Text(
+                text = "Активные загрузки (yt-dlp CLI)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            activeDownloads.values.forEach { dl ->
+                var isTerminalExpanded by remember { mutableStateOf(false) }
+
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                    border = BorderStroke(1.dp, SurfaceVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            VideoThumbnail(
+                                id = dl.id,
+                                duration = "",
+                                thumbnailUrl = dl.thumbnailUrl,
+                                modifier = Modifier
+                                    .width(70.dp)
+                                    .height(42.dp)
+                            )
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = dl.title,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val badgeColor = when (dl.status) {
+                                        "Extracting" -> Color(0xFFF59E0B)
+                                        "Downloading" -> Color(0xFF3B82F6)
+                                        "Merging" -> Color(0xFF8B5CF6)
+                                        "Completed" -> Color(0xFF10B981)
+                                        "Failed" -> Color(0xFFEF4444)
+                                        else -> Color.Gray
+                                    }
+                                    val statusText = when (dl.status) {
+                                        "Queued" -> "В очереди"
+                                        "Extracting" -> "Анализ линков"
+                                        "Downloading" -> "Скачивание"
+                                        "Merging" -> "Сборка FFmpeg"
+                                        "Completed" -> "Успешно"
+                                        "Failed" -> "Ошибка"
+                                        else -> dl.status
+                                    }
+
+                                    Surface(
+                                        color = badgeColor.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = statusText,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeColor,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+
+                                    if (dl.status == "Downloading") {
+                                        Text(
+                                            text = "${dl.speed} • ETA ${dl.eta}",
+                                            fontSize = 9.sp,
+                                            color = GreyText
+                                        )
+                                    }
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { isTerminalExpanded = !isTerminalExpanded },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Code,
+                                    contentDescription = "Терминал",
+                                    tint = if (isTerminalExpanded) MaterialTheme.colorScheme.primary else GreyText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        if (dl.status != "Completed" && dl.status != "Failed") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = { dl.progress },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(4.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = SurfaceVariant
+                                )
+                                Text(
+                                    text = "${(dl.progress * 100).toInt()}%",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+
+                        if (isTerminalExpanded) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Card(
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                                border = BorderStroke(1.dp, Color(0xFF334155)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val scrollState = rememberScrollState()
+                                LaunchedEffect(dl.logs.size) {
+                                    scrollState.animateScrollTo(scrollState.maxValue)
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 145.dp)
+                                        .verticalScroll(scrollState)
+                                        .padding(8.dp)
+                                ) {
+                                    dl.logs.forEach { line ->
+                                        Text(
+                                            text = line,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontSize = 9.sp,
+                                            color = if (line.contains("[error]")) Color(0xFFF87171) else Color(0xFF34D399),
+                                            lineHeight = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (downloadedVideos.isEmpty() && activeDownloads.isEmpty()) {
             EmptyStateContainer(
                 title = "Нет загруженных видео",
-                hint = "Вы можете скачать любой медиаконтент, нажав на кнопку загрузки в ленте рекомендуемого. Они будут доступны без доступа у сети!"
+                hint = "Вы можете скачать любой медиаконтент, нажав на кнопку загрузки в плеере. Все загрузки выполняются через ядро yt-dlp с высокой скоростью!"
             )
-        } else {
+        } else if (downloadedVideos.isNotEmpty()) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
@@ -1894,32 +2059,60 @@ fun RutubeVideoPlayer(
     videoId: String,
     modifier: Modifier = Modifier
 ) {
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                webViewClient = WebViewClient()
-                webChromeClient = WebChromeClient()
-                settings.apply {
-                    javaScriptEnabled = true
-                    domStorageEnabled = true
-                    mediaPlaybackRequiresUserGesture = false
-                    useWideViewPort = true
-                    loadWithOverviewMode = true
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val downloadFolder = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+    val offlineFile = java.io.File(downloadFolder, "$videoId.mp4")
+
+    if (offlineFile.exists()) {
+        AndroidView(
+            factory = { ctx ->
+                android.widget.VideoView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    val mediaController = android.widget.MediaController(ctx)
+                    mediaController.setAnchorView(this)
+                    setMediaController(mediaController)
+                    setVideoPath(offlineFile.absolutePath)
+                    start()
                 }
-                loadUrl("https://rutube.ru/play/embed/$videoId")
-            }
-        },
-        update = { webView ->
-            val expectedUrl = "https://rutube.ru/play/embed/$videoId"
-            if (webView.url != expectedUrl) {
-                webView.loadUrl(expectedUrl)
-            }
-        },
-        modifier = modifier
-    )
+            },
+            update = { videoView ->
+                if (!videoView.isPlaying) {
+                    videoView.start()
+                }
+            },
+            modifier = modifier
+        )
+    } else {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    webViewClient = WebViewClient()
+                    webChromeClient = WebChromeClient()
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        mediaPlaybackRequiresUserGesture = false
+                        useWideViewPort = true
+                        loadWithOverviewMode = true
+                    }
+                    loadUrl("https://rutube.ru/play/embed/$videoId")
+                }
+            },
+            update = { webView ->
+                val expectedUrl = "https://rutube.ru/play/embed/$videoId"
+                if (webView.url != expectedUrl) {
+                    webView.loadUrl(expectedUrl)
+                }
+            },
+            modifier = modifier
+        )
+    }
 }
 
