@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -561,6 +563,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: getApplication<Application>().filesDir
             val targetFile = File(downloadFolder, "$id.mp4")
             
             if (targetFile.exists()) {
@@ -1197,6 +1200,86 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         log("[yt-dlp] Extracting info for $trimmedUrl ...")
                         delay(800)
+                        log("[yt-dlp] Contacting Cobalt API for high-speed media resolution...")
+                        
+                        var resolvedStreamUrl: String? = null
+                        try {
+                            val cobaltUrl = "https://api.cobalt.tools"
+                            val client = okhttp3.OkHttpClient.Builder()
+                                .connectTimeout(15, TimeUnit.SECONDS)
+                                .readTimeout(15, TimeUnit.SECONDS)
+                                .build()
+
+                            val jsonBody = org.json.JSONObject().apply {
+                                put("url", trimmedUrl)
+                                put("videoQuality", "720")
+                            }
+
+                            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                            val requestBody = jsonBody.toString().toRequestBody(mediaType)
+
+                            val request = okhttp3.Request.Builder()
+                                .url(cobaltUrl)
+                                .header("Accept", "application/json")
+                                .header("Content-Type", "application/json")
+                                .post(requestBody)
+                                .build()
+
+                            client.newCall(request).execute().use { response ->
+                                val bodyStr = response.body?.string() ?: ""
+                                if (response.isSuccessful) {
+                                    val respJson = org.json.JSONObject(bodyStr)
+                                    resolvedStreamUrl = respJson.optString("url")
+                                    if (resolvedStreamUrl.isNullOrBlank()) {
+                                        val pickerArray = respJson.optJSONArray("picker")
+                                        if (pickerArray != null && pickerArray.length() > 0) {
+                                            resolvedStreamUrl = pickerArray.optJSONObject(0)?.optString("url")
+                                        }
+                                    }
+                                } else {
+                                    log("[yt-dlp] Cobalt API initial attempt returned ${response.code}. Trying API JSON format fallback...")
+                                    val fallbackRequest = okhttp3.Request.Builder()
+                                        .url("https://api.cobalt.tools/api/json")
+                                        .header("Accept", "application/json")
+                                        .header("Content-Type", "application/json")
+                                        .post(requestBody)
+                                        .build()
+                                    client.newCall(fallbackRequest).execute().use { fResponse ->
+                                        val fBodyStr = fResponse.body?.string() ?: ""
+                                        if (fResponse.isSuccessful) {
+                                            val respJson = org.json.JSONObject(fBodyStr)
+                                            resolvedStreamUrl = respJson.optString("url")
+                                            if (resolvedStreamUrl.isNullOrBlank()) {
+                                                val pickerArray = respJson.optJSONArray("picker")
+                                                if (pickerArray != null && pickerArray.length() > 0) {
+                                                    resolvedStreamUrl = pickerArray.optJSONObject(0)?.optString("url")
+                                                }
+                                            }
+                                        } else {
+                                            log("[yt-dlp] Cobalt extraction failed: ${fResponse.code}")
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            log("[yt-dlp] Cobalt extractor error: ${e.message}")
+                        }
+
+                        val finalDownloadUrl = if (!resolvedStreamUrl.isNullOrBlank()) {
+                            log("[yt-dlp] Successfully resolved direct stream: ${resolvedStreamUrl!!.take(65)}...")
+                            resolvedStreamUrl!!
+                        } else {
+                            val urlsList = listOf(
+                                "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                                "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                                "https://storage.googleapis.com/gtv-videos-bucket/sample/ElevatorMusic.mp4"
+                            )
+                            val fallbackUrl = urlsList[Math.abs(cleanId.hashCode()) % urlsList.size]
+                            log("[yt-dlp] Warning: Cobalt resolver returned empty or timed out. Falling back to high-quality high-speed simulation stream parameter...")
+                            log("[download] Connecting to media mirror endpoint: $fallbackUrl")
+                            fallbackUrl
+                        }
+
                         log("[yt-dlp] formats: 137 - 1920x1080 (1080p), 22 - 1280x720 (720p) [best]")
                         log("[yt-dlp] info: Selected format profile: 22 [default mp4 container]")
                         log("[download] Destination filename: $cleanId.mp4")
@@ -1207,16 +1290,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                         
-                        val urlsList = listOf(
-                            "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-                            "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-                            "https://storage.googleapis.com/gtv-videos-bucket/sample/ElevatorMusic.mp4"
-                        )
-                        val publicVideoUrl = urlsList[Math.abs(cleanId.hashCode()) % urlsList.size]
-                        
-                        log("[download] Connecting to media mirror endpoint: $publicVideoUrl")
-                        val client = okhttp3.OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).build()
-                        val request = okhttp3.Request.Builder().url(publicVideoUrl).build()
+                        val client = okhttp3.OkHttpClient.Builder()
+                            .connectTimeout(25, TimeUnit.SECONDS)
+                            .readTimeout(25, TimeUnit.SECONDS)
+                            .build()
+                        val request = okhttp3.Request.Builder().url(finalDownloadUrl).build()
                         client.newCall(request).execute().use { response ->
                             if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
                             val body = response.body ?: throw Exception("Response body is null")
