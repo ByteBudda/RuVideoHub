@@ -25,10 +25,20 @@
             android:theme="@style/Theme.MyApplication">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Deep Link для rutube.ru -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="rutube.ru" />
+                <data android:scheme="http" android:host="rutube.ru" />
+                <!-- также поддерживаем поддомены: www.rutube.ru -->
+                <data android:scheme="https" android:host="www.rutube.ru" />
+                <data android:scheme="http" android:host="www.rutube.ru" />
             </intent-filter>
         </activity>
     </application>
-
 </manifest>
