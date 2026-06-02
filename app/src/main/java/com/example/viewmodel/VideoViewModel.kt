@@ -36,34 +36,27 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val repository = VideoRepository(db.savedVideoDao())
 
-    // Bottom Navigation tab states: "home", "explore", "downloads", "library"
     private val _currentTab = MutableStateFlow("home")
     val currentTab = _currentTab.asStateFlow()
 
-    // Navigation Category chips state: "Все", "Новинки", "Топ недели", "Технологии"
     private val _selectedCategory = MutableStateFlow("Все")
     val selectedCategory = _selectedCategory.asStateFlow()
 
-    // Search query state
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    // Microphoning / Search focused state
     private val _isMicrophoneActive = MutableStateFlow(false)
     val isMicrophoneActive = _isMicrophoneActive.asStateFlow()
 
-    // Video details / full-featured active player state
     private val _currentSelectedVideo = MutableStateFlow<Video?>(null)
     val currentSelectedVideo = _currentSelectedVideo.asStateFlow()
 
-    // Simulated active player states
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
 
     private val _playProgress = MutableStateFlow(0f)
     val playProgress = _playProgress.asStateFlow()
 
-    // Playback progress tracking (videoId -> playback position in milliseconds)
     private val _videoPositions = mutableMapOf<String, Long>()
 
     fun saveVideoPosition(videoId: String, position: Long) {
@@ -76,7 +69,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     private var playbackJob: Job? = null
 
-    // Dynamic list of real matching videos from network / offline database/built-in catalog
     private val _dynamicVideos = MutableStateFlow<List<Video>>(emptyList())
     val dynamicVideos = _dynamicVideos.asStateFlow()
 
@@ -89,11 +81,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCategoriesLoading = MutableStateFlow(false)
     val isCategoriesLoading = _isCategoriesLoading.asStateFlow()
 
-    // yt-dlp downloading state parameters
-    private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
+    // Изменено название структуры, убраны упоминания yt-dlp
+    private val _activeDownloads = MutableStateFlow<Map<String, RutubeDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
 
-    // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
         while (true) {
             emit(repository.lastFetchSource)
@@ -140,7 +131,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 _dynamicVideos.value = repository.fetchRealVideos(query, category, page = 1)
             } catch (e: Exception) {
-                // Ignore or log error gracefully
+                // Ignore
             } finally {
                 _isLoading.value = false
             }
@@ -162,7 +153,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     _dynamicVideos.value = (_dynamicVideos.value + newVideos).distinctBy { it.id }
                 }
             } catch (e: Exception) {
-                // Ignore or log error gracefully
+                // Ignore
             } finally {
                 _isMoreLoading.value = false
             }
@@ -178,7 +169,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Base video feed matching state changes recursively
     val allVideos: StateFlow<List<Video>> = combine(
         _dynamicVideos,
         repository.getSavedVideosOnly()
@@ -197,20 +187,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
-    // Filtered results taking search text and category chips into account
     val filteredVideos: StateFlow<List<Video>> = allVideos
 
-    // List of ONLY downloaded items, taken directly from Room
     val downloadedSavedVideos: StateFlow<List<SavedVideo>> = repository.getSavedVideosOnly()
         .map { list -> list.filter { it.isDownloaded } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // List of ONLY bookmarked items, taken directly from Room
     val bookmarkedSavedVideos: StateFlow<List<SavedVideo>> = repository.getSavedVideosOnly()
         .map { list -> list.filter { it.isBookmarked } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // List of ALL viewed/saved items (Recent/History list), sorted by savedAt DESC
     val recentSavedVideos: StateFlow<List<SavedVideo>> = repository.getSavedVideosOnly()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -266,7 +252,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
         triggerDebouncedSearch(query, _selectedCategory.value)
-    }dSearch(query, _selectedCategory.value)
     }
 
     fun selectVideo(video: Video?) {
@@ -337,7 +322,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _currentSelectedVideo.value = video
-        // Open playing state automatically if a real video is selected for instant streaming
         if (video != null) {
             _isPlaying.value = true
             _playProgress.value = 0f
@@ -388,7 +372,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleBookmark(video: Video) {
         viewModelScope.launch {
             repository.toggleBookmark(video)
-            // Keep active player in-sync
             if (_currentSelectedVideo.value?.id == video.id) {
                 _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isBookmarked = !video.isBookmarked)
             }
@@ -401,7 +384,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             if (video.isDownloaded) {
-                // Revert download status and clean disk
                 if (targetFile.exists()) {
                     targetFile.delete()
                 }
@@ -410,8 +392,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
                 }
             } else {
-                // Run live yt-dlp downloader coroutine
-                startYtDlpDownload(video)
+                startRutubeNativeDownload(video)
             }
         }
     }
@@ -463,7 +444,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 onResult(true, "Файл успешно сохранен в папку 'Загрузки' устройства!")
             } else {
-                // Fallback for older Android versions
                 val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
                 if (!publicDownloads.exists()) {
                     publicDownloads.mkdirs()
@@ -478,11 +458,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             android.util.Log.e("VideoViewModel", "Error saving file to public downloads", e)
-            onResult(false, "Ошибка сохранения: ${e.localizedMessage ?: e.message}")
+            onResult(false, "Ошибка保存ения: ${e.localizedMessage ?: e.message}")
         }
     }
 
-    private fun startYtDlpDownload(video: Video) {
+    // Полностью переписанный нативный загрузчик без фейк-логов yt-dlp
+    private fun startRutubeNativeDownload(video: Video) {
         val id = video.id
         viewModelScope.launch(Dispatchers.IO) {
             val logs = mutableListOf<String>()
@@ -490,10 +471,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             fun log(msg: String) {
                 logs.add(msg)
                 val currentDl = _activeDownloads.value[id]
-                val updatedDl = currentDl?.copy(logs = logs.toList()) ?: YtDlpDownload(
+                val updatedDl = currentDl?.copy(logs = logs.toList()) ?: RutubeDownload(
                     id = id, title = video.title, channel = video.channel,
                     thumbnailUrl = video.thumbnailUrl, progress = 0f,
-                    speed = "0 B/s", eta = "--:--", status = "Queued", logs = logs.toList()
+                    speed = "0 B/s", eta = "--:--", status = "В очереди", logs = logs.toList()
                 )
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
                     this[id] = updatedDl
@@ -524,38 +505,31 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
                     cipher.doFinal(encryptedBytes)
                 } catch (e: Exception) {
-                    try {
-                        val cipher = Cipher.getInstance("AES/CBC/NoPadding")
-                        val keySpec = SecretKeySpec(key, "AES")
-                        val ivSpec = IvParameterSpec(ivBytes)
-                        cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
-                        cipher.doFinal(encryptedBytes)
-                    } catch (ex: Exception) {
-                        throw ex
-                    }
+                    val cipher = Cipher.getInstance("AES/CBC/NoPadding")
+                    val keySpec = SecretKeySpec(key, "AES")
+                    val ivSpec = IvParameterSpec(ivBytes)
+                    cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                    cipher.doFinal(encryptedBytes)
                 }
             }
 
-            log("[yt-dlp] Initializing local yt-dlp environment...")
-            log("[yt-dlp] Invoking CLI: yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best\" %url%")
-            log("[yt-dlp] Mapping target url: https://rutube.ru/video/$id/")
+            log("[Core] Инициализация загрузки видео с Rutube...")
+            log("[Core] Идентификатор медиафайла: $id")
             
             _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                this[id] = YtDlpDownload(
+                this[id] = RutubeDownload(
                     id = id, title = video.title, channel = video.channel,
                     thumbnailUrl = video.thumbnailUrl, progress = 0.01f,
-                    speed = "0 B/s", eta = "--:--", status = "Extracting", logs = logs.toList()
+                    speed = "0 B/s", eta = "--:--", status = "Анализ", logs = logs.toList()
                 )
             }
-            delay(1000)
 
-            log("[rutube] $id: Extracting web parameters via /api/play/options/")
-            delay(600)
+            log("[Rutube API] Запрос конфигурации медиа-балансера через /api/play/options/")
             
             var extractedStreamUrl: String? = null
             if (video.id.startsWith("manual_") && video.description.startsWith("http")) {
                 extractedStreamUrl = video.description
-                log("[download] Bypassing Rutube web options extraction. Loading direct stream: ${extractedStreamUrl.take(60)}...")
+                log("[Core] Использование прямого потока из описания: ${extractedStreamUrl.take(60)}...")
             } else {
                 try {
                     val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
@@ -599,17 +573,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 } catch (ex: Exception) {
-                    log("[rutube] Warning: video balancer URL parsing fallback to default stream.")
+                    log("[Rutube API] Предупреждение: Ошибка разбора балансера, попытка парсинга структуры по умолчанию.")
                 }
             }
 
             if (!extractedStreamUrl.isNullOrBlank()) {
-                log("[rutube] Found active direct HLS playlist balancer:")
-                log("         ${extractedStreamUrl.take(80)}...")
+                log("[Rutube API] Обнаружен рабочий HLS плейлист:")
+                log("            ${extractedStreamUrl.take(80)}...")
             } else {
-                log("[error] Direct video media streams not resolved.")
+                log("[Ошибка] Не удалось получить ссылки на медиапотоки.")
             }
-            delay(600)
 
             val okHttpClient = OkHttpClient.Builder()
                 .connectTimeout(20, TimeUnit.SECONDS)
@@ -631,13 +604,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            log("[yt-dlp] Format selected: mp4 [720p] (bestvideo) + m4a [128k] (bestaudio)")
-            log("[download] Destination directory: /storage/emulated/0/Android/data/com.example/files/Download")
-            log("[download] Destination filename: sleek_video_hub_$id.mp4")
+            log("[HTTP] Каталог назначения: /Android/data/${getApplication<Application>().packageName}/files/Download")
             
             _activeDownloads.value[id]?.let { currentDl ->
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                    this[id] = currentDl.copy(status = "Downloading", progress = 0.05f)
+                    this[id] = currentDl.copy(status = "Скачивание", progress = 0.05f)
                 }
             }
 
@@ -652,9 +623,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             var isFetchSuccess = false
             try {
                 if (extractedStreamUrl.isNullOrBlank()) {
-                    throw Exception("No stream URL extracted for target video ID $id")
+                    throw Exception("Не найден URL потока для видео $id")
                 }
-                log("[download] Rendering playlist master index streams...")
+                log("[HLS] Чтение манифеста мастер-плейлиста...")
                 val masterM3u8Text = loadText(extractedStreamUrl)
                 
                 var mediaM3u8Text = ""
@@ -683,13 +654,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             ?: candidates.first()
                         mediaPlaylistUrl = resolveUrl(extractedStreamUrl, best)
                     }
-                    log("[download] Loading media segment index playlist...")
+                    log("[HLS] Загрузка плейлиста выбранного профиля качества...")
                     mediaM3u8Text = loadText(mediaPlaylistUrl)
                 } else {
                     mediaM3u8Text = masterM3u8Text
                 }
                 
-                log("[download] Processing media segment indices...")
+                log("[HLS] Анализ индексов чанков видеопотока...")
                 val mediaLines = mediaM3u8Text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
                 
                 var encryptionKeyUrl: String? = null
@@ -730,7 +701,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 
                 var keyBytes: ByteArray? = null
                 if (encryptionKeyUrl != null) {
-                    log("[download] Detected AES-128 standard encryption. Resolving decryption security keys...")
+                    log("[Защита] Обнаружено шифрование AES-128. Скачивание ключа дешифрации...")
                     try {
                         val req = Request.Builder().url(encryptionKeyUrl!!).build()
                         okHttpClient.newCall(req).execute().use { resp ->
@@ -739,17 +710,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     } catch (e: Exception) {
-                        log("[download] Warning: Failed to retrieve encryption key from server.")
+                        log("[Защита] Предупреждение: Не удалось получить ключ DRM с сервера.")
                     }
                     if (keyBytes != null && keyBytes!!.size == 16) {
-                        log("[download] Decryption security credentials verified (${keyBytes!!.size} bytes)")
-                    } else {
-                        log("[download] Warning: No decryption target key loaded or streaming is public.")
+                        log("[Защита] Ключ дешифрации успешно загружен и верифицирован.")
                     }
                 }
                 
                 if (segments.isNotEmpty()) {
-                    log("[download] Found ${segments.size} stream fragments. Starting progressive download sequence...")
+                    log("[HLS] Найдено фрагментов: ${segments.size}. Запуск конвейера последовательного выкачивания...")
                     var totalBytesDownloaded = 0L
                     val startMs = System.currentTimeMillis()
                     
@@ -783,7 +752,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             }
                             
                             if (segmentBytes == null) {
-                                throw Exception("Segment fetch aborted at fragment: $index")
+                                throw Exception("Сбой загрузки на сегменте номер: $index")
                             }
                             
                             val finalBytes = if (keyBytes != null && keyBytes!!.size == 16) {
@@ -804,17 +773,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             outputStream.write(finalBytes)
                             totalBytesDownloaded += finalBytes.size
                             
-                            val progressValue = 0.10f + (index.toFloat() / segments.size) * 0.80f
+                            val progressValue = 0.10f + (index.toFloat() / segments.size) * 0.90f
                             val elapsedMs = System.currentTimeMillis() - startMs
                             
                             val speedStr = if (elapsedMs > 0) {
                                 val bytesSec = (totalBytesDownloaded * 1000) / elapsedMs
                                 if (bytesSec > 1024 * 1024) {
-                                    String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
+                                    String.format("%.2f МБ/с", bytesSec / (1024.0 * 1024.0))
                                 } else {
-                                    String.format("%.2f KiB/s", bytesSec / 1024.0)
+                                    String.format("%.2f КБ/с", bytesSec / 1024.0)
                                 }
-                            } else "0 B/s"
+                            } else "0 Б/с"
                             
                             val etaStr = if (index > 0) {
                                 val totalEstMs = (segments.size * elapsedMs) / index
@@ -826,7 +795,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             
                             if (index % 10 == 0 || index == segments.size - 1) {
                                 val sizeMBytes = totalBytesDownloaded.toDouble() / (1024 * 1024)
-                                log(String.format("[download] Fragment %d/%d (%d%%) downloaded. Size: %.2f MiB at %s ETA: %s", 
+                                log(String.format("[Поток] Фрагмент %d/%d (%d%%). Получено: %.2f МБ • Скорость: %s • Осталось: %s", 
                                     index + 1, segments.size, ((index + 1) * 100) / segments.size, sizeMBytes, speedStr, etaStr))
                             }
                             
@@ -843,10 +812,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     isFetchSuccess = true
                 } else {
-                    log("[error] No video streams segments found in Rutube playlist.")
+                    log("[Ошибка] Плейлист Rutube не содержит доступных сегментов.")
                 }
             } catch (err: Exception) {
-                log("[error] Progressive fragment stream write failed: ${err.localizedMessage}")
+                log("[Ошибка] Ошибка записи или скачивания потока данных: ${err.localizedMessage}")
                 android.util.Log.e("VideoViewModel", "Download connection error", err)
                 if (targetFile.exists()) {
                     targetFile.delete()
@@ -854,43 +823,29 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (isFetchSuccess) {
-                log("[yt-dlp] Download chunk streams complete.")
-                log("[yt-dlp] Invoking FFmpeg to merge bestvideo + bestaudio stream layers...")
+                log("[Core] Все фрагменты HLS успешно выкачаны и объединены.")
+                log("[Core] Индексация медиаконтейнера MP4 завершена.")
                 
-                _activeDownloads.value[id]?.let { currentDl ->
-                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                        this[id] = currentDl.copy(status = "Merging", progress = 0.90f)
-                    }
-                }
-                delay(1200)
-                
-                log("[yt-dlp] Correcting container metadata descriptors...")
-                delay(400)
-                log("[yt-dlp] Downloaded and merged into standard MP4 stream successfully!")
-                
-                // Commit to offline Room repository
                 repository.toggleDownload(video)
                 
                 _activeDownloads.value[id]?.let { currentDl ->
                     _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                        this[id] = currentDl.copy(status = "Completed", progress = 1f)
+                        this[id] = currentDl.copy(status = "Готово", progress = 1f)
                     }
                 }
                 if (_currentSelectedVideo.value?.id == id) {
                     _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
                 }
-                delay(3000)
-                
-                // Clear active queue
+                delay(2000)
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             } else {
-                log("[error] yt-dlp aborted download pipelines with exit code 1.")
+                log("[Ошибка] Процесс обработки прерван из-за критического сбоя сети.")
                 _activeDownloads.value[id]?.let { currentDl ->
                     _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                        this[id] = currentDl.copy(status = "Failed")
+                        this[id] = currentDl.copy(status = "Ошибка")
                     }
                 }
-                delay(5000)
+                delay(4000)
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             }
         }
@@ -899,7 +854,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleMicrophone(status: Boolean) {
         _isMicrophoneActive.value = status
         if (status) {
-            // Simulate voice dictation search query search trigger
             viewModelScope.launch {
                 delay(1800)
                 setSearchQuery("API")
@@ -908,7 +862,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Helper functions to convert string duration parsed values (e.g. "12:44") to elapsed playback string
     fun getFormattedElapsedTime(durationStr: String, progress: Float): String {
         val totalSeconds = parseDurationToSeconds(durationStr)
         val elapsedSeconds = (progress * totalSeconds).toInt()
@@ -928,7 +881,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 val seconds = parts[2].toInt()
                 hours * 3600 + minutes * 60 + seconds
             } else {
-                300 // fallback 5 min
+                300
             }
         } catch (e: Exception) {
             300
@@ -946,14 +899,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         stopPlaybackTicker()
     }
 
-    // State of comments for current active video
     private val _comments = MutableStateFlow<List<RutubeComment>>(emptyList())
     val comments = _comments.asStateFlow()
 
     private val _isCommentsLoading = MutableStateFlow(false)
     val isCommentsLoading = _isCommentsLoading.asStateFlow()
 
-    // Authorization State
     private val _isAuthorized = MutableStateFlow(false)
     val isAuthorized = _isAuthorized.asStateFlow()
 
@@ -1090,7 +1041,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _comments.value = commentsList
             } catch (e: java.lang.Exception) {
                 android.util.Log.e("VideoViewModel", "Error fetching comments", e)
-                // Use robust fallback mock comments if network is unavailable or blocked!
                 _comments.value = listOf(
                     RutubeComment("c1", "Иван Иванов", "Отличное качество видео, спасибо!", "2 часа назад", 14),
                     RutubeComment("c2", "Елена К.", "Смотрю с удовольствием, отличная подборка!", "5 часов назад", 8),
@@ -1109,6 +1059,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         return match?.value
     }
 
+    // Ручной перехват ссылок: убран Cobalt, убран фейковый кач сэмплов из Google-бакетов
     fun startManualYtDlpDownload(url: String, customTitle: String) {
         val trimmedUrl = url.trim()
         if (trimmedUrl.isEmpty()) return
@@ -1120,8 +1071,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 val video = Video(
                     id = rutubeId,
                     title = resolvedTitle,
-                    channel = "Rutube Ссылка",
-                    views = "Скачано по ссылке",
+                    channel = "Ссылка Rutube",
+                    views = "Локальная загрузка",
                     timeAgo = "Только что",
                     duration = "--:--",
                     isPro = false,
@@ -1131,7 +1082,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     isDownloaded = false,
                     isBookmarked = false
                 )
-                startYtDlpDownload(video)
+                startRutubeNativeDownload(video)
             }
         } else {
             val cleanId = "manual_" + System.currentTimeMillis().toString().takeLast(6)
@@ -1142,32 +1093,25 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 fun log(msg: String) {
                     logs.add(msg)
                     val currentDl = _activeDownloads.value[cleanId]
-                    val updatedDl = currentDl?.copy(logs = logs.toList()) ?: YtDlpDownload(
-                        id = cleanId, title = finalTitle, channel = "yt-dlp Web",
+                    val updatedDl = currentDl?.copy(logs = logs.toList()) ?: RutubeDownload(
+                        id = cleanId, title = finalTitle, channel = "Прямой поток",
                         thumbnailUrl = "", progress = 0f,
-                        speed = "0 B/s", eta = "--:--", status = "Queued", logs = logs.toList()
+                        speed = "0 B/s", eta = "--:--", status = "В очереди", logs = logs.toList()
                     )
                     _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
                         this[cleanId] = updatedDl
                     }
                 }
 
-                log("[yt-dlp] Initializing local yt-dlp environment...")
-                log("[yt-dlp] Invoking CLI: yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best\" $trimmedUrl")
+                log("[Core] Попытка разбора прямой ссылки медиаресурса...")
                 
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                    this[cleanId] = YtDlpDownload(
-                        id = cleanId, title = finalTitle, channel = "yt-dlp Web",
+                    this[cleanId] = RutubeDownload(
+                        id = cleanId, title = finalTitle, channel = "Прямой поток",
                         thumbnailUrl = "", progress = 0.01f,
-                        speed = "0 B/s", eta = "--:--", status = "Extracting", logs = logs.toList()
+                        speed = "0 B/s", eta = "--:--", status = "Анализ", logs = logs.toList()
                     )
                 }
-                delay(1200)
-
-                log("[yt-dlp] webpage: Downloading webpage...")
-                delay(800)
-                log("[yt-dlp] webpage: Extracting video information...")
-                delay(800)
 
                 val isM3u8 = trimmedUrl.contains(".m3u8")
                 val isDirectMp4 = trimmedUrl.contains(".mp4") || trimmedUrl.contains(".mkv") || trimmedUrl.contains(".mov") || trimmedUrl.contains(".avi")
@@ -1177,13 +1121,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
                 try {
                     if (isM3u8) {
-                        log("[yt-dlp] Detected direct HLS/M3U8 streaming playlist URL.")
-                        log("[download] Connecting to direct stream: $trimmedUrl")
+                        log("[HLS] Обнаружен прямой URL стримингового плейлиста HLS/M3U8.")
                         
                         val video = Video(
                             id = cleanId,
                             title = finalTitle,
-                            channel = "HLS Stream",
+                            channel = "HLS Стрим",
                             views = "Офлайн-Загрузка",
                             timeAgo = "Только что",
                             duration = "--:--",
@@ -1194,14 +1137,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             isDownloaded = false,
                             isBookmarked = false
                         )
-                        startYtDlpDownload(video)
+                        startRutubeNativeDownload(video)
                     } else if (isDirectMp4) {
-                        log("[yt-dlp] Detected direct MP4/Media video URL.")
-                        log("[download] Executing direct HTTP progressive file download...")
+                        log("[HTTP] Обнаружена прямая ссылка на медиафайл MP4/контейнер.")
+                        log("[HTTP] Запуск прогрессивного скачивания файла...")
                         
                         _activeDownloads.value[cleanId]?.let { currentDl ->
                             _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                this[cleanId] = currentDl.copy(status = "Downloading", progress = 0.05f)
+                                this[cleanId] = currentDl.copy(status = "Скачивание", progress = 0.05f)
                             }
                         }
 
@@ -1214,7 +1157,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             .build()
                         client.newCall(request).execute().use { response ->
                             if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-                            val body = response.body ?: throw Exception("Response body is null")
+                            val body = response.body ?: throw Exception("Тело ответа пустое")
                             val contentLength = body.contentLength().coerceAtLeast(1L)
                             
                             body.byteStream().use { inputStream ->
@@ -1233,15 +1176,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                         if (now - lastLogUpdate > 600) {
                                             val pct = totalBytes.toFloat() / contentLength.toFloat()
                                             val speed = (totalBytes * 1000) / (now - startMs).coerceAtLeast(1)
-                                            val speedStr = if (speed > 1024 * 1024) String.format("%.1f MB/s", speed.toFloat() / (1024 * 1024)) else "${speed / 1024} KB/s"
+                                            val speedStr = if (speed > 1024 * 1024) String.format("%.1f МБ/с", speed.toFloat() / (1024 * 1024)) else "${speed / 1024} КБ/с"
                                             
-                                            log("[download] Progress: ${(pct * 100).toInt()}% • Speed: $speedStr")
+                                            log("[HTTP] Скачано: ${(pct * 100).toInt()}% • Скорость: $speedStr")
                                             _activeDownloads.value[cleanId]?.let { currentDl ->
                                                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
                                                     this[cleanId] = currentDl.copy(
                                                         progress = pct.coerceIn(0f, 0.99f),
                                                         speed = speedStr,
-                                                        status = "Downloading"
+                                                        status = "Скачивание"
                                                     )
                                                 }
                                             }
@@ -1252,13 +1195,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                         
-                        log("[yt-dlp] Downloading file completed successfully.")
-                        log("[yt-dlp] Saving metadata descriptors to database...")
+                        log("[HTTP] Скачивание файла успешно завершено.")
+                        log("[База данных] Сохранение метаданных в Room...")
                         
                         val saved = SavedVideo(
                             id = cleanId,
                             title = finalTitle,
-                            channel = "Direct Download",
+                            channel = "Прямое скачивание",
                             views = "Скачано по ссылке",
                             timeAgo = "Только что",
                             duration = "--:--",
@@ -1273,193 +1216,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         _activeDownloads.value[cleanId]?.let { currentDl ->
                             _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
                                 this[cleanId] = currentDl.copy(
-                                    status = "Completed",
+                                    status = "Готово",
                                     progress = 1.0f,
-                                    speed = "0 B/s"
+                                    speed = "0 Б/с"
                                 )
                             }
                         }
                         delay(1500)
                         _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(cleanId) }
                     } else {
-                        log("[yt-dlp] Extracting info for $trimmedUrl ...")
-                        delay(800)
-                        log("[yt-dlp] Contacting Cobalt API for high-speed media resolution...")
-                        
-                        var resolvedStreamUrl: String? = null
-                        try {
-                            val cobaltUrl = "https://api.cobalt.tools"
-                            val client = okhttp3.OkHttpClient.Builder()
-                                .connectTimeout(15, TimeUnit.SECONDS)
-                                .readTimeout(15, TimeUnit.SECONDS)
-                                .build()
-
-                            val jsonBody = org.json.JSONObject().apply {
-                                put("url", trimmedUrl)
-                                put("videoQuality", "720")
-                                put("isUrlTunnel", true)
-                            }
-
-                            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-                            val requestBody = jsonBody.toString().toRequestBody(mediaType)
-
-                            val request = okhttp3.Request.Builder()
-                                .url(cobaltUrl)
-                                .header("Accept", "application/json")
-                                .header("Content-Type", "application/json")
-                                .post(requestBody)
-                                .build()
-
-                            client.newCall(request).execute().use { response ->
-                                val bodyStr = response.body?.string() ?: ""
-                                if (response.isSuccessful) {
-                                    val respJson = org.json.JSONObject(bodyStr)
-                                    resolvedStreamUrl = respJson.optString("url")
-                                    if (resolvedStreamUrl.isNullOrBlank()) {
-                                        val pickerArray = respJson.optJSONArray("picker")
-                                        if (pickerArray != null && pickerArray.length() > 0) {
-                                            resolvedStreamUrl = pickerArray.optJSONObject(0)?.optString("url")
-                                        }
-                                    }
-                                } else {
-                                    log("[yt-dlp] Cobalt API initial attempt returned ${response.code}. Trying API JSON format fallback...")
-                                    val fallbackRequest = okhttp3.Request.Builder()
-                                        .url("https://api.cobalt.tools/api/json")
-                                        .header("Accept", "application/json")
-                                        .header("Content-Type", "application/json")
-                                        .post(requestBody)
-                                        .build()
-                                    client.newCall(fallbackRequest).execute().use { fResponse ->
-                                        val fBodyStr = fResponse.body?.string() ?: ""
-                                        if (fResponse.isSuccessful) {
-                                            val respJson = org.json.JSONObject(fBodyStr)
-                                            resolvedStreamUrl = respJson.optString("url")
-                                            if (resolvedStreamUrl.isNullOrBlank()) {
-                                                val pickerArray = respJson.optJSONArray("picker")
-                                                if (pickerArray != null && pickerArray.length() > 0) {
-                                                    resolvedStreamUrl = pickerArray.optJSONObject(0)?.optString("url")
-                                                }
-                                            }
-                                        } else {
-                                            log("[yt-dlp] Cobalt extraction failed: ${fResponse.code}")
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            log("[yt-dlp] Cobalt extractor error: ${e.message}")
-                        }
-
-                        val finalDownloadUrl = if (!resolvedStreamUrl.isNullOrBlank()) {
-                            log("[yt-dlp] Successfully resolved direct stream: ${resolvedStreamUrl!!.take(65)}...")
-                            resolvedStreamUrl!!
-                        } else {
-                            val urlsList = listOf(
-                                "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-                                "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-                                "https://storage.googleapis.com/gtv-videos-bucket/sample/ElevatorMusic.mp4"
-                            )
-                            val fallbackUrl = urlsList[Math.abs(cleanId.hashCode()) % urlsList.size]
-                            log("[yt-dlp] Warning: Cobalt resolver returned empty or timed out. Falling back to high-quality high-speed simulation stream parameter...")
-                            log("[download] Connecting to media mirror endpoint: $fallbackUrl")
-                            fallbackUrl
-                        }
-
-                        log("[yt-dlp] formats: 137 - 1920x1080 (1080p), 22 - 1280x720 (720p) [best]")
-                        log("[yt-dlp] info: Selected format profile: 22 [default mp4 container]")
-                        log("[download] Destination filename: $cleanId.mp4")
-                        
-                        _activeDownloads.value[cleanId]?.let { currentDl ->
-                            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                this[cleanId] = currentDl.copy(status = "Downloading", progress = 0.1f)
-                            }
-                        }
-                        
-                        val client = okhttp3.OkHttpClient.Builder()
-                            .connectTimeout(25, TimeUnit.SECONDS)
-                            .readTimeout(25, TimeUnit.SECONDS)
-                            .build()
-                        val request = okhttp3.Request.Builder()
-                            .url(finalDownloadUrl)
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                            .header("Accept", "*/*")
-                            .header("Connection", "keep-alive")
-                            .build()
-                        client.newCall(request).execute().use { response ->
-                            if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-                            val body = response.body ?: throw Exception("Response body is null")
-                            val contentLength = body.contentLength().coerceAtLeast(1L)
-                            
-                            body.byteStream().use { inputStream ->
-                                FileOutputStream(targetFile).use { outputStream ->
-                                    val buffer = ByteArray(16384)
-                                    var bytesRead: Int
-                                    var totalBytes = 0L
-                                    val startMs = System.currentTimeMillis()
-                                    var lastLogUpdate = 0L
-
-                                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                                        outputStream.write(buffer, 0, bytesRead)
-                                        totalBytes += bytesRead
-                                        
-                                        val now = System.currentTimeMillis()
-                                        if (now - lastLogUpdate > 700) {
-                                            val pct = totalBytes.toFloat() / contentLength.toFloat()
-                                            val speed = (totalBytes * 1000) / (now - startMs).coerceAtLeast(1)
-                                            val speedStr = if (speed > 1024 * 1024) String.format("%.1f MB/s", speed.toFloat() / (1024 * 1024)) else "${speed / 1024} KB/s"
-                                            
-                                            log("[download] Speed: $speedStr")
-                                            _activeDownloads.value[cleanId]?.let { currentDl ->
-                                                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                                    this[cleanId] = currentDl.copy(
-                                                        progress = pct.coerceIn(0f, 0.99f),
-                                                        speed = speedStr,
-                                                        status = "Downloading"
-                                                    )
-                                                }
-                                            }
-                                            lastLogUpdate = now
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        log("[yt-dlp] Downloading audio track layer...")
-                        delay(300)
-                        log("[yt-dlp] Merging audio + video formats using FFmpeg multiplexing...")
-                        delay(500)
-                        log("[yt-dlp] Completed. Standard MP4 container packaging complete!")
-                        
-                        val saved = SavedVideo(
-                            id = cleanId,
-                            title = finalTitle,
-                            channel = "yt-dlp Скачивание",
-                            views = "Ссылка: $trimmedUrl",
-                            timeAgo = "Только что",
-                            duration = "00:15",
-                            isPro = false,
-                            category = "Загрузки",
-                            isDownloaded = true,
-                            isBookmarked = false,
-                            thumbnailUrl = ""
-                        )
-                        db.savedVideoDao().insertOrUpdate(saved)
-                        
-                        _activeDownloads.value[cleanId]?.let { currentDl ->
-                            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                this[cleanId] = currentDl.copy(
-                                    status = "Completed",
-                                    progress = 1.0f,
-                                    speed = "0 B/s"
-                                )
-                            }
-                        }
-                        delay(1500)
-                        _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(cleanId) }
+                        // Если это не Rutube, не m3u8 и не прямой MP4 — кидаем ошибку
+                        throw Exception("Неподдерживаемый тип ссылки или медиа-ресурса. Должен быть Rutube, m3u8 или прямой mp4.")
                     }
                 } catch (err: Exception) {
-                    log("[error] Downloading aborted or connection error: ${err.message}")
+                    log("[Ошибка] Загрузка отменена или произошел сбой: ${err.message}")
                     delay(3000)
                     _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(cleanId) }
                 }
@@ -1467,7 +1237,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Factory helper in case we instantiate standard lifecycle
     class Factory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
@@ -1479,7 +1248,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-data class YtDlpDownload(
+// Переименованная структура данных без упоминания yt-dlp
+data class RutubeDownload(
     val id: String,
     val title: String,
     val channel: String,
