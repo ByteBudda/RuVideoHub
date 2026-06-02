@@ -406,7 +406,7 @@ fun SleekHeader(
             }
 
             val statusLabel = when (apiSource) {
-                "Rutube LIVE" -> "Подключено к Rutube LIVE"
+                "Rutube" -> "Подключено к Rutube"
                 "Встроенные хиты" -> "Встроенная медиатека (Офлайн)"
                 else -> "Локальный архив (Офлайн)"
             }
@@ -483,7 +483,7 @@ fun RecommendedSectionHeader() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "РЕКОМЕНДУЕМОЕ • БЕЗ РЕКЛАМЫ",
+            text = "Популярные видео",
             color = Primary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -500,7 +500,7 @@ fun RecommendedSectionHeader() {
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = "PRO",
+                contentDescription = "qntx",
                 tint = ProBadgeText,
                 modifier = Modifier.size(10.dp)
             )
@@ -1035,7 +1035,7 @@ fun DownloadsTabScreen(
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
-                    text = "Скачать по внешней ссылке (yt-dlp)",
+                    text = "Скачать по внешней ссылке",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -1048,7 +1048,7 @@ fun DownloadsTabScreen(
                 androidx.compose.material3.OutlinedTextField(
                     value = urlInput,
                     onValueChange = { urlInput = it },
-                    label = { Text("Ссылка (Rutube, MP4, HLS/M3U8, Youtube...)", fontSize = 11.sp) },
+                    label = { Text("Ссылка (Rutube)", fontSize = 11.sp) },
                     placeholder = { Text("https://example.com/video.mp4", fontSize = 11.sp) },
                     singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
