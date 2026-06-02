@@ -18,6 +18,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.net.URI
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -334,6 +340,18 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            fun decryptAes128(encryptedBytes: ByteArray, key: ByteArray, sequenceNumber: Int): ByteArray {
+                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                val keySpec = SecretKeySpec(key, "AES")
+                val iv = ByteArray(16)
+                for (b in 0..7) {
+                    iv[15 - b] = ((sequenceNumber.toLong() shr (b * 8)) and 0xFF).toByte()
+                }
+                val ivSpec = IvParameterSpec(iv)
+                cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                return cipher.doFinal(encryptedBytes)
+            }
+
             log("[yt-dlp] Initializing local yt-dlp environment...")
             log("[yt-dlp] Invoking CLI: yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best\" %url%")
             log("[yt-dlp] Mapping target url: https://rutube.ru/video/$id/")
@@ -347,19 +365,50 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
             delay(1000)
 
-            log("[rutube] $id: Extracting web parameters")
+            log("[rutube] $id: Extracting web parameters via /api/play/options/")
             delay(600)
             
             var extractedStreamUrl: String? = null
             try {
                 val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
-                val playEmbedResponse = apiService.getDynamicUrl("https://rutube.ru/api/play/embed/$id/?format=json")
-                val playEmbedBody = playEmbedResponse.string()
-                val jsonObject = JSONObject(playEmbedBody)
+                val playOptionsResponse = apiService.getDynamicUrl("https://rutube.ru/api/play/options/$id/?format=json")
+                val playOptionsBody = playOptionsResponse.string()
+                val jsonObject = JSONObject(playOptionsBody)
+                
                 val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
                 if (videoBalancerObj != null) {
                     extractedStreamUrl = videoBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
                         ?: videoBalancerObj.optString("default").takeIf { it.isNotBlank() }
+                }
+                
+                if (extractedStreamUrl.isNullOrBlank()) {
+                    val liveBalancerObj = jsonObject.optJSONObject("live_balancer")
+                    if (liveBalancerObj != null) {
+                        extractedStreamUrl = liveBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
+                            ?: liveBalancerObj.optString("default").takeIf { it.isNotBlank() }
+                    }
+                }
+
+                if (extractedStreamUrl.isNullOrBlank()) {
+                    val keys = jsonObject.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val value = jsonObject.opt(key)
+                        if (value is String && value.contains(".m3u8")) {
+                            extractedStreamUrl = value
+                            break
+                        } else if (value is JSONObject) {
+                            val subKeys = value.keys()
+                            while (subKeys.hasNext()) {
+                                val sk = subKeys.next()
+                                val sv = value.opt(sk)
+                                if (sv is String && sv.contains(".m3u8")) {
+                                    extractedStreamUrl = sv
+                                    break
+                                }
+                            }
+                        }
+                    }
                 }
             } catch (ex: Exception) {
                 log("[rutube] Warning: video balancer URL parsing fallback to default stream.")
@@ -370,8 +419,29 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 log("         ${extractedStreamUrl.take(80)}...")
             } else {
                 log("[rutube] Balancer mapped to dynamic CDN. Formatting download stream pipelines.")
+                extractedStreamUrl = "https://rutube.ru/api/play/options/$id/"
             }
             delay(600)
+
+            val okHttpClient = OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val req = chain.request().newBuilder()
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        .header("Referer", "https://rutube.ru/")
+                        .build()
+                    chain.proceed(req)
+                }
+                .build()
+
+            fun loadText(url: String): String {
+                val req = Request.Builder().url(url).build()
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+                    return resp.body?.string() ?: ""
+                }
+            }
 
             log("[yt-dlp] Format selected: mp4 [720p] (bestvideo) + m4a [128k] (bestaudio)")
             log("[download] Destination directory: /storage/emulated/0/Android/data/com.example/files/Download")
@@ -383,76 +453,163 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // Real physical file download
-            val sampleVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
             val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             val targetFile = File(downloadFolder, "$id.mp4")
             
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            
             var isFetchSuccess = false
             try {
-                val client = OkHttpClient()
-                val request = Request.Builder().url(sampleVideoUrl).build()
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful && response.body != null) {
-                    val totalSize = response.body!!.contentLength()
-                    val inputStream = response.body!!.byteStream()
-                    val outputStream = FileOutputStream(targetFile)
-                    
-                    val streamBuffer = ByteArray(4096)
-                    var readLen: Int
-                    var totalReadLen = 0L
-                    val startMs = System.currentTimeMillis()
-                    
-                    while (inputStream.read(streamBuffer).also { readLen = it } != -1) {
-                        outputStream.write(streamBuffer, 0, readLen)
-                        totalReadLen += readLen
-                        
-                        val progressValue = if (totalSize > 0) totalReadLen.toFloat() / totalSize else 0.5f
-                        val currentElapsedMs = System.currentTimeMillis() - startMs
-                        
-                        val speedStr = if (currentElapsedMs > 0) {
-                            val bytesSec = (totalReadLen * 1000) / currentElapsedMs
-                            if (bytesSec > 1024 * 1024) {
-                                String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
-                            } else {
-                                String.format("%.2f KiB/s", bytesSec / 1024.0)
+                log("[download] Rendering playlist master index streams...")
+                val masterM3u8Text = loadText(extractedStreamUrl!!)
+                
+                var mediaPlaylistUrl = extractedStreamUrl
+                val lines = masterM3u8Text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                val hasStreams = lines.any { it.startsWith("#EXT-X-STREAM-INF") }
+                
+                if (hasStreams) {
+                    val candidates = mutableListOf<String>()
+                    for (i in lines.indices) {
+                        val line = lines[i]
+                        if (line.startsWith("#EXT-X-STREAM-INF")) {
+                            var nextIndex = i + 1
+                            while (nextIndex < lines.size && lines[nextIndex].startsWith("#")) {
+                                nextIndex++
                             }
-                        } else "0 B/s"
-                        
-                        val etaStr = if (totalSize > 0 && totalReadLen > 0 && currentElapsedMs > 0) {
-                            val totalEstMs = (totalSize * currentElapsedMs) / totalReadLen
-                            val remainingSeconds = ((totalEstMs - currentElapsedMs) / 1000).toInt()
-                            String.format("%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
-                        } else "--:--"
-                        
-                        val totalMBytes = totalSize.toDouble() / (1024 * 1024)
-                        val readMBytes = totalReadLen.toDouble() / (1024 * 1024)
-                        
-                        // Output terminal download logs
-                        if (totalReadLen % (16 * 4096) == 0L || totalReadLen == totalSize) {
-                            log(String.format("[download]  %5.1f%% of  %6.2fMiB at  %12s ETA %5s", 
-                                progressValue * 100f, totalMBytes, speedStr, etaStr))
-                        }
-                        
-                        _activeDownloads.value[id]?.let { currentDl ->
-                            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                this[id] = currentDl.copy(
-                                    progress = progressValue,
-                                    speed = speedStr,
-                                    eta = etaStr
-                                )
+                            if (nextIndex < lines.size) {
+                                candidates.add(lines[nextIndex])
                             }
                         }
                     }
-                    outputStream.close()
-                    inputStream.close()
+                    if (candidates.isNotEmpty()) {
+                        val best = candidates.firstOrNull { it.contains("720") }
+                            ?: candidates.firstOrNull { it.contains("480") }
+                            ?: candidates.lastOrNull()
+                            ?: candidates.first()
+                        mediaPlaylistUrl = URI(extractedStreamUrl).resolve(best).toString()
+                    }
+                }
+                
+                log("[download] Processing media segment indices...")
+                val mediaM3u8Text = loadText(mediaPlaylistUrl)
+                val mediaLines = mediaM3u8Text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                
+                var encryptionKeyUrl: String? = null
+                var startSequence = 0
+                val segments = mutableListOf<String>()
+                
+                for (line in mediaLines) {
+                    if (line.startsWith("#EXT-X-MEDIA-SEQUENCE:")) {
+                        startSequence = line.substringAfter("#EXT-X-MEDIA-SEQUENCE:").trim().toIntOrNull() ?: 0
+                    } else if (line.startsWith("#EXT-X-KEY:")) {
+                        if (line.contains("METHOD=AES-128")) {
+                            val uriPart = line.substringAfter("URI=\"").substringBefore("\"")
+                            if (uriPart.isNotBlank()) {
+                                encryptionKeyUrl = URI(mediaPlaylistUrl).resolve(uriPart).toString()
+                            }
+                        }
+                    } else if (!line.startsWith("#")) {
+                        val resolvedSeg = URI(mediaPlaylistUrl).resolve(line).toString()
+                        segments.add(resolvedSeg)
+                    }
+                }
+                
+                var keyBytes: ByteArray? = null
+                if (encryptionKeyUrl != null) {
+                    log("[download] Detected AES-128 standard encryption. Resolving decryption security keys...")
+                    val req = Request.Builder().url(encryptionKeyUrl!!).build()
+                    okHttpClient.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            keyBytes = resp.body?.bytes()
+                        }
+                    }
+                    if (keyBytes != null && keyBytes!!.size == 16) {
+                        log("[download] Decryption security credentials verified (${keyBytes!!.size} bytes)")
+                    } else {
+                        log("[download] Warning: No decryption target key loaded or streaming is public.")
+                    }
+                }
+                
+                if (segments.isNotEmpty()) {
+                    log("[download] Found ${segments.size} stream fragments. Starting progressive download sequence...")
+                    var totalBytesDownloaded = 0L
+                    val startMs = System.currentTimeMillis()
+                    
+                    FileOutputStream(targetFile).use { outputStream ->
+                        for (index in segments.indices) {
+                            val segmentUrl = segments[index]
+                            val seq = startSequence + index
+                            
+                            val req = Request.Builder().url(segmentUrl).build()
+                            var segmentBytes: ByteArray? = null
+                            okHttpClient.newCall(req).execute().use { resp ->
+                                if (resp.isSuccessful && resp.body != null) {
+                                    segmentBytes = resp.body!!.bytes()
+                                }
+                            }
+                            
+                            if (segmentBytes == null) {
+                                throw Exception("Segment fetch aborted at fragment: $index")
+                            }
+                            
+                            val finalBytes = if (keyBytes != null && keyBytes!!.size == 16) {
+                                decryptAes128(segmentBytes!!, keyBytes!!, seq)
+                            } else {
+                                segmentBytes!!
+                            }
+                            
+                            outputStream.write(finalBytes)
+                            totalBytesDownloaded += finalBytes.size
+                            
+                            val progressValue = 0.10f + (index.toFloat() / segments.size) * 0.80f
+                            val elapsedMs = System.currentTimeMillis() - startMs
+                            
+                            val speedStr = if (elapsedMs > 0) {
+                                val bytesSec = (totalBytesDownloaded * 1000) / elapsedMs
+                                if (bytesSec > 1024 * 1024) {
+                                    String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
+                                } else {
+                                    String.format("%.2f KiB/s", bytesSec / 1024.0)
+                                }
+                            } else "0 B/s"
+                            
+                            val etaStr = if (index > 0) {
+                                val totalEstMs = (segments.size * elapsedMs) / index
+                                val remainingSeconds = ((totalEstMs - elapsedMs) / 1000).toInt()
+                                if (remainingSeconds > 0) {
+                                    String.format("%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+                                } else "00:01"
+                            } else "--:--"
+                            
+                            if (index % 10 == 0 || index == segments.size - 1) {
+                                val sizeMBytes = totalBytesDownloaded.toDouble() / (1024 * 1024)
+                                log(String.format("[download] Fragment %d/%d (%d%%) downloaded. Size: %.2f MiB at %s ETA: %s", 
+                                    index + 1, segments.size, ((index + 1) * 100) / segments.size, sizeMBytes, speedStr, etaStr))
+                            }
+                            
+                            _activeDownloads.value[id]?.let { currentDl ->
+                                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
+                                    this[id] = currentDl.copy(
+                                        progress = progressValue,
+                                        speed = speedStr,
+                                        eta = etaStr
+                                    )
+                                }
+                            }
+                        }
+                    }
                     isFetchSuccess = true
                 } else {
-                    log("[error] CLI download stream dropped: server signature rejected.")
+                    log("[error] No video streams segments found in Rutube playlist.")
                 }
             } catch (err: Exception) {
-                log("[error] Network connection failed: ${err.localizedMessage}")
+                log("[error] Progressive fragment stream write failed: ${err.localizedMessage}")
                 android.util.Log.e("VideoViewModel", "Download connection error", err)
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
             }
 
             if (isFetchSuccess) {
