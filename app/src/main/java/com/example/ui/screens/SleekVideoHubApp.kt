@@ -401,14 +401,14 @@ fun SleekHeader(
         ) {
             val badgeColor = when (apiSource) {
                 "Rutube LIVE" -> Color(0xFF4CAF50)
-                "Gemini Hybrid AI" -> Color(0xFF9C27B0)
+                "Встроенные хиты" -> Color(0xFF9C27B0)
                 else -> Color(0xFFFF9800)
             }
 
             val statusLabel = when (apiSource) {
                 "Rutube LIVE" -> "Подключено к Rutube LIVE"
-                "Gemini Hybrid AI" -> "Умный поиск Gemini AI (Мягкий fallback)"
-                else -> "Локальная демоверсия (Офлайн)"
+                "Встроенные хиты" -> "Встроенная медиатека (Офлайн)"
+                else -> "Локальный архив (Офлайн)"
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {

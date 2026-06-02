@@ -48,8 +48,13 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
     fun parseVideoListJson(bodyString: String, defaultCategoryName: String): List<Video> {
         val mapped = mutableListOf<Video>()
+        val trimmed = bodyString.trim()
+        if (!trimmed.startsWith("{")) {
+            android.util.Log.w("VideoRepository", "Response body for category '$defaultCategoryName' is not a JSON object, search query might be blocked or HTML error was returned.")
+            return mapped
+        }
         try {
-            val jsonObj = JSONObject(bodyString)
+            val jsonObj = JSONObject(trimmed)
             val resultsArray = jsonObj.optJSONArray("results") ?: return emptyList()
             
             for (i in 0 until resultsArray.length()) {
@@ -236,6 +241,12 @@ class VideoRepository(private val dao: SavedVideoDao) {
     }
 
     suspend fun fetchRealVideos(query: String?, category: String?): List<Video> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            fetchRealVideosSuspend(query, category)
+        }
+    }
+
+    private suspend fun fetchRealVideosSuspend(query: String?, category: String?): List<Video> {
         // Try calling the actual Rutube Search or Showcase APIs
         try {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
@@ -332,18 +343,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("VideoRepository", "Rutube API error, falling back to Gemini", e)
-        }
-
-        // If Rutube call fails or empty, call Gemini API fallback loader
-        try {
-            val geminiResults = com.example.data.gemini.GeminiSearchService.fetchSearchFallback(query, category)
-            if (geminiResults.isNotEmpty()) {
-                lastFetchSource = "Gemini Hybrid AI"
-                return geminiResults
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("VideoRepository", "Gemini API error, falling back to offline database", e)
+            android.util.Log.e("VideoRepository", "Rutube API error, falling back to offline database", e)
         }
 
         // Fallback to Room DB saved offline videos to prevent complete empty stubs
@@ -372,7 +372,62 @@ class VideoRepository(private val dao: SavedVideoDao) {
                         video.channel.contains(query, ignoreCase = true)
                 matchCat && matchQuery
             }
-            return filteredSaved
+            if (filteredSaved.isNotEmpty()) {
+                return filteredSaved
+            } else {
+                lastFetchSource = "Встроенные хиты"
+                val defaultVideos = listOf(
+                    Video(
+                        id = "fallback_mock_1",
+                        title = "Музыкальный хит: Космическое Путешествие",
+                        channel = "Dreamer Records",
+                        views = "500К просмотров",
+                        timeAgo = "1 день назад",
+                        duration = "03:45",
+                        isPro = false,
+                        category = "Музыка",
+                        description = "Красивый успокаивающий инструментальный клип для работы и сна в Sleek Video Hub.",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500",
+                        isDownloaded = false,
+                        isBookmarked = false
+                    ),
+                    Video(
+                        id = "fallback_mock_2",
+                        title = "Качественные технологии будущего в 2026 году",
+                        channel = "TechFocus",
+                        views = "1.2М просмотров",
+                        timeAgo = "3 дня назад",
+                        duration = "10:15",
+                        isPro = true,
+                        category = "Технологии",
+                        description = "Обзор революционных девайсов, инноваций и умной техники в современном разрешении.",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=500",
+                        isDownloaded = false,
+                        isBookmarked = false
+                    ),
+                    Video(
+                        id = "fallback_mock_3",
+                        title = "Невероятный юмор: Смешные курьезы из жизни",
+                        channel = "SmileTime",
+                        views = "350К просмотров",
+                        timeAgo = "5 дней назад",
+                        duration = "07:20",
+                        isPro = false,
+                        category = "Юмор",
+                        description = "Подборка лучших веселых жизненных моментов, которые поднимут вам настроение на весь день.",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=500",
+                        isDownloaded = false,
+                        isBookmarked = false
+                    )
+                )
+                return defaultVideos.filter { video ->
+                    val matchCat = category.isNullOrBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
+                    val matchQuery = query.isNullOrBlank() || 
+                            video.title.contains(query, ignoreCase = true) || 
+                            video.channel.contains(query, ignoreCase = true)
+                    matchCat && matchQuery
+                }
+            }
         } catch (dbEx: Exception) {
             return emptyList()
         }

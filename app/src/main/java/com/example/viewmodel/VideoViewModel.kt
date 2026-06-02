@@ -74,7 +74,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     private var playbackJob: Job? = null
 
-    // Dynamic list of real matching videos from network / Gemini / local repository
+    // Dynamic list of real matching videos from network / offline database/built-in catalog
     private val _dynamicVideos = MutableStateFlow<List<Video>>(emptyList())
     val dynamicVideos = _dynamicVideos.asStateFlow()
 
@@ -91,7 +91,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
 
-    // Expose active loading source: Rutube API Live, Gemini AI Fallback, Offline
+    // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
         while (true) {
             emit(repository.lastFetchSource)
