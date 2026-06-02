@@ -340,16 +340,40 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            fun decryptAes128(encryptedBytes: ByteArray, key: ByteArray, sequenceNumber: Int): ByteArray {
-                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                val keySpec = SecretKeySpec(key, "AES")
-                val iv = ByteArray(16)
-                for (b in 0..7) {
-                    iv[15 - b] = ((sequenceNumber.toLong() shr (b * 8)) and 0xFF).toByte()
+            fun resolveUrl(baseUrl: String, relativeUrl: String): String {
+                if (relativeUrl.startsWith("http://") || relativeUrl.startsWith("https://")) {
+                    return relativeUrl
                 }
-                val ivSpec = IvParameterSpec(iv)
-                cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
-                return cipher.doFinal(encryptedBytes)
+                if (relativeUrl.startsWith("/")) {
+                    val schemeAndDomain = baseUrl.substringBefore("://") + "://" + baseUrl.substringAfter("://").substringBefore("/")
+                    return schemeAndDomain + relativeUrl
+                }
+                val lastSlash = baseUrl.lastIndexOf('/')
+                if (lastSlash != -1) {
+                    val basePath = baseUrl.substring(0, lastSlash + 1)
+                    return basePath + relativeUrl
+                }
+                return relativeUrl
+            }
+
+            fun decryptAes128(encryptedBytes: ByteArray, key: ByteArray, ivBytes: ByteArray): ByteArray {
+                return try {
+                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                    val keySpec = SecretKeySpec(key, "AES")
+                    val ivSpec = IvParameterSpec(ivBytes)
+                    cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                    cipher.doFinal(encryptedBytes)
+                } catch (e: Exception) {
+                    try {
+                        val cipher = Cipher.getInstance("AES/CBC/NoPadding")
+                        val keySpec = SecretKeySpec(key, "AES")
+                        val ivSpec = IvParameterSpec(ivBytes)
+                        cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                        cipher.doFinal(encryptedBytes)
+                    } catch (ex: Exception) {
+                        throw ex
+                    }
+                }
             }
 
             log("[yt-dlp] Initializing local yt-dlp environment...")
@@ -382,7 +406,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 
                 if (extractedStreamUrl.isNullOrBlank()) {
-                    val liveBalancerObj = jsonObject.optJSONObject("live_balancer")
+                    val liveBalancerObj = jsonObject.optJSONObject("live_balancer") ?: jsonObject.optJSONObject("live_streams")
                     if (liveBalancerObj != null) {
                         extractedStreamUrl = liveBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
                             ?: liveBalancerObj.optString("default").takeIf { it.isNotBlank() }
@@ -418,8 +442,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 log("[rutube] Found active direct HLS playlist balancer:")
                 log("         ${extractedStreamUrl.take(80)}...")
             } else {
-                log("[rutube] Balancer mapped to dynamic CDN. Formatting download stream pipelines.")
-                extractedStreamUrl = "https://rutube.ru/api/play/options/$id/"
+                log("[error] Direct video media streams not resolved.")
             }
             delay(600)
 
@@ -462,24 +485,28 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             
             var isFetchSuccess = false
             try {
+                if (extractedStreamUrl.isNullOrBlank()) {
+                    throw Exception("No stream URL extracted for target video ID $id")
+                }
                 log("[download] Rendering playlist master index streams...")
-                val masterM3u8Text = loadText(extractedStreamUrl!!)
+                val masterM3u8Text = loadText(extractedStreamUrl)
                 
+                var mediaM3u8Text = ""
                 var mediaPlaylistUrl = extractedStreamUrl
-                val lines = masterM3u8Text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-                val hasStreams = lines.any { it.startsWith("#EXT-X-STREAM-INF") }
+                val masterLines = masterM3u8Text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                val hasStreams = masterLines.any { it.startsWith("#EXT-X-STREAM-INF") }
                 
                 if (hasStreams) {
                     val candidates = mutableListOf<String>()
-                    for (i in lines.indices) {
-                        val line = lines[i]
+                    for (i in masterLines.indices) {
+                        val line = masterLines[i]
                         if (line.startsWith("#EXT-X-STREAM-INF")) {
                             var nextIndex = i + 1
-                            while (nextIndex < lines.size && lines[nextIndex].startsWith("#")) {
+                            while (nextIndex < masterLines.size && masterLines[nextIndex].startsWith("#")) {
                                 nextIndex++
                             }
-                            if (nextIndex < lines.size) {
-                                candidates.add(lines[nextIndex])
+                            if (nextIndex < masterLines.size) {
+                                candidates.add(masterLines[nextIndex])
                             }
                         }
                     }
@@ -488,17 +515,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             ?: candidates.firstOrNull { it.contains("480") }
                             ?: candidates.lastOrNull()
                             ?: candidates.first()
-                        mediaPlaylistUrl = URI(extractedStreamUrl).resolve(best).toString()
+                        mediaPlaylistUrl = resolveUrl(extractedStreamUrl, best)
                     }
+                    log("[download] Loading media segment index playlist...")
+                    mediaM3u8Text = loadText(mediaPlaylistUrl)
+                } else {
+                    mediaM3u8Text = masterM3u8Text
                 }
                 
                 log("[download] Processing media segment indices...")
-                val mediaM3u8Text = loadText(mediaPlaylistUrl)
                 val mediaLines = mediaM3u8Text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
                 
                 var encryptionKeyUrl: String? = null
                 var startSequence = 0
                 val segments = mutableListOf<String>()
+                var explicitIv: ByteArray? = null
                 
                 for (line in mediaLines) {
                     if (line.startsWith("#EXT-X-MEDIA-SEQUENCE:")) {
@@ -507,11 +538,26 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         if (line.contains("METHOD=AES-128")) {
                             val uriPart = line.substringAfter("URI=\"").substringBefore("\"")
                             if (uriPart.isNotBlank()) {
-                                encryptionKeyUrl = URI(mediaPlaylistUrl).resolve(uriPart).toString()
+                                encryptionKeyUrl = resolveUrl(mediaPlaylistUrl, uriPart)
+                            }
+                            try {
+                                if (line.contains("IV=")) {
+                                    val ivHex = line.substringAfter("IV=0x").substringBefore(",").substringBefore("\"").trim()
+                                    if (ivHex.length == 32) {
+                                        explicitIv = ByteArray(16)
+                                        for (i in 0 until 16) {
+                                            val high = Character.digit(ivHex[i * 2], 16)
+                                            val low = Character.digit(ivHex[i * 2 + 1], 16)
+                                            explicitIv!![i] = ((high shl 4) or low).toByte()
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                explicitIv = null
                             }
                         }
                     } else if (!line.startsWith("#")) {
-                        val resolvedSeg = URI(mediaPlaylistUrl).resolve(line).toString()
+                        val resolvedSeg = resolveUrl(mediaPlaylistUrl, line)
                         segments.add(resolvedSeg)
                     }
                 }
@@ -519,11 +565,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 var keyBytes: ByteArray? = null
                 if (encryptionKeyUrl != null) {
                     log("[download] Detected AES-128 standard encryption. Resolving decryption security keys...")
-                    val req = Request.Builder().url(encryptionKeyUrl!!).build()
-                    okHttpClient.newCall(req).execute().use { resp ->
-                        if (resp.isSuccessful) {
-                            keyBytes = resp.body?.bytes()
+                    try {
+                        val req = Request.Builder().url(encryptionKeyUrl!!).build()
+                        okHttpClient.newCall(req).execute().use { resp ->
+                            if (resp.isSuccessful) {
+                                keyBytes = resp.body?.bytes()
+                            }
                         }
+                    } catch (e: Exception) {
+                        log("[download] Warning: Failed to retrieve encryption key from server.")
                     }
                     if (keyBytes != null && keyBytes!!.size == 16) {
                         log("[download] Decryption security credentials verified (${keyBytes!!.size} bytes)")
@@ -542,11 +592,27 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             val segmentUrl = segments[index]
                             val seq = startSequence + index
                             
-                            val req = Request.Builder().url(segmentUrl).build()
                             var segmentBytes: ByteArray? = null
-                            okHttpClient.newCall(req).execute().use { resp ->
-                                if (resp.isSuccessful && resp.body != null) {
-                                    segmentBytes = resp.body!!.bytes()
+                            var retryCount = 0
+                            val maxRetries = 3
+                            
+                            while (segmentBytes == null && retryCount < maxRetries) {
+                                try {
+                                    val req = Request.Builder().url(segmentUrl).build()
+                                    okHttpClient.newCall(req).execute().use { resp ->
+                                        if (resp.isSuccessful && resp.body != null) {
+                                            segmentBytes = resp.body!!.bytes()
+                                        } else {
+                                            retryCount++
+                                            delay(1000L * retryCount)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    retryCount++
+                                    delay(1000L * retryCount)
+                                    if (retryCount >= maxRetries) {
+                                        throw e
+                                    }
                                 }
                             }
                             
@@ -555,7 +621,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             }
                             
                             val finalBytes = if (keyBytes != null && keyBytes!!.size == 16) {
-                                decryptAes128(segmentBytes!!, keyBytes!!, seq)
+                                val currentIv = if (explicitIv != null) {
+                                    explicitIv!!
+                                } else {
+                                    val iv = ByteArray(16)
+                                    for (b in 0..7) {
+                                        iv[15 - b] = ((seq.toLong() shr (b * 8)) and 0xFF).toByte()
+                                    }
+                                    iv
+                                }
+                                decryptAes128(segmentBytes!!, keyBytes!!, currentIv)
                             } else {
                                 segmentBytes!!
                             }
