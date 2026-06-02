@@ -1,8 +1,12 @@
-// RutubeModels.kt
+package com.example.data.rutube
+
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
+
 @JsonClass(generateAdapter = true)
 data class RutubeSearchResponse(
     @Json(name = "results") val results: List<RutubeVideoItem>? = null,
-    @Json(name = "next") val next: String? = null   // ← пагинация
+    @Json(name = "next") val next: String? = null
 )
 
 @JsonClass(generateAdapter = true)
