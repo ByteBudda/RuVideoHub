@@ -106,6 +106,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         fetchRealCategories()
     }
 
+    private var currentPage = 1
+    private var isEndReached = false
+    private var currentQuery: String? = null
+    private var currentCategory: String? = "Все"
+
+    private val _isMoreLoading = MutableStateFlow(false)
+    val isMoreLoading = _isMoreLoading.asStateFlow()
+
     fun fetchRealCategories() {
         viewModelScope.launch {
             _isCategoriesLoading.value = true
@@ -123,14 +131,40 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private var fetchJob: Job? = null
     fun fetchRealVideos(query: String? = null, category: String? = null) {
         fetchJob?.cancel()
+        currentQuery = query
+        currentCategory = category
+        currentPage = 1
+        isEndReached = false
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                _dynamicVideos.value = repository.fetchRealVideos(query, category)
+                _dynamicVideos.value = repository.fetchRealVideos(query, category, page = 1)
             } catch (e: Exception) {
                 // Ignore or log error gracefully
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    fun loadNextPage() {
+        if (_isMoreLoading.value || isEndReached || _isLoading.value) return
+        
+        viewModelScope.launch {
+            _isMoreLoading.value = true
+            try {
+                val nextPage = currentPage + 1
+                val newVideos = repository.fetchRealVideos(currentQuery, currentCategory, nextPage)
+                if (newVideos.isEmpty()) {
+                    isEndReached = true
+                } else {
+                    currentPage = nextPage
+                    _dynamicVideos.value = (_dynamicVideos.value + newVideos).distinctBy { it.id }
+                }
+            } catch (e: Exception) {
+                // Ignore or log error gracefully
+            } finally {
+                _isMoreLoading.value = false
             }
         }
     }
@@ -176,6 +210,50 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         .map { list -> list.filter { it.isBookmarked } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // List of ALL viewed/saved items (Recent/History list), sorted by savedAt DESC
+    val recentSavedVideos: StateFlow<List<SavedVideo>> = repository.getSavedVideosOnly()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addToRecentHistory(video: Video) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = com.example.data.AppDatabase.getDatabase(getApplication())
+                val existing = db.savedVideoDao().getVideoById(video.id)
+                val toSave = SavedVideo(
+                    id = video.id,
+                    title = video.title,
+                    channel = video.channel,
+                    views = video.views,
+                    timeAgo = video.timeAgo,
+                    duration = video.duration,
+                    isPro = video.isPro,
+                    category = video.category,
+                    thumbnailUrl = video.thumbnailUrl,
+                    isDownloaded = existing?.isDownloaded ?: false,
+                    isBookmarked = existing?.isBookmarked ?: false,
+                    savedAt = System.currentTimeMillis()
+                )
+                db.savedVideoDao().insertOrUpdate(toSave)
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Log history insert failed", e)
+            }
+        }
+    }
+
+    fun deleteRecentItem(video: Video) {
+        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val targetFile = File(downloadFolder, "${video.id}.mp4")
+        viewModelScope.launch {
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            repository.deleteVideoById(video.id)
+            if (_currentSelectedVideo.value?.id == video.id) {
+                _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
+            }
+        }
+    }
+
     fun selectTab(tab: String) {
         _currentTab.value = tab
     }
@@ -188,6 +266,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
         triggerDebouncedSearch(query, _selectedCategory.value)
+    }dSearch(query, _selectedCategory.value)
     }
 
     fun selectVideo(video: Video?) {
