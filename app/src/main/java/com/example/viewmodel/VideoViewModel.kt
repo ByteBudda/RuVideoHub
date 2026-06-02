@@ -10,6 +10,7 @@ import com.example.data.AppDatabase
 import com.example.data.SavedVideo
 import com.example.data.Video
 import com.example.data.VideoRepository
+import com.example.data.RutubeCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -62,6 +63,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _realCategories = MutableStateFlow<List<RutubeCategory>>(emptyList())
+    val realCategories = _realCategories.asStateFlow()
+
+    private val _isCategoriesLoading = MutableStateFlow(false)
+    val isCategoriesLoading = _isCategoriesLoading.asStateFlow()
+
     // yt-dlp downloading state parameters
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
@@ -76,6 +83,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         fetchRealVideos()
+        fetchRealCategories()
+    }
+
+    fun fetchRealCategories() {
+        viewModelScope.launch {
+            _isCategoriesLoading.value = true
+            try {
+                val cats = repository.fetchRealCategories()
+                _realCategories.value = cats
+            } catch (e: Exception) {
+                // Ignore
+            } finally {
+                _isCategoriesLoading.value = false
+            }
+        }
     }
 
     private var fetchJob: Job? = null

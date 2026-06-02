@@ -852,14 +852,8 @@ fun ExploreTabScreen(
     viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
-    val trendingCategories = listOf(
-        ExploreItem("Шоу и Передачи", "14.2к трансляций", listOf(Color(0xFFE9D5FF), Color(0xFFC084FC))),
-        ExploreItem("Развлечения и Лайф", "25.8к видео", listOf(Color(0xFFFCE7F3), Color(0xFFF472B6))),
-        ExploreItem("Новости и События", "910 эфиров", listOf(Color(0xFFDBEAFE), Color(0xFF60A5FA))),
-        ExploreItem("Игры и Трансляции", "6.4к стримеров", listOf(Color(0xFFD1FAE5), Color(0xFF34D399))),
-        ExploreItem("Спорт экстрим", "2.1к турниров", listOf(Color(0xFFFEF3C7), Color(0xFFFBBF24))),
-        ExploreItem("Техноблогеры", "12.7к обзоров", listOf(Color(0xFFE0F2FE), Color(0xFF38BDF8)))
-    )
+    val realCategories by viewModel.realCategories.collectAsStateWithLifecycle()
+    val isCategoriesLoading by viewModel.isCategoriesLoading.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -868,232 +862,123 @@ fun ExploreTabScreen(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Исследуйте Rutube",
+            text = "Проводник Rutube",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Свежие тренды, популярные стримы и горячие плейлисты собранные специально для вас",
+            text = "Исследуйте полный каталог категорий, трансляций и шоу в реальном времени с Rutube",
             fontSize = 12.sp,
             color = GreyText,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 18.dp),
             lineHeight = 16.sp
         )
 
-        // Category grid arrangement (2 columns)
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            for (i in trendingCategories.indices step 2) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    val firstItem = trendingCategories[i]
-                    TrendingChipItem(
-                        item = firstItem,
-                        onClick = {
-                            when (firstItem.title) {
-                                "Шоу и Передачи" -> {
-                                    viewModel.selectCategory("Телепередачи")
-                                    viewModel.setSearchQuery("")
-                                }
-                                "Развлечения и Лайф" -> {
-                                    viewModel.selectCategory("Все")
-                                    viewModel.setSearchQuery("развлечения")
-                                }
-                                "Новости и События" -> {
-                                    viewModel.selectCategory("Все")
-                                    viewModel.setSearchQuery("новости")
-                                }
-                                "Игры и Трансляции" -> {
-                                    viewModel.selectCategory("Видеоигры")
-                                    viewModel.setSearchQuery("")
-                                }
-                                "Спорт экстрим" -> {
-                                    viewModel.selectCategory("Спорт")
-                                    viewModel.setSearchQuery("")
-                                }
-                                "Техноблогеры" -> {
-                                    viewModel.selectCategory("Технологии")
-                                    viewModel.setSearchQuery("")
-                                }
-                            }
-                            viewModel.selectTab("home")
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (i + 1 < trendingCategories.size) {
-                        val secondItem = trendingCategories[i + 1]
-                        TrendingChipItem(
-                            item = secondItem,
-                            onClick = {
-                                when (secondItem.title) {
-                                    "Шоу и Передачи" -> {
-                                        viewModel.selectCategory("Телепередачи")
-                                        viewModel.setSearchQuery("")
-                                    }
-                                    "Развлечения и Лайф" -> {
-                                        viewModel.selectCategory("Все")
-                                        viewModel.setSearchQuery("развлечения")
-                                    }
-                                    "Новости и События" -> {
-                                        viewModel.selectCategory("Все")
-                                        viewModel.setSearchQuery("новости")
-                                    }
-                                    "Игры и Трансляции" -> {
-                                        viewModel.selectCategory("Видеоигры")
-                                        viewModel.setSearchQuery("")
-                                    }
-                                    "Спорт экстрим" -> {
-                                        viewModel.selectCategory("Спорт")
-                                        viewModel.setSearchQuery("")
-                                    }
-                                    "Техноблогеры" -> {
-                                        viewModel.selectCategory("Технологии")
-                                        viewModel.setSearchQuery("")
-                                    }
-                                }
-                                viewModel.selectTab("home")
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Featured live item
-        Text(
-            text = "Прямой Эфир • Рекомендуем",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = Primary,
-            letterSpacing = 1.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp),
-            colors = CardDefaults.cardColors(containerColor = SecondaryBackground)
-        ) {
+        if (isCategoriesLoading && realCategories.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFF311042), Color(0xFF1D062C))
-                        )
-                    )
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
             ) {
-                // Background grid pattern
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(
-                        color = Color.White.copy(alpha = 0.03f),
-                        style = Stroke(width = 1f)
-                    )
-                }
-
-                // Banner Details
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Red)
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Color.White)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "ЭФИР",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = "Финал Кибер-Арены 2026",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Смотрят сейчас: 42.5к зрителей",
-                            color = Color.White.copy(0.7f),
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
-                }
-
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.15f),
-                    modifier = Modifier
-                        .size(120.dp)
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 12.dp)
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
-        }
-    }
-}
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (i in realCategories.indices step 2) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(11.dp)
+                    ) {
+                        val firstItem = realCategories[i]
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(115.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    viewModel.selectCategory(firstItem.title)
+                                    viewModel.setSearchQuery("")
+                                    viewModel.selectTab("home")
+                                }
+                        ) {
+                            AsyncImage(
+                                model = firstItem.picture,
+                                contentDescription = firstItem.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                                            startY = 50f
+                                        )
+                                    )
+                            )
+                            Text(
+                                text = firstItem.title,
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            )
+                        }
 
-data class ExploreItem(
-    val title: String,
-    val stats: String,
-    val colors: List<Color>
-)
-
-@Composable
-fun TrendingChipItem(
-    item: ExploreItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .height(96.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(colors = item.colors))
-            .clickable { onClick() }
-            .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = item.title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1D062C),
-                lineHeight = 16.sp
-            )
-            Text(
-                text = item.stats,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1D062C).copy(alpha = 0.6f)
-            )
+                        if (i + 1 < realCategories.size) {
+                            val secondItem = realCategories[i + 1]
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(115.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        viewModel.selectCategory(secondItem.title)
+                                        viewModel.setSearchQuery("")
+                                        viewModel.selectTab("home")
+                                    }
+                            ) {
+                                AsyncImage(
+                                    model = secondItem.picture,
+                                    contentDescription = secondItem.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                                                startY = 50f
+                                            )
+                                        )
+                                )
+                                Text(
+                                    text = secondItem.title,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1799,46 +1684,7 @@ fun SleekPlayerDetailOverlay(
             }
         }
 
-        // Slider and Progress Timer Bar
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Slider(
-                value = progress,
-                onValueChange = { viewModel.seekProgress(it) },
-                valueRange = 0f..1f,
-                colors = SliderDefaults.colors(
-                    thumbColor = Primary,
-                    activeTrackColor = Primary,
-                    inactiveTrackColor = SurfaceVariant
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp)
-                    .testTag("player_timeline")
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formattedElapsed,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = GreyText
-                )
-                Text(
-                    text = video.duration,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = GreyText
-                )
-            }
-        }
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Detail descriptions and channels metadata
         Column(

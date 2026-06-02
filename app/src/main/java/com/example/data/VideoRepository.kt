@@ -11,6 +11,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
     var lastFetchSource: String = "Инициализация"
         private set
 
+    private val dynamicCategoryTargets = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     fun getVideosFlow(): Flow<List<Video>> {
         return dao.getAllSavedVideos().map { savedList ->
             savedList.map { saved ->
@@ -249,7 +251,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     return results
                 }
             } else {
-                val categorySlug = categorySlugs[selectedCategoryName]
+                var categorySlug = categorySlugs[selectedCategoryName]
+                if (categorySlug == null) {
+                    categorySlug = dynamicCategoryTargets[selectedCategoryName]
+                }
                 if (categorySlug != null) {
                     try {
                         val feedResponse = apiService.getDynamicUrl("https://rutube.ru/api/feeds/$categorySlug/?format=json")
@@ -426,4 +431,42 @@ class VideoRepository(private val dao: SavedVideoDao) {
             dao.insertOrUpdate(updated)
         }
     }
+
+    suspend fun fetchRealCategories(): List<RutubeCategory> {
+        val categoriesList = mutableListOf<RutubeCategory>()
+        try {
+            val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+            val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
+            val bodyStr = response.string()
+            val jsonObj = JSONObject(bodyStr)
+            val resultsArray = jsonObj.optJSONArray("results")
+            if (resultsArray != null) {
+                for (i in 0 until resultsArray.length()) {
+                    val item = resultsArray.optJSONObject(i) ?: continue
+                    val id = item.optInt("id")
+                    val title = item.optString("title")
+                    val picture = item.optString("picture")
+                    val target = item.optString("target")
+                    if (title.isNotBlank()) {
+                        categoriesList.add(
+                            RutubeCategory(
+                                id = id,
+                                title = title,
+                                picture = picture,
+                                target = target
+                            )
+                        )
+                        val slug = target.removePrefix("/feeds/").removeSuffix("/")
+                        if (slug.isNotBlank()) {
+                            dynamicCategoryTargets[title] = slug
+                        }
+                    }
+                }
+            }
+        } catch (ex: Exception) {
+            android.util.Log.e("VideoRepository", "Error fetching real categories", ex)
+        }
+        return categoriesList
+    }
 }
+
