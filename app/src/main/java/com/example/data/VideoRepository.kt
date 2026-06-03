@@ -10,10 +10,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
-// Предполагаем, что эти дата-классы объявлены в твоем проекте. 
-// Если имена отличаются (например, RutubeCategory), подправь под свою модель.
-data class RutubeCategory(val id: Int, val title: String, val picture: String, val target: String)
-
 class VideoRepository(
     private val dao: SavedVideoDao,
     private val apiService: RutubeApiService
@@ -109,8 +105,6 @@ class VideoRepository(
 
     private suspend fun fetchCategoryPage(slug: String, categoryName: String, page: Int): Pair<List<Video>, String?> {
         return try {
-            // Внимание: базовые slug фидов (типа 'movies') отдают структуру разметки страниц, а не списки видео.
-            // Для работы напрямую через API, этот URL используется как фоллбек.
             val url = "https://rutube.ru/api/feeds/$slug/?page=$page&format=json"
             val response = apiService.getDynamicUrl(url)
             val videos = response.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
@@ -124,7 +118,6 @@ class VideoRepository(
 
     private suspend fun fetchAllCategoriesVideos(): List<Video> {
         return try {
-            // Используем официальную витрину популярного контента для дефолтной страницы
             val response = apiService.getPopularVideos(page = 1)
             lastFetchSource = "Rutube LIVE (Популярное)"
             response.results?.mapNotNull { toVideo(it, "Все") } ?: emptyList()
@@ -241,7 +234,6 @@ class VideoRepository(
     suspend fun fetchRealCategories(): List<RutubeCategory> {
         val categoriesList = mutableListOf<RutubeCategory>()
         try {
-            // Запрашиваем сырой ResponseBody для ручного парсинга нативного JSON
             val responseBody = apiService.getRawDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
             val jsonStr = responseBody.string() 
             
@@ -256,7 +248,6 @@ class VideoRepository(
                     val target = item.optString("target")
                     if (title.isNotBlank()) {
                         categoriesList.add(RutubeCategory(id, title, picture, target))
-                        // Парсим slug: убираем префиксы и слэши по краям
                         val slug = target.removePrefix("/feeds/").removePrefix("feeds/").trim('/')
                         if (slug.isNotBlank()) {
                             dynamicCategoryTargets[title] = slug
