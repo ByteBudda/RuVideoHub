@@ -14,7 +14,7 @@ class VideoPagingSource(
             val (videos, nextKey) = repository.fetchVideosPage(query, category, params.key)
             LoadResult.Page(
                 data = videos,
-                prevKey = null,               // API не поддерживает предыдущую страницу
+                prevKey = null,
                 nextKey = nextKey
             )
         } catch (e: Exception) {
