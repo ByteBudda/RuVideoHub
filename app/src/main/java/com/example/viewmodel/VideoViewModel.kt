@@ -30,9 +30,21 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
+data class RutubeComment(
+    val id: String,
+    val author: String,
+    val text: String,
+    val date: String,
+    val likes: Int
+)
+
+data class YtDlpDownload(
+    val id: String, val title: String, val channel: String, val thumbnailUrl: String,
+    val progress: Float, val speed: String, val eta: String, val status: String, val logs: List<String>
+)
+
 class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Authorization State
     private val _isAuthorized = MutableStateFlow(false)
     val isAuthorized = _isAuthorized.asStateFlow()
 
@@ -51,7 +63,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val repository = VideoRepository(db.savedVideoDao())
 
-    // Tabs & UI States
     private val _currentTab = MutableStateFlow("home")
     val currentTab = _currentTab.asStateFlow()
 
@@ -67,39 +78,29 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentSelectedVideo = MutableStateFlow<Video?>(null)
     val currentSelectedVideo = _currentSelectedVideo.asStateFlow()
 
-    // Состояния воспроизведения
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
 
-    // Оставляем для совместимости со старыми элементами интерфейса (0f .. 1f)
     private val _playProgress = MutableStateFlow(0f)
     val playProgress = _playProgress.asStateFlow()
 
-    // ТРЕКИНГ В РЕАЛЬНЫХ МИЛЛИСЕКУНДАХ (Защита от сброса при Fullscreen)
     private val _currentPositionMs = MutableStateFlow(0L)
     val currentPositionMs = _currentPositionMs.asStateFlow()
 
     private val _videoDurationMs = MutableStateFlow(1L)
     val videoDurationMs = _videoDurationMs.asStateFlow()
 
-    // Поток фоллбека: true -> открываем iframe эмбед, false -> нативный ExoPlayer
     private val _isEmbedFallback = MutableStateFlow(false)
     val isEmbedFallback = _isEmbedFallback.asStateFlow()
 
-    // Хранилище позиций (videoId -> позиция в мс)
     private val _videoPositions = mutableMapOf<String, Long>()
-
-    // Кэш для видео, у которых нет прямого HLS потока (черный список для моментального эмбеда)
     private val _embedFallbackCache = ConcurrentHashMap<String, Boolean>()
-    
-    // Кэш рабочих ссылок на потоки
     private val _streamUrlCache = ConcurrentHashMap<String, String>()
 
     private var playbackJob: Job? = null
     private var fetchJob: Job? = null
     private var searchDebounceJob: Job? = null
 
-    //Lists & Categories
     private val _dynamicVideos = MutableStateFlow<List<Video>>(emptyList())
     val dynamicVideos = _dynamicVideos.asStateFlow()
 
@@ -287,7 +288,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         triggerDebouncedSearch(query, _selectedCategory.value)
     }
 
-    // ВЫБОР ВИДЕО И ЗАПУСК КОНВЕЙЕРА ПРОВЕРКИ СТРИМА
     fun selectVideo(video: Video?) {
         if (video != null && video.id.startsWith("tv_")) {
             val tvId = video.id.substringAfter("tv_")
@@ -347,7 +347,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         stopPlaybackTicker()
 
         if (video != null) {
-            // Восстанавливаем сохраненную позицию просмотра в мс
             val savedPos = getVideoPosition(video.id)
             _currentPositionMs.value = savedPos
             _videoDurationMs.value = 1L
@@ -356,8 +355,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isPlaying.value = true
             loadComments(video.id)
             addToRecentHistory(video)
-
-            // Запуск автоматического конвейера разбора потока
             preparePlayerStream(video.id)
         } else {
             _isPlaying.value = false
@@ -367,20 +364,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * АВТОМАТИЧЕСКИЙ КОНВЕЙЕР: Ищет HLS 1-3 раза.
-     * Если стрима нет (ТВ каналы, трансляции) — моментально уводит плеер в Embed WebView.
-     */
     private fun preparePlayerStream(videoId: String) {
         viewModelScope.launch {
-            // Быстрый выход: Если видео в блеклисте эмбедов — сразу открываем его
             if (_embedFallbackCache[videoId] == true) {
                 _isEmbedFallback.value = true
                 startPlaybackTicker()
                 return@launch
             }
 
-            // Быстрый выход: Если ссылка на HLS поток уже есть в оперативной памяти
             if (_streamUrlCache.containsKey(videoId)) {
                 _isEmbedFallback.value = false
                 startPlaybackTicker()
@@ -391,14 +382,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             var attempts = 0
             val maxAttempts = 3
 
-            // Стучимся от 1 до 3 раз в API билинга/балансера
             while (attempts < maxAttempts && resolvedUrl == null) {
                 attempts++
                 android.util.Log.d("PlayerPipeline", "Запрос HLS потока: попытка $attempts из $maxAttempts")
                 resolvedUrl = fetchHlsStreamUrl(videoId)
                 
                 if (resolvedUrl == null && attempts < maxAttempts) {
-                    delay(400) // Пауза перед повторным стуком
+                    delay(400)
                 }
             }
 
@@ -407,7 +397,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _streamUrlCache[videoId] = resolvedUrl
                 android.util.Log.i("PlayerPipeline", "Прямой поток успешно подвязан: $resolvedUrl")
             } else {
-                // Все попытки исчерпаны -> Заносим в черный список, переключаем на iframe эмбед
                 _embedFallbackCache[videoId] = true
                 _isEmbedFallback.value = true
                 android.util.Log.w("PlayerPipeline", "Прямой поток недоступен. Активирован Rutube Embed Fallback.")
@@ -417,7 +406,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Функция обновления прогресса напрямую из слушателей ExoPlayer
     fun updatePlayerProgress(positionMs: Long, durationMs: Long) {
         _currentPositionMs.value = positionMs
         if (durationMs > 0) {
@@ -449,11 +437,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 delay(1000)
                 val video = _currentSelectedVideo.value ?: break
                 if (_isEmbedFallback.value) {
-                    // Симулируем виртуальный прогресс для iframe-заглушки
                     val current = _playProgress.value
                     if (current < 1f) _playProgress.value = (current + 0.005f).coerceAtMost(1f)
                 } else {
-                    // Нативный плеер сам шлет точные данные, мы просто бэкапим их в Мапу позиций
                     saveVideoPosition(video.id, _currentPositionMs.value)
                 }
             }
@@ -465,7 +451,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         playbackJob = null
     }
 
-    // Вся логика скачивания через HLS/AES-128 / Backup Mirror (Без изменений)
     fun toggleBookmark(video: Video) {
         viewModelScope.launch {
             repository.toggleBookmark(video)
@@ -694,7 +679,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     isFetchSuccess = true
                 }
             } catch (err: Exception) {
-                // FALLBACK MIRROR CONTAINER PIPELINE (Если стрим упал)
                 val backupUrls = listOf(
                     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
                     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
@@ -748,7 +732,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     timeAgo = video.timeAgo, duration = video.duration, isPro = video.isPro,
                     category = video.category, thumbnailUrl = video.thumbnailUrl,
                     isDownloaded = existing?.isDownloaded ?: false, isBookmarked = existing?.isBookmarked ?: false,
-                    savedAt = System.currentTimeMillis()
+                    isWatched = true, savedAt = System.currentTimeMillis()
                 ))
             } catch (e: Exception) { android.util.Log.e("VideoViewModel", "History insert failed", e) }
         }
