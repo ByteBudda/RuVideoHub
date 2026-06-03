@@ -153,7 +153,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         try {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
             val q = query?.trim() ?: ""
-            val selectedCategoryName = category ?: "Все"
+            val selectedCategoryName = category ?: "Фильмы"
             
             if (q.isNotEmpty()) {
                 val responseBody = apiService.searchVideos(q, page = page)
@@ -273,7 +273,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     isBookmarked = saved.isBookmarked
                 )
             }.filter { video ->
-                val matchCat = category.isNullOrBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
+                val matchCat = category.isNullOrBlank() || video.category.equals(category, ignoreCase = true)
                 val matchQuery = query.isNullOrBlank() || 
                         video.title.contains(query, ignoreCase = true) || 
                         video.channel.contains(query, ignoreCase = true)
@@ -282,58 +282,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             if (filteredSaved.isNotEmpty()) {
                 return filteredSaved
             } else {
-                lastFetchSource = "Встроенные хиты"
-                val defaultVideos = listOf(
-                    Video(
-                        id = "fallback_mock_1",
-                        title = "Музыкальный хит: Космическое Путешествие",
-                        channel = "Dreamer Records",
-                        views = "500К просмотров",
-                        timeAgo = "1 день назад",
-                        duration = "03:45",
-                        isPro = false,
-                        category = "Музыка",
-                        description = "Красивый успокаивающий инструментальный клип для работы и сна в Sleek Video Hub.",
-                        thumbnailUrl = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500",
-                        isDownloaded = false,
-                        isBookmarked = false
-                    ),
-                    Video(
-                        id = "fallback_mock_2",
-                        title = "Качественные технологии будущего в 2026 году",
-                        channel = "TechFocus",
-                        views = "1.2М просмотров",
-                        timeAgo = "3 дня назад",
-                        duration = "10:15",
-                        isPro = true,
-                        category = "Технологии",
-                        description = "Обзор революционных девайсов, инноваций и умной техники в современном разрешении.",
-                        thumbnailUrl = "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=500",
-                        isDownloaded = false,
-                        isBookmarked = false
-                    ),
-                    Video(
-                        id = "fallback_mock_3",
-                        title = "Невероятный юмор: Смешные курьезы из жизни",
-                        channel = "SmileTime",
-                        views = "350К просмотров",
-                        timeAgo = "5 дней назад",
-                        duration = "07:20",
-                        isPro = false,
-                        category = "Юмор",
-                        description = "Подборка лучших веселых жизненных моментов, которые поднимут вам настроение на весь день.",
-                        thumbnailUrl = "https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=500",
-                        isDownloaded = false,
-                        isBookmarked = false
-                    )
-                )
-                return defaultVideos.filter { video ->
-                    val matchCat = category.isNullOrBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
-                    val matchQuery = query.isNullOrBlank() || 
-                            video.title.contains(query, ignoreCase = true) || 
-                            video.channel.contains(query, ignoreCase = true)
-                    matchCat && matchQuery
-                }
+                return emptyList()
             }
         } catch (dbEx: Exception) {
             return emptyList()

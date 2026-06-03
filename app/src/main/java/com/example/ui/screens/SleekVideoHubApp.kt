@@ -87,6 +87,7 @@ fun SleekVideoHubApp(
                     when (tab) {
                         "home" -> HomeTabScreen(viewModel = viewModel)
                         "explore" -> ExploreTabScreen(viewModel = viewModel)
+                        "recents" -> RecentsTabScreen(viewModel = viewModel)
                         "downloads" -> DownloadsTabScreen(viewModel = viewModel)
                         "library" -> LibraryTabScreen(viewModel = viewModel)
                     }
@@ -161,6 +162,13 @@ fun SleekBottomNavigation(
             BottomTabItem(
                 label = "Недавние",
                 icon = Icons.Default.History,
+                isActive = selectedTab == "recents",
+                onClick = { onTabSelected("recents") },
+                testTag = "tab_recents"
+            )
+            BottomTabItem(
+                label = "Загрузки",
+                icon = Icons.Default.Download,
                 isActive = selectedTab == "downloads",
                 onClick = { onTabSelected("downloads") },
                 testTag = "tab_downloads"
@@ -229,7 +237,7 @@ fun HomeTabScreen(
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
     val apiSource by viewModel.apiSource.collectAsStateWithLifecycle()
 
-    val categories = listOf("Все", "Фильмы", "Сериалы", "Телепередачи", "Музыка", "Мультфильмы", "Спорт", "Юмор", "Видеоигры", "Технологии")
+    val categories = listOf("Фильмы", "Сериалы", "Телепередачи", "Музыка", "Мультфильмы", "Спорт", "Юмор", "Видеоигры", "Технологии")
 
     Column(modifier = modifier.fillMaxSize()) {
         // App search header
@@ -1019,7 +1027,7 @@ fun ExploreTabScreen(
 }
 
 @Composable
-fun DownloadsTabScreen(
+fun RecentsTabScreen(
     viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -1173,6 +1181,149 @@ fun DownloadsTabScreen(
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = "Удалить из истории",
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DownloadsTabScreen(
+    viewModel: VideoViewModel,
+    modifier: Modifier = Modifier
+) {
+    val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(bottom = 12.dp)) {
+            Text(
+                text = "Загрузки",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Скачанные видео для офлайн-просмотра",
+                fontSize = 11.sp,
+                color = GreyText
+            )
+        }
+
+        if (downloadedVideos.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DownloadDone,
+                        contentDescription = null,
+                        tint = GreyText.copy(alpha = 0.4f),
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Список загрузок пуст",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Вы можете скачивать видео во время воспроизведения в плеере.",
+                        fontSize = 11.sp,
+                        color = GreyText,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                items(downloadedVideos, key = { it.id }) { saved ->
+                    val videoRuntime = Video(
+                        id = saved.id,
+                        title = saved.title,
+                        channel = saved.channel,
+                        views = saved.views,
+                        timeAgo = saved.timeAgo,
+                        duration = saved.duration,
+                        isPro = saved.isPro,
+                        category = saved.category,
+                        description = "Скачанное видео.",
+                        thumbnailUrl = saved.thumbnailUrl,
+                        isDownloaded = true,
+                        isBookmarked = saved.isBookmarked
+                    )
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                        border = BorderStroke(1.dp, SurfaceVariant),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.selectVideo(videoRuntime) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            VideoThumbnail(
+                                id = saved.id,
+                                duration = saved.duration,
+                                thumbnailUrl = saved.thumbnailUrl,
+                                modifier = Modifier
+                                    .width(100.dp)
+                                    .height(60.dp)
+                            )
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = saved.title,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = saved.channel,
+                                    fontSize = 10.sp,
+                                    color = GreyText
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { 
+                                    viewModel.toggleDownload(videoRuntime)
+                                },
+                                modifier = Modifier.size(32.dp).testTag("delete_download_${saved.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Удалить загрузку",
                                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                                     modifier = Modifier.size(18.dp)
                                 )

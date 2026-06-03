@@ -40,8 +40,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentTab = MutableStateFlow("home")
     val currentTab = _currentTab.asStateFlow()
 
-    // Navigation Category chips state: "Все", "Новинки", "Топ недели", "Технологии"
-    private val _selectedCategory = MutableStateFlow("Все")
+    // Navigation Category chips state: "Фильмы", "Сериалы" etc.
+    private val _selectedCategory = MutableStateFlow("Фильмы")
     val selectedCategory = _selectedCategory.asStateFlow()
 
     // Search query state
@@ -109,7 +109,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private var currentPage = 1
     private var isEndReached = false
     private var currentQuery: String? = null
-    private var currentCategory: String? = "Все"
+    private var currentCategory: String? = "Фильмы"
     private var currentActiveApiEndpoint: String? = null
 
     private val _isMoreLoading = MutableStateFlow(false)
@@ -133,14 +133,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchRealVideos(query: String? = null, category: String? = null) {
         fetchJob?.cancel()
         currentQuery = query
-        currentCategory = category
+        val targetCategory = category ?: _selectedCategory.value
+        currentCategory = targetCategory
         currentPage = 1
         isEndReached = false
         currentActiveApiEndpoint = null
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                _dynamicVideos.value = repository.fetchRealVideos(query, category, page = 1)
+                _dynamicVideos.value = repository.fetchRealVideos(query, targetCategory, page = 1)
             } catch (e: Exception) {
                 // Ignore or log error gracefully
             } finally {
@@ -162,7 +163,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
                     val response = apiService.getDynamicUrl(url)
                     val bodyStr = response.string()
-                    repository.parseVideoListJson(bodyStr, currentCategory ?: "Все")
+                    repository.parseVideoListJson(bodyStr, currentCategory ?: "Фильмы")
                 } else {
                     repository.fetchRealVideos(currentQuery, currentCategory, nextPage)
                 }
@@ -334,7 +335,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     
                     if (loadedVideos.isNotEmpty()) {
                         _dynamicVideos.value = loadedVideos
-                        _selectedCategory.value = "Все"
+                        _selectedCategory.value = "Фильмы"
                         _searchQuery.value = ""
                         selectTab("home")
                         
