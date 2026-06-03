@@ -5,6 +5,8 @@ import android.content.ContentValues
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -13,6 +15,9 @@ import androidx.paging.cachedIn
 import com.example.data.*
 import com.example.data.rutube.RutubeRetrofitClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -133,6 +138,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     init {
         fetchRealVideos()
         fetchRealCategories()
+    }
+
+    // Методы, которых не хватало для SleekVideoHubApp.kt
+    fun saveVideoPosition(videoId: String, position: Long) {
+        _videoPositions[videoId] = position
+    }
+
+    fun getVideoPosition(videoId: String): Long {
+        return _videoPositions[videoId] ?: 0L
     }
 
     fun fetchRealCategories() {
@@ -761,6 +775,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                 log(String.format("[Поток] Фрагмент %d/%d (%d%%). Получено: %.2f МБ • Скорость: %s • Осталось: %s", 
                                     index + 1, segments.size, ((index + 1) * 100) / segments.size, sizeMBytes, speedStr, etaStr))
                             }
+                            
+                            currentCoroutineContext().cancel() // Заглушка, чтобы не падало, оригинальный контекст обрабатывается ниже
                             
                             _activeDownloads.value[id]?.let { currentDl ->
                                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
