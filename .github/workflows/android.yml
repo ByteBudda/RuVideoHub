@@ -21,7 +21,13 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # Вместо ./gradlew запускаем системный gradle, который всегда есть на сервере
+      # Генерируем дебажный keystore на лету, чтобы таска validateSigningDebug не падала
+      - name: Generate Debug Keystore
+        run: |
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        working-directory: ./app
+
+      # Запускаем сборку, отключая Configuration Cache флагом --no-configuration-cache
       - name: Build with Gradle
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --no-configuration-cache
         working-directory: ./app
