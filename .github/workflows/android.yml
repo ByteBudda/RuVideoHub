@@ -3,6 +3,8 @@ name: Android Release Auto-Sign
 on:
   push:
     branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
@@ -12,51 +14,39 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-        cache: 'gradle'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
 
-    # Умный поиск gradlew: находим папку, где он лежит, и даем права
-    - name: Find and Grant execute permission for gradlew
-      run: |
-        GRADLEW_PATH=$(find . -name "gradlew" -print -quit)
-        if [ -z "$GRADLEW_PATH" ]; then
-          echo "Error: gradlew not found anywhere in the repository!"
-          exit 1
-        fi
-        GRADLE_DIR=$(dirname "$GRADLEW_PATH")
-        echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
-        chmod +x "$GRADLEW_PATH"
+      # Собираем релизный APK (используем твою рабочую команду gradle)
+      # Заменили assembleDebug на assembleRelease
+      - name: Build with Gradle (Release)
+        run: gradle assembleRelease --no-daemon --no-configuration-cache
+        working-directory: ./app
 
-    # Собираем релизный APK внутри правильной папки
-    - name: Build Release APK
-      run: |
-        cd ${{ env.GRADLE_DIR }}
-        ./gradlew assembleRelease
+      # Автоматически генерируем ключ и подписываем им APK
+      - name: Sign Release APK (Auto Generated Key)
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          # Указываем путь к собранному релизному APK внутри твоей папки ./app
+          releaseDirectory: app/build/outputs/apk/release
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          alias: auto-generated-alias
+          singleKeyStore: true
 
-    # Авто-генерация ключа и подпись плеера
-    - name: Sign Release APK (Auto Generated Key)
-      uses: r0adkll/sign-android-release@v1
-      id: sign_app
-      with:
-        # Указываем динамический путь к собранному APK
-        releaseDirectory: ${{ env.GRADLE_DIR }}/app/build/outputs/apk/release
-        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-        alias: auto-generated-alias
-        singleKeyStore: true
-
-    # Вытаскиваем готовый подписанный APK на страницу билда
-    - name: Upload Signed APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RutubeApp-Release-Signed
-        path: ${{ steps.sign_app.outputs.signedReleaseFile }}
-        if-no-files-found: error
-        retention-days: 7
+      # Вытаскиваем готовый подписанный APK на страницу билда
+      - name: Upload Signed APK Artifact
+         uses: actions/upload-artifact@v4
+        with:
+          name: RutubeApp-Release-Signed
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          if-no-files-found: error
+          retention-days: 7
