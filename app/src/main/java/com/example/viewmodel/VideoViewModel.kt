@@ -93,19 +93,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
 
-    private val _searchedChannels = MutableStateFlow<List<com.example.data.SearchChannel>>(emptyList())
-    val searchedChannels = _searchedChannels.asStateFlow()
-
-    private val _subscribedChannelIds = MutableStateFlow<Set<String>>(emptySet())
-    val subscribedChannelIds = _subscribedChannelIds.asStateFlow()
-
-    fun toggleSubscribeChannel(channelId: String) {
-        if (_subscribedChannelIds.value.contains(channelId)) {
-            _subscribedChannelIds.value = _subscribedChannelIds.value - channelId
-        } else {
-            _subscribedChannelIds.value = _subscribedChannelIds.value + channelId
-        }
-    }
+    private val _streamUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
@@ -156,17 +144,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
             try {
                 _dynamicVideos.value = repository.fetchRealVideos(query, targetCategory, page = 1)
-                
-                // Fetch Channels concurrently if we have a non-blank search query
-                if (!query.isNullOrBlank()) {
-                    try {
-                        _searchedChannels.value = repository.fetchChannels(query)
-                    } catch (ex: Exception) {
-                        _searchedChannels.value = emptyList()
-                    }
-                } else {
-                    _searchedChannels.value = emptyList()
-                }
             } catch (e: Exception) {
                 // Ignore or log error gracefully
             } finally {
@@ -1135,7 +1112,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String): String? {
-        return withContext(Dispatchers.IO) {
+        val cachedUrl = _streamUrlCache[videoId]
+        if (cachedUrl != null) {
+            return cachedUrl
+        }
+        val resolvedUrl = withContext(Dispatchers.IO) {
             try {
                 val tizenUas = listOf(
                     "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/4.0 Chrome/108.0.5359.128",
@@ -1210,6 +1191,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 null
             }
         }
+        if (resolvedUrl != null) {
+            _streamUrlCache[videoId] = resolvedUrl
+        }
+        return resolvedUrl
     }
 
     fun loadComments(videoId: String) {
