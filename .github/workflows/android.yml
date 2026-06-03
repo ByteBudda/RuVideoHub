@@ -1,17 +1,14 @@
-name: Android CI
+name: Android Release Auto-Sign
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
-  pull_request:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
-      # Фиксим ворнинг из логов: принудительно запускаем Node.js 24 для экшенов
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -23,20 +20,33 @@ jobs:
       with:
         distribution: 'zulu'
         java-version: '17'
-        # Включаем встроенное кэширование, чтобы сборка шла быстрее
         cache: 'gradle'
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug
+    # Собираем релизный APK
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
 
-    # Вот этот шаг вытащит файл из виртуалки на страницу GitHub Actions
-    - name: Upload APK Artifact
+    # Генерируем рандомный ключ и сразу подписываем им билд
+    - name: Sign Release APK (Auto Generated Key)
+      uses: r0adkll/sign-android-release@v1
+      id: sign_app
+      with:
+        releaseDirectory: app/build/outputs/apk/release
+        # Передаем пароли из секретов
+        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+        # Эти параметры заставят экшен САМОМУ создать валидный ключ с рандомным алиасом
+        alias: auto-generated-alias
+        singleKeyStore: true
+
+    # Забираем готовый подписанный APK
+    - name: Upload Signed APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RutubeApp-Debug-APK
-        path: app/build/outputs/apk/debug/app-debug.apk
-        if-no-files-found: error # Если путь не совпадет, сборка упадет с понятной ошибкой
-        retention-days: 7 # Артефакт будет храниться неделю, потом удалится сам
+        name: RutubeApp-Release-Signed
+        path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+        if-no-files-found: error
+        retention-days: 7
