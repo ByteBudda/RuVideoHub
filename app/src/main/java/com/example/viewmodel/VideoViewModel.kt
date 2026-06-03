@@ -72,6 +72,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentSelectedVideo = MutableStateFlow<Video?>(null)
     val currentSelectedVideo = _currentSelectedVideo.asStateFlow()
 
+    // --- NEW: Active direct stream URL for media player ---
+    private val _hlsStreamUrl = MutableStateFlow<String?>(null)
+    val hlsStreamUrl = _hlsStreamUrl.asStateFlow()
+
+    // --- NEW: Retain playback position globally for Fullscreen seamless transition ---
+    private val _currentPlaybackPositionMs = MutableStateFlow<Long>(0L)
+    val currentPlaybackPositionMs = _currentPlaybackPositionMs.asStateFlow()
+
+    fun updatePlaybackPosition(positionMs: Long) {
+        _currentPlaybackPositionMs.value = positionMs
+        _currentSelectedVideo.value?.id?.let { videoId ->
+            saveVideoPosition(videoId, positionMs)
+        }
+    }
+
     // Simulated active player states
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
@@ -376,6 +391,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         currentActiveApiEndpoint = "https://rutube.ru/api/metainfo/tv/$tvId/video/"
                         currentPage = 1
                         isEndReached = false
+
+                        // Start stream resolution with retry logic for embed player
+                        resolveStreamUrlWithRetries(firstEpisode.id)
                     } else {
                         setSearchQuery(video.title)
                         selectTab("home")
@@ -416,6 +434,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         currentActiveApiEndpoint = "https://rutube.ru/api/video/person/$channelId/"
                         currentPage = 1
                         isEndReached = false
+
+                        if (loadedVideos.isNotEmpty()) {
+                            val firstVid = loadedVideos.first()
+                            _currentSelectedVideo.value = firstVid
+                            _isPlaying.value = true
+                            _playProgress.value = 0f
+                            startPlaybackTicker()
+                            resolveStreamUrlWithRetries(firstVid.id)
+                        }
                     } else {
                         setSearchQuery(video.title)
                         selectTab("home")
@@ -436,13 +463,46 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         if (video != null) {
             _isPlaying.value = true
             _playProgress.value = 0f
+            
+            // Restore previous global layout positioning state to avoid reset
+            _currentPlaybackPositionMs.value = getVideoPosition(video.id)
+            
             startPlaybackTicker()
             loadComments(video.id)
             addToRecentHistory(video)
+
+            // Resolve the HLS stream with maximum two sequential tries
+            resolveStreamUrlWithRetries(video.id)
         } else {
             _isPlaying.value = false
             _playProgress.value = 0f
+            _hlsStreamUrl.value = null
+            _currentPlaybackPositionMs.value = 0L
             stopPlaybackTicker()
+        }
+    }
+
+    // --- NEW: Helper routine to execute up to 2 attempts for link fetch and trigger instant auto-playback ---
+    private fun resolveStreamUrlWithRetries(videoId: String) {
+        viewModelScope.launch {
+            _hlsStreamUrl.value = null // clear old buffer state
+            var streamUrl: String? = null
+            var attempts = 0
+            
+            while (streamUrl == null && attempts < 2) {
+                attempts++
+                streamUrl = fetchHlsStreamUrl(videoId)
+                if (streamUrl == null && attempts < 2) {
+                    delay(800) // minor grace backoff before attempt 2
+                }
+            }
+            
+            if (streamUrl != null) {
+                _hlsStreamUrl.value = streamUrl
+                _isPlaying.value = true // Ensure live autoplay target active flags
+            } else {
+                android.util.Log.e("VideoViewModel", "Failed to resolve stream after 2 attempts.")
+            }
         }
     }
 
