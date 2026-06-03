@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.ViewModelProvider
 import com.example.ui.screens.SleekVideoHubApp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.VideoViewModel
@@ -29,4 +30,3 @@ class MainActivity : ComponentActivity() {
     }
   }
 }
-
