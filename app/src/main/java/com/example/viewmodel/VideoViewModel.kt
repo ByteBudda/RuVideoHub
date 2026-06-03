@@ -33,6 +33,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
+    // Authorization State
+    private val _isAuthorized = MutableStateFlow(false)
+    val isAuthorized = _isAuthorized.asStateFlow()
+
+    private val _authSessionId = MutableStateFlow<String?>(null)
+    val authSessionId = _authSessionId.asStateFlow()
+
+    private val _authCsrfToken = MutableStateFlow<String?>(null)
+    val authCsrfToken = _authCsrfToken.asStateFlow()
+
+    private val _username = MutableStateFlow<String>("Сергей Петров")
+    val username = _username.asStateFlow()
+
+    private val _userAvatar = MutableStateFlow<String>("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=60")
+    val userAvatar = _userAvatar.asStateFlow()
+
     private val db = AppDatabase.getDatabase(application)
     private val repository = VideoRepository(db.savedVideoDao())
 
@@ -104,6 +120,19 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Инициализация...")
 
     init {
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        val savedSessionId = sharedPrefs.getString("sessionid", null)
+        val savedCsrfToken = sharedPrefs.getString("csrftoken", null)
+        val savedUsername = sharedPrefs.getString("username", "Сергей Петров")
+        if (!savedSessionId.isNullOrBlank()) {
+            _authSessionId.value = savedSessionId
+            _authCsrfToken.value = savedCsrfToken
+            _isAuthorized.value = true
+            _username.value = savedUsername ?: "Сергей Петров"
+            
+            com.example.data.rutube.RutubeRetrofitClient.sessionId = savedSessionId
+            com.example.data.rutube.RutubeRetrofitClient.csrfToken = savedCsrfToken
+        }
         fetchRealVideos()
         fetchRealCategories()
     }
@@ -1082,33 +1111,42 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCommentsLoading = MutableStateFlow(false)
     val isCommentsLoading = _isCommentsLoading.asStateFlow()
 
-    // Authorization State
-    private val _isAuthorized = MutableStateFlow(false)
-    val isAuthorized = _isAuthorized.asStateFlow()
 
-    private val _authSessionId = MutableStateFlow<String?>(null)
-    val authSessionId = _authSessionId.asStateFlow()
-
-    private val _authCsrfToken = MutableStateFlow<String?>(null)
-    val authCsrfToken = _authCsrfToken.asStateFlow()
-
-    private val _username = MutableStateFlow<String>("Сергей Петров")
-    val username = _username.asStateFlow()
-
-    private val _userAvatar = MutableStateFlow<String>("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=60")
-    val userAvatar = _userAvatar.asStateFlow()
 
     fun setCredentials(sessionId: String, csrfToken: String, user: String = "Сергей Петров") {
         _authSessionId.value = sessionId
         _authCsrfToken.value = csrfToken
         _isAuthorized.value = true
         _username.value = user
+
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit()
+            .putString("sessionid", sessionId)
+            .putString("csrftoken", csrfToken)
+            .putString("username", user)
+            .apply()
+
+        com.example.data.rutube.RutubeRetrofitClient.sessionId = sessionId
+        com.example.data.rutube.RutubeRetrofitClient.csrfToken = csrfToken
     }
 
     fun logout() {
         _authSessionId.value = null
         _authCsrfToken.value = null
         _isAuthorized.value = false
+
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().clear().apply()
+
+        com.example.data.rutube.RutubeRetrofitClient.sessionId = null
+        com.example.data.rutube.RutubeRetrofitClient.csrfToken = null
+
+        // Clear webview cookies as well so they can log in cleanly
+        try {
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+        } catch (e: Exception) {
+            // Ignore if WebView is not fully configured
+        }
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String): String? {

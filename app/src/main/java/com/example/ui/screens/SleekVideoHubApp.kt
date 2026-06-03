@@ -1523,71 +1523,127 @@ fun LibraryTabScreen(
                     }
 
                     if (showAuthDialog) {
-                        var tempSessId by remember { mutableStateOf("") }
-                        var tempCsrf by remember { mutableStateOf("") }
-                        var tempUser by remember { mutableStateOf("Сергей Петров") }
-
-                        androidx.compose.material3.AlertDialog(
+                        androidx.compose.ui.window.Dialog(
                             onDismissRequest = { showAuthDialog = false },
-                            title = { Text("Авторизация Rutube v1.0", fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-                            text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text("Введите учетные данные сессии (из Cookies на Rutube):", fontSize = 11.sp, color = GreyText)
-                                    
-                                    androidx.compose.material3.OutlinedTextField(
-                                        value = tempUser,
-                                        onValueChange = { tempUser = it },
-                                        label = { Text("Имя пользователя", fontSize = 10.sp) },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    androidx.compose.material3.OutlinedTextField(
-                                        value = tempSessId,
-                                        onValueChange = { tempSessId = it },
-                                        label = { Text("sessionid (Cookie)", fontSize = 10.sp) },
-                                        placeholder = { Text("например, 8f3b2a6d...", fontSize = 10.sp) },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    androidx.compose.material3.OutlinedTextField(
-                                        value = tempCsrf,
-                                        onValueChange = { tempCsrf = it },
-                                        label = { Text("csrftoken (Cookie)", fontSize = 10.sp) },
-                                        placeholder = { Text("например, tZ6gY8...", fontSize = 10.sp) },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    Button(
-                                        onClick = {
-                                            tempSessId = "sess_" + (100000..999999).random().toString()
-                                            tempCsrf = "csrf_" + (100000..999999).random().toString()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant),
-                                        modifier = Modifier.fillMaxWidth()
+                            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                        ) {
+                            androidx.compose.material3.Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.95f)
+                                    .fillMaxHeight(0.85f)
+                                    .clip(RoundedCornerShape(16.dp)),
+                                color = MaterialTheme.colorScheme.background,
+                                border = BorderStroke(1.dp, SurfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(SecondaryBackground)
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Сгенерировать cookies", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                                        Column {
+                                            Text(
+                                                text = "Вход в аккаунт Rutube",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            Text(
+                                                text = "Войдите на сайте. Мы автоматически перехватим сессию.",
+                                                fontSize = 10.sp,
+                                                color = GreyText
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { showAuthDialog = false },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Закрыть",
+                                                tint = MaterialTheme.colorScheme.onBackground,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                     }
-                                }
-                            },
-                            confirmButton = {
-                                Button(
-                                    onClick = {
-                                        val u = tempUser.trim().ifBlank { "Сергей Петров" }
-                                        val s = tempSessId.trim().ifBlank { "sess_default" }
-                                        val c = tempCsrf.trim().ifBlank { "csrf_default" }
-                                        viewModel.setCredentials(s, c, u)
-                                        showAuthDialog = false
+
+                                    var isWebViewLoading by remember { mutableStateOf(true) }
+
+                                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                        androidx.compose.ui.viewinterop.AndroidView(
+                                            factory = { context ->
+                                                android.webkit.WebView(context).apply {
+                                                    layoutParams = android.view.ViewGroup.LayoutParams(
+                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                                    )
+                                                    
+                                                    android.webkit.CookieManager.getInstance().setAcceptCookie(true)
+                                                    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                                    
+                                                    settings.apply {
+                                                        javaScriptEnabled = true
+                                                        domStorageEnabled = true
+                                                        databaseEnabled = true
+                                                        userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                                    }
+
+                                                    webViewClient = object : android.webkit.WebViewClient() {
+                                                        override fun onPageStarted(view: android.webkit.WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                                            super.onPageStarted(view, url, favicon)
+                                                            isWebViewLoading = true
+                                                        }
+
+                                                        override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                                                            super.onPageFinished(view, url)
+                                                            isWebViewLoading = false
+
+                                                            val cookiesString = android.webkit.CookieManager.getInstance().getCookie("https://rutube.ru")
+                                                            if (cookiesString != null) {
+                                                                var sessionid: String? = null
+                                                                var csrftoken: String? = null
+                                                                
+                                                                val cookies = cookiesString.split(";")
+                                                                for (cookie in cookies) {
+                                                                    val parts = cookie.trim().split("=")
+                                                                    if (parts.size >= 2) {
+                                                                        val name = parts[0].trim()
+                                                                        val value = parts.subList(1, parts.size).joinToString("=").trim()
+                                                                        if (name.equals("sessionid", ignoreCase = true)) {
+                                                                            sessionid = value
+                                                                        } else if (name.equals("csrftoken", ignoreCase = true)) {
+                                                                            csrftoken = value
+                                                                        }
+                                                                    }
+                                                                }
+                                                                
+                                                                if (!sessionid.isNullOrBlank()) {
+                                                                    viewModel.setCredentials(sessionid, csrftoken ?: "csrf_default", "Пользователь Rutube")
+                                                                    showAuthDialog = false
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    loadUrl("https://rutube.ru/multipass/login/?client=wdp&referer=https%3A%2F%2Frutube.ru%2F&themeId=dark2021&snake-startForm=gid-otp-init&context=glavnaya&new-next=https%3A%2F%2Frutube.ru%2F")
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+
+                                        if (isWebViewLoading) {
+                                            androidx.compose.material3.CircularProgressIndicator(
+                                                color = Primary,
+                                                modifier = Modifier.run { align(Alignment.Center) }
+                                            )
+                                        }
                                     }
-                                ) {
-                                    Text("Подтвердить")
-                                }
-                            },
-                            dismissButton = {
-                                androidx.compose.material3.TextButton(onClick = { showAuthDialog = false }) {
-                                    Text("Отмена")
                                 }
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -1618,9 +1674,49 @@ fun LibraryTabScreen(
                     .background(SurfaceVariant)
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val sumDuration = 30 * bookmarkedVideos.size
+                val totalDurationText = remember(bookmarkedVideos) {
+                    var totalSeconds = 0
+                    for (video in bookmarkedVideos) {
+                        val durationStr = video.duration.trim()
+                        if (durationStr.isEmpty()) continue
+                        try {
+                            val parts = durationStr.split(":")
+                            if (parts.size == 3) {
+                                val hours = parts[0].toIntOrNull() ?: 0
+                                val minutes = parts[1].toIntOrNull() ?: 0
+                                val seconds = parts[2].toIntOrNull() ?: 0
+                                totalSeconds += hours * 3600 + minutes * 60 + seconds
+                            } else if (parts.size == 2) {
+                                val minutes = parts[0].toIntOrNull() ?: 0
+                                val seconds = parts[1].toIntOrNull() ?: 0
+                                totalSeconds += minutes * 60 + seconds
+                            } else {
+                                val clean = durationStr.replace(Regex("[^0-9]"), "")
+                                val num = clean.toIntOrNull() ?: 0
+                                if (durationStr.contains("ч", ignoreCase = true) || durationStr.contains("h", ignoreCase = true)) {
+                                    totalSeconds += num * 3600
+                                } else {
+                                    totalSeconds += num * 60
+                                }
+                            }
+                        } catch (e: Exception) {
+                            totalSeconds += 30 * 60
+                        }
+                    }
+                    val hours = totalSeconds / 3600
+                    val minutes = (totalSeconds % 3600) / 60
+                    if (hours > 0) {
+                        if (minutes > 0) {
+                            "$hours ч $minutes мин"
+                        } else {
+                            "$hours ч"
+                        }
+                    } else {
+                        "$minutes мин"
+                    }
+                }
                 Text(
-                    text = "$sumDuration мин",
+                    text = totalDurationText,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Primary
