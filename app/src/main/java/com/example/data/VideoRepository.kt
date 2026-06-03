@@ -276,7 +276,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
         }
     }
 
-    // Совместимость со старым кодом ViewModel, который может передавать 3 аргумента (включая page)
     suspend fun fetchRealVideos(query: String?, category: String?, page: Int = 1): List<Video> {
         return withContext(Dispatchers.IO) {
             fetchRealVideosSuspend(query, category)
@@ -295,7 +294,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 // Поиск каналов
                 try {
                     val channelResponse = apiService.getDynamicUrl("https://rutube.ru/api/search/channel/?query=$q&format=json")
-                    val channelBodyString = channelResponse.string()
+                    val channelBodyString = channelResponse.body()?.string() ?: ""
                     val parsedChannels = parseVideoListJson(channelBodyString, "Поиск каналов: $q")
                     combinedResults.addAll(parsedChannels)
                 } catch (channelEx: Exception) {
@@ -305,7 +304,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 // Поиск видео
                 try {
                     val videoResponse = apiService.searchVideos(q)
-                    val videoBodyString = videoResponse.string()
+                    val videoBodyString = videoResponse.body()?.string() ?: ""
                     val parsedVideos = parseVideoListJson(videoBodyString, "Поиск: $q")
                     combinedResults.addAll(parsedVideos)
                 } catch (videoEx: Exception) {
@@ -324,7 +323,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 if (categorySlug != null) {
                     try {
                         val feedResponse = apiService.getDynamicUrl("https://rutube.ru/api/feeds/$categorySlug/?format=json")
-                        val feedJsonStr = feedResponse.string()
+                        val feedJsonStr = feedResponse.body()?.string() ?: ""
                         val feedObj = JSONObject(feedJsonStr)
                         val tabsArray = feedObj.optJSONArray("tabs")
                         
@@ -355,8 +354,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
                                 endpoint
                             }
                             try {
-                                val resourceResponseBody = apiService.getDynamicUrl(targetResourceUrl)
-                                val resourceJsonStr = resourceResponseBody.string()
+                                val resourceResponse = apiService.getDynamicUrl(targetResourceUrl)
+                                val resourceJsonStr = resourceResponse.body()?.string() ?: ""
                                 val categoryVideos = parseVideoListJson(resourceJsonStr, selectedCategoryName, targetResourceUrl)
                                 parsedResults.addAll(categoryVideos)
                             } catch (resEx: Exception) {
@@ -374,7 +373,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     
                     try {
                         val fallbackSearchResponse = apiService.searchVideos(selectedCategoryName)
-                        val fallbackSearchBody = fallbackSearchResponse.string()
+                        val fallbackSearchBody = fallbackSearchResponse.body()?.string() ?: ""
                         val searchVideos = parseVideoListJson(fallbackSearchBody, selectedCategoryName)
                         if (searchVideos.isNotEmpty()) {
                             lastFetchSource = "Rutube LIVE"
@@ -384,8 +383,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
                         Log.e("VideoRepository", "Fallback search failed", ex)
                     }
                 } else {
-                    val responseBody = apiService.getPopularVideos()
-                    val bodyString = responseBody.string()
+                    val response = apiService.getPopularVideos()
+                    val bodyString = response.body()?.string() ?: ""
                     val results = parseVideoListJson(bodyString, "Популярное")
                     if (results.isNotEmpty()) {
                         lastFetchSource = "Rutube LIVE"
@@ -487,7 +486,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         try {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
             val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
-            val bodyStr = response.string()
+            val bodyStr = response.body()?.string() ?: ""
             val jsonObj = JSONObject(bodyStr)
             val resultsArray = jsonObj.optJSONArray("results")
             if (resultsArray != null) {
