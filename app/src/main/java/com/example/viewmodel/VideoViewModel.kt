@@ -120,21 +120,51 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Инициализация...")
 
     init {
-        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
-        val savedSessionId = sharedPrefs.getString("sessionid", null)
-        val savedCsrfToken = sharedPrefs.getString("csrftoken", null)
-        val savedUsername = sharedPrefs.getString("username", "Сергей Петров")
-        if (!savedSessionId.isNullOrBlank()) {
-            _authSessionId.value = savedSessionId
-            _authCsrfToken.value = savedCsrfToken
-            _isAuthorized.value = true
-            _username.value = savedUsername ?: "Сергей Петров"
-            
-            com.example.data.rutube.RutubeRetrofitClient.sessionId = savedSessionId
-            com.example.data.rutube.RutubeRetrofitClient.csrfToken = savedCsrfToken
-        }
+        // Проверяем куки из WebView при старте приложения
+        checkCookiesAndSyncState()
+
         fetchRealVideos()
         fetchRealCategories()
+    }
+
+    /**
+     * Метод проверяет наличие сессии в CookieManager устройства
+     * и синхронизирует состояние авторизации внутри ViewModel.
+     */
+    fun checkCookiesAndSyncState() {
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        cookieManager.flush()
+        val cookies = cookieManager.getCookie("https://rutube.ru")
+        
+        var sessionId: String? = null
+        var csrfToken: String? = null
+
+        if (!cookies.isNullOrBlank()) {
+            cookies.split("; ").forEach { pair ->
+                val parts = pair.split("=")
+                if (parts.size == 2) {
+                    when (parts[0].trim()) {
+                        "sessionid" -> sessionId = parts[1].trim()
+                        "csrftoken" -> csrfToken = parts[1].trim()
+                    }
+                }
+            }
+        }
+
+        if (!sessionId.isNullOrBlank()) {
+            _authSessionId.value = sessionId
+            _authCsrfToken.value = csrfToken
+            _isAuthorized.value = true
+            
+            // Также подтягиваем имя, если оно было сохранено ранее
+            val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+            _username.value = sharedPrefs.getString("username", "Сергей Петров") ?: "Сергей Петров"
+        } else {
+            // Если кук нет или они просрочены — сбрасываем стейт авторизации
+            _authSessionId.value = null
+            _authCsrfToken.value = null
+            _isAuthorized.value = false
+        }
     }
 
     private var currentPage = 1
@@ -928,7 +958,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
                     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
                 )
-                // Use a deterministic choice of fallback URL based on video id so we download a consistent size
                 val indexChoice = Math.abs(id.hashCode()) % backupUrls.size
                 val chosenBackupUrl = backupUrls[indexChoice]
 
@@ -997,7 +1026,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                     }
                                 }
 
-                                // Small delay to show smooth visual loading state over high-speed networks
                                 delay(15)
                             }
                         }
@@ -1026,7 +1054,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 delay(400)
                 log("[yt-dlp] Downloaded and merged into standard MP4 stream successfully!")
                 
-                // Commit to offline Room repository
                 repository.toggleDownload(video)
                 
                 _activeDownloads.value[id]?.let { currentDl ->
@@ -1039,7 +1066,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 delay(3000)
                 
-                // Clear active queue
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             } else {
                 log("[error] yt-dlp aborted download pipelines with exit code 1.")
@@ -1057,7 +1083,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleMicrophone(status: Boolean) {
         _isMicrophoneActive.value = status
         if (status) {
-            // Simulate voice dictation search query search trigger
             viewModelScope.launch {
                 delay(1800)
                 setSearchQuery("API")
@@ -1066,7 +1091,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Helper functions to convert string duration parsed values (e.g. "12:44") to elapsed playback string
     fun getFormattedElapsedTime(durationStr: String, progress: Float): String {
         val totalSeconds = parseDurationToSeconds(durationStr)
         val elapsedSeconds = (progress * totalSeconds).toInt()
@@ -1086,7 +1110,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 val seconds = parts[2].toInt()
                 hours * 3600 + minutes * 60 + seconds
             } else {
-                300 // fallback 5 min
+                300
             }
         } catch (e: Exception) {
             300
@@ -1111,8 +1135,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCommentsLoading = MutableStateFlow(false)
     val isCommentsLoading = _isCommentsLoading.asStateFlow()
 
-
-
     fun setCredentials(sessionId: String, csrfToken: String, user: String = "Сергей Петров") {
         _authSessionId.value = sessionId
         _authCsrfToken.value = csrfToken
@@ -1126,8 +1148,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             .putString("username", user)
             .apply()
 
-        com.example.data.rutube.RutubeRetrofitClient.sessionId = sessionId
-        com.example.data.rutube.RutubeRetrofitClient.csrfToken = csrfToken
+        // Записываем куки принудительно в системный CookieManager
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setCookie("https://rutube.ru", "sessionid=$sessionId")
+        cookieManager.setCookie("https://rutube.ru", "csrftoken=$csrfToken")
+        cookieManager.flush()
     }
 
     fun logout() {
@@ -1138,12 +1164,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
         sharedPrefs.edit().clear().apply()
 
-        com.example.data.rutube.RutubeRetrofitClient.sessionId = null
-        com.example.data.rutube.RutubeRetrofitClient.csrfToken = null
-
-        // Clear webview cookies as well so they can log in cleanly
+        // Полностью очищаем куки в WebView
         try {
-            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+            val cookieManager = android.webkit.CookieManager.getInstance()
+            cookieManager.removeAllCookies(null)
+            cookieManager.flush()
         } catch (e: Exception) {
             // Ignore if WebView is not fully configured
         }
@@ -1265,7 +1290,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _comments.value = commentsList
             } catch (e: java.lang.Exception) {
                 android.util.Log.e("VideoViewModel", "Error fetching comments", e)
-                // Use robust fallback mock comments if network is unavailable or blocked!
                 _comments.value = listOf(
                     RutubeComment("c1", "Иван Иванов", "Отличное качество видео, спасибо!", "2 часа назад", 14),
                     RutubeComment("c2", "Елена К.", "Смотрю с удовольствием, отличная подборка!", "5 часов назад", 8),
@@ -1277,7 +1301,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Factory helper in case we instantiate standard lifecycle
     class Factory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
