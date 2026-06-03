@@ -19,26 +19,13 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
     
-    - name: Cache Gradle
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-    
-    - name: Make gradlew executable
-      run: chmod +x ./gradlew
-    
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
       with:
-        gradle-version: 9.3.1
+        gradle-version: 8.7
     
     - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      run: gradle assembleDebug
       env:
         JAVA_OPTS: "-Djava.awt.headless=true -Xmx2048m"
         GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2048m -Djava.awt.headless=true"
