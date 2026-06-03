@@ -2,6 +2,7 @@ package com.example.data
 
 import android.util.Log
 import com.example.data.rutube.RutubeApiService
+import com.example.data.rutube.RutubeVideoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -126,7 +127,8 @@ class VideoRepository(
     }
 
     /**
-     * Прямой порт твоего логики из parser.js для обработки структуры Rutube API.
+     * Бронебойный парсинг списков через JSONObject (Прямой порт логики из твоих JS парсеров).
+     * Разворачивает вложенные cardgroup, promogroup и обрабатывает userchannel/tv модели.
      */
     private fun parseRawJsonToVideos(jsonStr: String, categoryName: String): Pair<List<Video>, String?> {
         val videosList = mutableListOf<Video>()
@@ -142,22 +144,17 @@ class VideoRepository(
                     try {
                         val rawItem = resultsArray.optJSONObject(i) ?: continue
                         
-                        // Извлекаем content_type.model
                         val contentTypeObj = rawItem.optJSONObject("content_type")
                         val model = contentTypeObj?.optString("model") ?: "video"
                         
-                        // Логика isNested: если есть content_type и поле object
                         val nestedObject = rawItem.optJSONObject("object")
                         val item = if (contentTypeObj != null && nestedObject != null) nestedObject else rawItem
 
-                        // Безопасное извлечение ID (число или строка)
                         val videoId = item.optString("id").takeIf { it.isNotBlank() && it != "null" }
                             ?: item.optString("video_id").takeIf { it.isNotBlank() && it != "null" }
                             ?: item.optString("code").takeIf { it.isNotBlank() && it != "null" }
 
-                        if (videoId == null) {
-                            continue
-                        }
+                        if (videoId == null) continue
 
                         // 1. Модель КАНАЛ (userchannel)
                         if (model == "userchannel") {
@@ -238,7 +235,6 @@ class VideoRepository(
                             else -> "0"
                         } + " просмотров"
 
-                        // Парсинг автора
                         val authorObj = item.optJSONObject("author")
                         val channelName = authorObj?.optString("name")?.takeIf { it.isNotBlank() }
                             ?: item.optString("author_name").takeIf { it.isNotBlank() }
@@ -263,7 +259,6 @@ class VideoRepository(
                             )
                         )
                     } catch (itemException: Exception) {
-                        // Если одна карточка сломалась, не ломаем весь список, а просто скипаем её
                         Log.e("VideoRepository", "Ошибка разбора отдельного элемента", itemException)
                     }
                 }
@@ -273,6 +268,57 @@ class VideoRepository(
         }
 
         return videosList to nextUrl
+    }
+
+    /**
+     * ВОЗВРАЩЕНО ДЛЯ СОВМЕСТИМОСТИ С VideoViewModel.kt
+     * Предотвращает ошибку компиляции "Unresolved reference 'toVideo'".
+     */
+    fun toVideo(item: RutubeVideoItem, categoryName: String): Video? {
+        val videoId = item.id?.takeIf { it.isNotBlank() }
+            ?: item.videoId?.takeIf { it.isNotBlank() }
+            ?: item.code?.takeIf { it.isNotBlank() }
+
+        if (videoId == null) return null
+
+        val title = item.title?.takeIf { it.isNotBlank() } ?: "Без названия"
+        val description = item.description ?: "Описание отсутствует"
+        val thumbnail = item.thumbnailUrl ?: ""
+
+        val seconds = item.duration ?: -1
+        val durationStr = if (seconds > 0) {
+            val h = seconds / 3600
+            val m = (seconds % 3600) / 60
+            val s = seconds % 60
+            if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
+        } else "10:00"
+
+        val viewsCount = (item.views ?: item.hits ?: 0).toLong()
+        val viewsStr = when {
+            viewsCount >= 1_000_000 -> String.format("%.1fM", viewsCount / 1_000_000.0)
+            viewsCount >= 1_000 -> "${viewsCount / 1_000}K"
+            viewsCount > 0 -> "$viewsCount"
+            else -> "0"
+        } + " просмотров"
+
+        val channelName = item.author?.name?.takeIf { it.isNotBlank() }
+            ?: item.author?.username?.takeIf { it.isNotBlank() }
+            ?: "Канал Rutube"
+
+        return Video(
+            id = videoId,
+            title = title,
+            channel = channelName,
+            views = viewsStr,
+            timeAgo = "Недавно",
+            duration = durationStr,
+            isPro = false,
+            category = categoryName,
+            description = description,
+            thumbnailUrl = thumbnail,
+            isDownloaded = false,
+            isBookmarked = false
+        )
     }
 
     suspend fun deleteVideoById(videoId: String) {
