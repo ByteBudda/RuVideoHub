@@ -21,10 +21,7 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-        working-directory: ./app
-
+      # Вместо ./gradlew запускаем системный gradle, который всегда есть на сервере
       - name: Build with Gradle
-        run: ./gradlew assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
         working-directory: ./app
