@@ -1,9 +1,19 @@
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # Добавляем права на исполнение внутри папки app
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-        # Если gradlew лежит в подпапке, раскомментируй строку ниже и укажи имя папки:
-        # working-directory: ./Имя_Папки_Проекта
+        working-directory: ./app
 
+      # Запускаем сборку тоже внутри папки app
       - name: Build with Gradle
         run: ./gradlew assembleDebug --no-daemon
-        # Если gradlew лежит в подпапке, раскомментируй строку ниже:
-        # working-directory: ./Имя_Папки_Проекта
+        working-directory: ./app
