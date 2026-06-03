@@ -1,4 +1,4 @@
-name: Android Release Auto-Sign
+name: Android Release Sign with Repo Key
 
 on:
   push:
@@ -24,17 +24,25 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # ИСПРАВЛЕНО: Добавили флаги, которые отключают поиск локального файла jks при сборке
-      - name: Build with Gradle (Release Unsigned)
-        run: gradle assembleRelease -Pandroid.injected.signing.store.file="" --no-daemon --no-configuration-cache
+      # Декодируем твой готовый ключ из репозитория в файл, который ждет Gradle
+      - name: Decode Keystore from Repo
+        run: |
+          base64 --decode debug.keystore.base64 > my-upload-key.jks
+
+      # Собираем релизный APK через глобальный gradle в папке ./app
+      # Прокидываем путь к только что созданному файлу ключа прямо в Gradle
+      - name: Build with Gradle (Release)
+        run: gradle assembleRelease -Pandroid.injected.signing.store.file="../my-upload-key.jks" --no-daemon --no-configuration-cache
         working-directory: ./app
 
-      # Автоматически генерируем ключ и подписываем им получившийся APK
-      - name: Sign Release APK (Auto Generated Key)
+      # На всякий случай подстрахуемся и подпишем финальный пакет через экшен, 
+      # используя тот же самый файл, чтобы Android точно не ругался
+      - name: Sign Release APK
         uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
           releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }} # Если секрет не задан, экшен подпишет дефолтным, но Gradle уже не упадет!
           keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
           alias: auto-generated-alias
