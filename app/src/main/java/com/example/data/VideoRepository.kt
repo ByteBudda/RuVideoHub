@@ -73,6 +73,19 @@ class VideoRepository(
             }
 
             if (effectiveCategory == "Все") {
+                // Пробуем популярные видео
+                try {
+                    val popularResponse = apiService.getPopularVideos(page = 1)
+                    val popularVideos = popularResponse.results?.mapNotNull { toVideo(it, "Популярное") } ?: emptyList()
+                    if (popularVideos.isNotEmpty()) {
+                        lastFetchSource = "Rutube LIVE (популярное)"
+                        return@withContext popularVideos to popularResponse.next
+                    }
+                } catch (e: Exception) {
+                    Log.e("VideoRepository", "Popular videos failed", e)
+                }
+                
+                // Fallback: сборка из категорий
                 val allVideos = fetchAllCategoriesVideos()
                 return@withContext allVideos to null
             }
@@ -108,8 +121,56 @@ class VideoRepository(
         return try {
             val url = "https://rutube.ru/api/feeds/$slug/?page=$page&format=json"
             val response = apiService.getDynamicUrl(url)
-            val videos = response.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
-            lastFetchSource = "Rutube LIVE"
+            
+            // Пытаемся получить videos из response.results (если есть)
+            var videos = response.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
+            
+            // Если results пустой, пробуем распарсить структуру с tabs
+            if (videos.isEmpty()) {
+                val jsonStr = response.toString()
+                val jsonObj = JSONObject(jsonStr)
+                val tabsArray = jsonObj.optJSONArray("tabs")
+                
+                if (tabsArray != null && tabsArray.length() > 0) {
+                    var targetTab: JSONObject? = null
+                    for (i in 0 until tabsArray.length()) {
+                        val tab = tabsArray.optJSONObject(i)
+                        if (tab?.optString("name") == "Все") {
+                            targetTab = tab
+                            break
+                        }
+                    }
+                    if (targetTab == null && tabsArray.length() > 0) {
+                        targetTab = tabsArray.optJSONObject(0)
+                    }
+                    
+                    val resourcesArray = targetTab?.optJSONArray("resources")
+                    if (resourcesArray != null && resourcesArray.length() > 0) {
+                        val allResourceVideos = mutableListOf<Video>()
+                        for (r in 0 until resourcesArray.length()) {
+                            val resource = resourcesArray.optJSONObject(r)
+                            val resourceUrl = resource?.optString("url")
+                            if (!resourceUrl.isNullOrBlank()) {
+                                try {
+                                    val fullUrl = if (resourceUrl.startsWith("/")) {
+                                        "https://rutube.ru$resourceUrl"
+                                    } else {
+                                        resourceUrl
+                                    }
+                                    val resourceResponse = apiService.getDynamicUrl("$fullUrl&format=json")
+                                    val resourceVideos = resourceResponse.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
+                                    allResourceVideos.addAll(resourceVideos)
+                                } catch (e: Exception) {
+                                    Log.e("VideoRepository", "Error loading resource $resourceUrl", e)
+                                }
+                            }
+                        }
+                        videos = allResourceVideos
+                    }
+                }
+            }
+            
+            lastFetchSource = "Rutube LIVE (категория: $categoryName)"
             videos to response.next
         } catch (e: Exception) {
             Log.e("VideoRepository", "fetchCategoryPage error for $slug", e)
@@ -121,9 +182,7 @@ class VideoRepository(
         val allVideos = mutableListOf<Video>()
         for (slug in categorySlugs.values) {
             try {
-                val url = "https://rutube.ru/api/feeds/$slug/?page=1&format=json"
-                val response = apiService.getDynamicUrl(url)
-                val videos = response.results?.mapNotNull { toVideo(it, slug) } ?: emptyList()
+                val (videos, _) = fetchCategoryPage(slug, slug, 1)
                 allVideos.addAll(videos.take(10))
             } catch (e: Exception) {
                 Log.e("VideoRepository", "fetchAllCategoriesVideos error for $slug", e)
@@ -277,7 +336,21 @@ class VideoRepository(
             }
 
             if (effectiveCategory == "Все") {
-                return@withContext fetchAllCategoriesVideos()
+                // Пробуем популярные видео
+                try {
+                    val popularResponse = apiService.getPopularVideos(page = page)
+                    val popularVideos = popularResponse.results?.mapNotNull { toVideo(it, "Популярное") } ?: emptyList()
+                    if (popularVideos.isNotEmpty()) {
+                        lastFetchSource = "Rutube LIVE (популярное)"
+                        return@withContext popularVideos
+                    }
+                } catch (e: Exception) {
+                    Log.e("VideoRepository", "Popular videos failed", e)
+                }
+                
+                // Fallback: сборка из категорий
+                val allVideos = fetchAllCategoriesVideos()
+                return@withContext allVideos
             }
 
             emptyList()
