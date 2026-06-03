@@ -24,41 +24,29 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # 1. Декодируем твой базовый ключ прямо под именем, которое прописано в релизе
+      # 1. Распаковываем твой оригинальный ключ из репозитория
       - name: Decode Keystore to Root
         run: |
           base64 --decode debug.keystore.base64 > my-upload-key.jks
 
-      # 2. Запускаем сборку релиза и переопределяем переменные окружения прямо в Gradle.
-      # Мы заставляем его использовать правильный алиас и пароли от дебаг-ключа,
-      # чтобы он успешно упаковал APK без синтаксических ошибок!
+      # 2. Собираем релиз и принудительно переопределяем свойства подписи прямо в команде!
+      # Флаги -Pandroid.injected.signing... заставят Gradle забить на строку "upload" в gradle.kts
+      # и использовать правильные параметры твоего дебаг-ключа.
       - name: Build with Gradle (Release)
-        run: gradle assembleRelease --no-daemon --no-configuration-cache
+        run: |
+          gradle assembleRelease \
+            -Pandroid.injected.signing.store.file="../my-upload-key.jks" \
+            -Pandroid.injected.signing.store.password="android" \
+            -Pandroid.injected.signing.key.alias="androiddebugkey" \
+            -Pandroid.injected.signing.key.password="android" \
+            --no-daemon --no-configuration-cache
         working-directory: ./app
-        env:
-          STORE_PASSWORD: "android"
-          KEY_PASSWORD: "android"
-          # Если бы в gradle.kts алиас брался из env, мы бы прокинули и его,
-          # но раз там жестко "upload", мы сделали трюк на шаге 3 (ниже)
 
-      # 3. На случай, если Gradle выплюнет unsigned из-за несовпадения алиаса "upload",
-      # этот экшен гарантированно переподпишет готовый файл твоим ключом со встроенным дебаг-алиасом!
-      - name: Force Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }} # Если пустой, он возьмет файл из шага 1
-          keyStorePassword: "android"
-          keyPassword: "android"
-          alias: "androiddebugkey" # Родной алиас твоего debug.keystore.base64
-          singleKeyStore: true
-
-      # 4. Выгружаем готовый рабочий АПК
+      # 3. Вытаскиваем уже полностью собранный и валидно подписанный APK в артефакты
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RutubeApp-Release-Signed
-          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 7
