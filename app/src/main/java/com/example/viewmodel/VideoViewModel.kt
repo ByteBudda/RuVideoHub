@@ -110,6 +110,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private var isEndReached = false
     private var currentQuery: String? = null
     private var currentCategory: String? = "Все"
+    private var currentActiveApiEndpoint: String? = null
 
     private val _isMoreLoading = MutableStateFlow(false)
     val isMoreLoading = _isMoreLoading.asStateFlow()
@@ -135,6 +136,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         currentCategory = category
         currentPage = 1
         isEndReached = false
+        currentActiveApiEndpoint = null
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
@@ -154,7 +156,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isMoreLoading.value = true
             try {
                 val nextPage = currentPage + 1
-                val newVideos = repository.fetchRealVideos(currentQuery, currentCategory, nextPage)
+                val newVideos = if (currentActiveApiEndpoint != null) {
+                    val separator = if (currentActiveApiEndpoint!!.contains("?")) "&" else "?"
+                    val url = "${currentActiveApiEndpoint}${separator}format=json&page=$nextPage"
+                    val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                    val response = apiService.getDynamicUrl(url)
+                    val bodyStr = response.string()
+                    repository.parseVideoListJson(bodyStr, currentCategory ?: "Все")
+                } else {
+                    repository.fetchRealVideos(currentQuery, currentCategory, nextPage)
+                }
+
                 if (newVideos.isEmpty()) {
                     isEndReached = true
                 } else {
@@ -162,7 +174,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     _dynamicVideos.value = (_dynamicVideos.value + newVideos).distinctBy { it.id }
                 }
             } catch (e: Exception) {
-                // Ignore or log error gracefully
+                android.util.Log.e("VideoViewModel", "Error loading next page", e)
             } finally {
                 _isMoreLoading.value = false
             }
@@ -285,6 +297,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         _playProgress.value = 0f
                         startPlaybackTicker()
                         _dynamicVideos.value = episodes
+                        
+                        // Setup nested paging state for dynamic pagination of episodes
+                        currentActiveApiEndpoint = "https://rutube.ru/api/metainfo/tv/$tvId/video/"
+                        currentPage = 1
+                        isEndReached = false
                     } else {
                         setSearchQuery(video.title)
                         selectTab("home")
@@ -320,6 +337,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         _selectedCategory.value = "Все"
                         _searchQuery.value = ""
                         selectTab("home")
+                        
+                        // Setup nested paging state for dynamic pagination of channel profile clips
+                        currentActiveApiEndpoint = "https://rutube.ru/api/video/person/$channelId/"
+                        currentPage = 1
+                        isEndReached = false
                     } else {
                         setSearchQuery(video.title)
                         selectTab("home")

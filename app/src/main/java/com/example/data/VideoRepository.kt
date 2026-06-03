@@ -55,189 +55,91 @@ class VideoRepository(private val dao: SavedVideoDao) {
         }
         try {
             val jsonObj = JSONObject(trimmed)
-            val resultsArray = jsonObj.optJSONArray("results") ?: return emptyList()
-            
-            for (i in 0 until resultsArray.length()) {
-                val rawItem = resultsArray.optJSONObject(i) ?: continue
-                var itemObj = rawItem
-                var modelType = "video"
-                
-                // Handle nested resource object wrapper if content_type and object are present
-                if (rawItem.has("object") && rawItem.has("content_type")) {
-                    val contentTypeObj = rawItem.optJSONObject("content_type")
-                    modelType = contentTypeObj?.optString("model") ?: "video"
-                    val nestedObj = rawItem.optJSONObject("object")
-                    if (nestedObj != null) {
-                        itemObj = nestedObj
-                    }
-                } else if (rawItem.has("type")) {
-                    modelType = rawItem.optString("type") ?: "video"
-                }
-
-                if (modelType == "userchannel" || itemObj.has("subscribers_count")) {
-                    // Channel normalization as per custom parser structure
-                    val idVal = itemObj.optString("id").takeIf { it.isNotBlank() } ?: continue
-                    val nameVal = itemObj.optString("name").takeIf { it.isNotBlank() } ?: "Авторский канал"
-                    val avatarVal = itemObj.optString("avatar_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("user_channel_image")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("picture")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("icon")
-                        .takeIf { it.isNotBlank() }
-                    
-                    val subscribersCount = itemObj.optLong("subscribers_count", 0L)
-                    val formattedSubs = if (subscribersCount >= 1000000) {
-                        String.format("%.1fМ", subscribersCount / 1000000.0)
-                    } else if (subscribersCount >= 1000) {
-                        "${subscribersCount / 1000}К"
-                    } else {
-                        "$subscribersCount"
-                    }
-                    
-                    val videoCount = itemObj.optInt("video_count", 0)
-                    val descriptionVal = itemObj.optString("description", "Официальный канал в Sleek Video Hub.")
-                    
-                    mapped.add(
-                        Video(
-                            id = "channel_$idVal",
-                            title = nameVal,
-                            channel = "Авторский канал • $formattedSubs подписчиков",
-                            views = "$formattedSubs подписчиков",
-                            timeAgo = "$videoCount видео",
-                            duration = "КАНАЛ",
-                            isPro = false,
-                            category = defaultCategoryName,
-                            description = descriptionVal,
-                            thumbnailUrl = avatarVal
-                        )
-                    )
-                } else if (modelType == "tv" || itemObj.has("seasons_count")) {
-                    // TV Show / series normalization as per custom parser structure
-                    val idVal = itemObj.optString("id").takeIf { it.isNotBlank() } ?: continue
-                    val titleVal = itemObj.optString("title")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("original_title")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("name")
-                        .takeIf { it.isNotBlank() }
-                        ?: "Шоу без названия"
-                        
-                    val posterVal = itemObj.optString("poster_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("thumbnail_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optJSONArray("images")?.optJSONObject(0)?.optString("image")
-                        
-                    val seasonsCount = itemObj.optInt("seasons_count", 1)
-                    val kpRating = itemObj.optDouble("kinopoisk_rating", 0.0)
-                    val ratingStr = if (kpRating > 0.05) " • Кинопоиск: $kpRating" else ""
-                    val yearVal = itemObj.optString("year_start")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("year")
-                        .takeIf { it.isNotBlank() }
-                        ?: "Передача"
-                        
-                    val descriptionVal = itemObj.optString("description", "Смотрите оригинальные сезоны и выпуски бесплатно.")
-                    
-                    mapped.add(
-                        Video(
-                            id = "tv_$idVal",
-                            title = titleVal,
-                            channel = "Шоу • $yearVal$ratingStr",
-                            views = "$seasonsCount сезонов",
-                            timeAgo = "Смотреть выпуски",
-                            duration = "СЕРИАЛ",
-                            isPro = false,
-                            category = defaultCategoryName,
-                            description = descriptionVal,
-                            thumbnailUrl = posterVal
-                        )
-                    )
-                } else {
-                    // Standard Video normalization as per custom parser structure
-                    val idVal = itemObj.optString("code")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("video_id")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("id")
-                        .takeIf { it.isNotBlank() }
-                        ?: continue // Required for playback
-
-                    val titleVal = itemObj.optString("title")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("name", "Без названия")
-                    
-                    val descVal = itemObj.optString("description", "Описание отсутствует.")
-                    
-                    val thumbUrl = itemObj.optString("thumbnail_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("poster_url")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("picture")
-                        .takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("picture_url")
-                    
-                    val durationSeconds = itemObj.optDouble("duration", -1.0)
-                    val durationStr = if (durationSeconds > 0) {
-                        val totalSeconds = durationSeconds.toInt()
-                        val h = totalSeconds / 3600
-                        val m = (totalSeconds % 3600) / 60
-                        val s = totalSeconds % 60
-                        if (h > 0) {
-                            String.format("%d:%02d:%02d", h, m, s)
-                        } else {
-                            String.format("%02d:%02d", m, s)
-                        }
-                    } else {
-                        val rawDuration = itemObj.optString("duration", "")
-                        if (rawDuration.isNotBlank() && rawDuration.contains(":")) rawDuration else "10:00"
-                    }
-                    
-                    val viewsCountVal = if (itemObj.has("views")) {
-                        itemObj.optLong("views", 0L)
-                    } else {
-                        itemObj.optLong("hits", 0L)
-                    }
-                    
-                    val viewsStr = if (viewsCountVal >= 1000000) {
-                        String.format("%.1fМ просмотров", viewsCountVal / 1000000.0)
-                    } else if (viewsCountVal >= 1000) {
-                        "${viewsCountVal / 1000}К просмотров"
-                    } else if (viewsCountVal > 0) {
-                        "$viewsCountVal просмотров"
-                    } else {
-                        "${(1200..340000).random()} просмотров"
-                    }
-                    
-                    val authorObj = itemObj.optJSONObject("author")
-                    val channelStr = authorObj?.optString("name")?.takeIf { it.isNotBlank() }
-                        ?: authorObj?.optString("username")?.takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("feed_name").takeIf { it.isNotBlank() }
-                        ?: itemObj.optString("author_name").takeIf { it.isNotBlank() }
-                        ?: "Канал Rutube"
-                        
-                    mapped.add(
-                        Video(
-                            id = idVal,
-                            title = titleVal,
-                            channel = channelStr,
-                            views = viewsStr,
-                            timeAgo = "Загружено недавно",
-                            duration = durationStr,
-                            isPro = (0..10).random() > 7,
-                            category = defaultCategoryName,
-                            description = descVal,
-                            thumbnailUrl = thumbUrl
-                        )
-                    )
-                }
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, defaultCategoryName)
+            for (card in parsed.items) {
+                mapped.add(mapNormalizedCardToVideo(card, defaultCategoryName))
             }
         } catch (ex: Exception) {
-            android.util.Log.e("VideoRepository", "Error parsing results JSON list", ex)
+            android.util.Log.e("VideoRepository", "Error parsing results JSON list via SmartRutubeParser", ex)
         }
         return mapped
+    }
+
+    private fun mapNormalizedCardToVideo(card: com.example.data.rutube.SmartRutubeParser.NormalizedCard, defaultCategoryName: String): Video {
+        return when (card) {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
+                Video(
+                    id = card.id,
+                    title = card.title,
+                    channel = card.channelName,
+                    views = card.views,
+                    timeAgo = card.published,
+                    duration = card.duration,
+                    isPro = (0..10).random() > 8,
+                    category = defaultCategoryName,
+                    description = card.description,
+                    thumbnailUrl = card.thumbnail
+                )
+            }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvShowCard -> {
+                val ratingStr = if (card.rating != null && card.rating > 0.05) " • Кинопоиск: ${card.rating}" else ""
+                val yearVal = card.year ?: "Передача"
+                Video(
+                    id = "tv_${card.id}",
+                    title = card.title,
+                    channel = "Шоу • $yearVal$ratingStr",
+                    views = "${card.seasonsCount} сезонов",
+                    timeAgo = "Смотреть выпуски",
+                    duration = "СЕРИАЛ",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = card.description ?: "Смотрите оригинальные сезоны и выпуски бесплатно.",
+                    thumbnailUrl = card.poster
+                )
+            }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
+                Video(
+                    id = "channel_${card.id}",
+                    title = card.name,
+                    channel = "Авторский канал • ${card.subscribers} подписчиков",
+                    views = "${card.subscribers} подписчиков",
+                    timeAgo = "${card.videosCount} видео",
+                    duration = "КАНАЛ",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = card.description ?: "Официальный канал в Sleek Video Hub.",
+                    thumbnailUrl = card.avatar
+                )
+            }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
+                Video(
+                    id = "promo_${card.id}",
+                    title = card.title,
+                    channel = "Реклама",
+                    views = "Промо",
+                    timeAgo = "Перейти по ссылке",
+                    duration = "ПРОМО",
+                    isPro = true,
+                    category = defaultCategoryName,
+                    description = card.description ?: "Спонсорский медиаконтент.",
+                    thumbnailUrl = card.thumbnail
+                )
+            }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
+                Video(
+                    id = "unknown_${Math.random()}",
+                    title = card.title,
+                    channel = card.rawType ?: "Неизвестно",
+                    views = "0 просмотров",
+                    timeAgo = "Опубликовано недавно",
+                    duration = "00:00",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = "Элемент каталога",
+                    thumbnailUrl = card.thumbnail
+                )
+            }
+        }
     }
 
     suspend fun fetchRealVideos(query: String?, category: String?, page: Int = 1): List<Video> {
