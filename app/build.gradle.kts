@@ -100,6 +100,10 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
+
+implementation("androidx.media3:media3-exoplayer:1.3.1")
+implementation("androidx.media3:media3-ui:1.3.1")
+
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
