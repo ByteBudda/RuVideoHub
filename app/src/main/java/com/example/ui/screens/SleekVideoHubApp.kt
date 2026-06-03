@@ -159,15 +159,15 @@ fun SleekBottomNavigation(
                 testTag = "tab_explore"
             )
             BottomTabItem(
-                label = "Загрузки",
-                icon = Icons.Default.DownloadDone,
+                label = "Недавние",
+                icon = Icons.Default.History,
                 isActive = selectedTab == "downloads",
                 onClick = { onTabSelected("downloads") },
                 testTag = "tab_downloads"
             )
             BottomTabItem(
-                label = "Медиатека",
-                icon = Icons.Default.VideoLibrary,
+                label = "Избранное",
+                icon = Icons.Default.Favorite,
                 isActive = selectedTab == "library",
                 onClick = { onTabSelected("library") },
                 testTag = "tab_library"
@@ -251,6 +251,7 @@ fun HomeTabScreen(
         Spacer(modifier = Modifier.height(4.dp))
 
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+        val isMoreLoading by viewModel.isMoreLoading.collectAsStateWithLifecycle()
 
         // Video lists
         if (isLoading) {
@@ -269,7 +270,24 @@ fun HomeTabScreen(
         } else if (filteredVideos.isEmpty()) {
             EmptySearchState(query = searchQuery)
         } else {
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            
+            val shouldLoadMore by remember {
+                derivedStateOf {
+                    val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                        ?: return@derivedStateOf false
+                    lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
+                }
+            }
+
+            LaunchedEffect(shouldLoadMore) {
+                if (shouldLoadMore) {
+                    viewModel.loadNextPage()
+                }
+            }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
@@ -293,6 +311,23 @@ fun HomeTabScreen(
                             onDownloadToggle = { viewModel.toggleDownload(video) },
                             onBookmarkToggle = { viewModel.toggleBookmark(video) }
                         )
+                    }
+                }
+
+                if (isMoreLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = Primary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -406,7 +441,7 @@ fun SleekHeader(
             }
 
             val statusLabel = when (apiSource) {
-                "Rutube" -> "Подключено к Rutube"
+                "Rutube LIVE" -> "Подключено к Rutube LIVE"
                 "Встроенные хиты" -> "Встроенная медиатека (Офлайн)"
                 else -> "Локальный архив (Офлайн)"
             }
@@ -483,7 +518,7 @@ fun RecommendedSectionHeader() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Популярные видео",
+            text = "РЕКОМЕНДУЕМОЕ • БЕЗ РЕКЛАМЫ",
             color = Primary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -500,7 +535,7 @@ fun RecommendedSectionHeader() {
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = "qntx",
+                contentDescription = "PRO",
                 tint = ProBadgeText,
                 modifier = Modifier.size(10.dp)
             )
@@ -988,8 +1023,7 @@ fun DownloadsTabScreen(
     viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
-    val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
-    val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+    val recentVideos by viewModel.recentSavedVideos.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -1001,284 +1035,80 @@ fun DownloadsTabScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Офлайн-Загрузки",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            if (downloadedVideos.isNotEmpty()) {
-                Surface(
-                    color = PrimaryContainer,
-                    shape = RoundedCornerShape(100.dp)
-                ) {
-                    Text(
-                        text = "Файлов: ${downloadedVideos.size}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-
-        // Paste external link to download
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-            border = BorderStroke(1.dp, SurfaceVariant),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column {
                 Text(
-                    text = "Скачать по внешней ссылке",
-                    fontSize = 13.sp,
+                    text = "Недавние",
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    color = MaterialTheme.colorScheme.onBackground
                 )
-
-                var urlInput by remember { mutableStateOf("") }
-                var titleInput by remember { mutableStateOf("") }
-
-                androidx.compose.material3.OutlinedTextField(
-                    value = urlInput,
-                    onValueChange = { urlInput = it },
-                    label = { Text("Ссылка (Rutube)", fontSize = 11.sp) },
-                    placeholder = { Text("https://example.com/video.mp4", fontSize = 11.sp) },
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = SurfaceVariant,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary
-                    )
+                Text(
+                    text = "История просмотров",
+                    fontSize = 11.sp,
+                    color = GreyText
                 )
+            }
 
-                androidx.compose.material3.OutlinedTextField(
-                    value = titleInput,
-                    onValueChange = { titleInput = it },
-                    label = { Text("Название видео (необязательно)", fontSize = 11.sp) },
-                    placeholder = { Text("Например: Мой Любимый Клип", fontSize = 11.sp) },
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = SurfaceVariant,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-
-                Button(
+            if (recentVideos.isNotEmpty()) {
+                TextButton(
                     onClick = {
-                        if (urlInput.isNotBlank()) {
-                            viewModel.startManualYtDlpDownload(urlInput, titleInput)
-                            urlInput = ""
-                            titleInput = ""
+                        // Clear all history
+                        recentVideos.forEach {
+                            viewModel.deleteRecentItem(Video(
+                                id = it.id, title = it.title, channel = it.channel,
+                                views = it.views, timeAgo = it.timeAgo, duration = it.duration,
+                                isPro = it.isPro, category = it.category, description = "", thumbnailUrl = it.thumbnailUrl,
+                                isDownloaded = it.isDownloaded, isBookmarked = it.isBookmarked
+                            ))
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(42.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = urlInput.isNotBlank()
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text("Запустить закачку", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
+                ) {
+                    Text("Очистить всё", color = Primary, fontSize = 12.sp)
                 }
             }
         }
 
-        // Active downloads section
-        if (activeDownloads.isNotEmpty()) {
-            Text(
-                text = "Активные загрузки (yt-dlp CLI)",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            activeDownloads.values.forEach { dl ->
-                var isTerminalExpanded by remember { mutableStateOf(false) }
-
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                    border = BorderStroke(1.dp, SurfaceVariant),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
+        if (recentVideos.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(32.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            VideoThumbnail(
-                                id = dl.id,
-                                duration = "",
-                                thumbnailUrl = dl.thumbnailUrl,
-                                modifier = Modifier
-                                    .width(70.dp)
-                                    .height(42.dp)
-                            )
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = dl.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    val badgeColor = when (dl.status) {
-                                        "Extracting" -> Color(0xFFF59E0B)
-                                        "Downloading" -> Color(0xFF3B82F6)
-                                        "Merging" -> Color(0xFF8B5CF6)
-                                        "Completed" -> Color(0xFF10B981)
-                                        "Failed" -> Color(0xFFEF4444)
-                                        else -> Color.Gray
-                                    }
-                                    val statusText = when (dl.status) {
-                                        "Queued" -> "В очереди"
-                                        "Extracting" -> "Анализ линков"
-                                        "Downloading" -> "Скачивание"
-                                        "Merging" -> "Сборка FFmpeg"
-                                        "Completed" -> "Успешно"
-                                        "Failed" -> "Ошибка"
-                                        else -> dl.status
-                                    }
-
-                                    Surface(
-                                        color = badgeColor.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = statusText,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = badgeColor,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-
-                                    if (dl.status == "Downloading") {
-                                        Text(
-                                            text = "${dl.speed} • ETA ${dl.eta}",
-                                            fontSize = 9.sp,
-                                            color = GreyText
-                                        )
-                                    }
-                                }
-                            }
-
-                            IconButton(
-                                onClick = { isTerminalExpanded = !isTerminalExpanded },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Code,
-                                    contentDescription = "Терминал",
-                                    tint = if (isTerminalExpanded) MaterialTheme.colorScheme.primary else GreyText,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        if (dl.status != "Completed" && dl.status != "Failed") {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                LinearProgressIndicator(
-                                    progress = { dl.progress },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(4.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = SurfaceVariant
-                                )
-                                Text(
-                                    text = "${(dl.progress * 100).toInt()}%",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                            }
-                        }
-
-                        if (isTerminalExpanded) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Card(
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-                                border = BorderStroke(1.dp, Color(0xFF334155)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                val scrollState = rememberScrollState()
-                                LaunchedEffect(dl.logs.size) {
-                                    scrollState.animateScrollTo(scrollState.maxValue)
-                                }
-
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(max = 145.dp)
-                                        .verticalScroll(scrollState)
-                                        .padding(8.dp)
-                                ) {
-                                    dl.logs.forEach { line ->
-                                        Text(
-                                            text = line,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                            fontSize = 9.sp,
-                                            color = if (line.contains("[error]")) Color(0xFFF87171) else Color(0xFF34D399),
-                                            lineHeight = 12.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        tint = GreyText.copy(alpha = 0.4f),
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "История пока пуста",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Здесь будут отображаться видео, которые вы запускали на просмотр.",
+                        fontSize = 11.sp,
+                        color = GreyText,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        if (downloadedVideos.isEmpty() && activeDownloads.isEmpty()) {
-            EmptyStateContainer(
-                title = "Нет загруженных видео",
-                hint = "Вы можете скачать любой медиаконтент, нажав на кнопку загрузки в плеере. Все загрузки выполняются через ядро yt-dlp с высокой скоростью!"
-            )
-        } else if (downloadedVideos.isNotEmpty()) {
+        } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
-                items(downloadedVideos, key = { it.id }) { saved ->
+                items(recentVideos, key = { it.id }) { saved ->
                     val videoRuntime = Video(
                         id = saved.id,
                         title = saved.title,
@@ -1288,9 +1118,9 @@ fun DownloadsTabScreen(
                         duration = saved.duration,
                         isPro = saved.isPro,
                         category = saved.category,
-                        description = "Файл сохранен локально во внутреннем кэше устройства.",
+                        description = "Просмотрено недавно.",
                         thumbnailUrl = saved.thumbnailUrl,
-                        isDownloaded = true,
+                        isDownloaded = saved.isDownloaded,
                         isBookmarked = saved.isBookmarked
                     )
 
@@ -1323,7 +1153,7 @@ fun DownloadsTabScreen(
                                     text = saved.title,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
@@ -1332,34 +1162,18 @@ fun DownloadsTabScreen(
                                     fontSize = 10.sp,
                                     color = GreyText
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = Color(0xFF10B981),
-                                        modifier = Modifier.size(10.dp)
-                                    )
-                                    Text(
-                                        text = "Доступно офлайн",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF10B981)
-                                    )
-                                }
                             }
 
                             IconButton(
-                                onClick = { viewModel.toggleDownload(videoRuntime) },
-                                modifier = Modifier.size(32.dp).testTag("delete_download_${saved.id}")
+                                onClick = { 
+                                    viewModel.deleteRecentItem(videoRuntime)
+                                },
+                                modifier = Modifier.size(32.dp).testTag("delete_recent_${saved.id}")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Удалить",
-                                    tint = MaterialTheme.colorScheme.error,
+                                    contentDescription = "Удалить из истории",
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1384,13 +1198,13 @@ fun LibraryTabScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Медиатека",
+            text = "Избранное",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Просмотр сохраненного контента и закладок",
+            text = "Просмотр сохраненного контента и избранных видео",
             fontSize = 12.sp,
             color = GreyText,
             modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
@@ -1597,7 +1411,7 @@ fun LibraryTabScreen(
 
         if (bookmarkedVideos.isEmpty()) {
             EmptyStateContainer(
-                title = "Медиатека пуста",
+                title = "Список избранного пуст",
                 hint = "Вы можете добавить медиа в этот список, нажав на кнопку закладок на карточке видео."
             )
         } else {

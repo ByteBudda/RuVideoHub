@@ -11,17 +11,16 @@ interface RutubeApiService {
         @Query("query") query: String,
         @Query("page") page: Int = 1,
         @Query("format") format: String = "json"
-    ): RutubeSearchResponse
+    ): ResponseBody
 
-    @GET("api/feeds/popular/")
+    @GET("api/video/")
     suspend fun getPopularVideos(
         @Query("page") page: Int = 1,
         @Query("format") format: String = "json"
-    ): RutubeSearchResponse
+    ): ResponseBody
 
     @GET
-    suspend fun getDynamicUrl(@Url url: String): RutubeSearchResponse
-
-    @GET
-    suspend fun getRawDynamicUrl(@Url url: String): ResponseBody
+    suspend fun getDynamicUrl(
+        @Url url: String
+    ): ResponseBody
 }
