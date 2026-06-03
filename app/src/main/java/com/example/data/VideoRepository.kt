@@ -2,7 +2,6 @@ package com.example.data
 
 import android.util.Log
 import com.example.data.rutube.RutubeApiService
-import com.example.data.rutube.RutubeVideoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -82,9 +81,8 @@ class VideoRepository(
 
     private suspend fun loadPageByUrl(url: String, fallbackCategory: String): Pair<List<Video>, String?> {
         return try {
-            val response = apiService.getDynamicUrl(url)
-            val videos = response.results?.mapNotNull { toVideo(it, fallbackCategory) } ?: emptyList()
-            videos to response.next
+            val responseBody = apiService.getRawDynamicUrl(url)
+            return parseRawJsonToVideos(responseBody.string(), fallbackCategory)
         } catch (e: Exception) {
             Log.e("VideoRepository", "loadPageByUrl error", e)
             emptyList<Video>() to null
@@ -93,10 +91,10 @@ class VideoRepository(
 
     private suspend fun searchVideosPage(query: String, page: Int): Pair<List<Video>, String?> {
         return try {
-            val response = apiService.searchVideos(query, page = page)
-            val videos = response.results?.mapNotNull { toVideo(it, "Поиск: $query") } ?: emptyList()
+            val url = "https://rutube.ru/api/search/video/?query=$query&page=$page&format=json"
+            val responseBody = apiService.getRawDynamicUrl(url)
             lastFetchSource = "Rutube LIVE (поиск)"
-            videos to response.next
+            return parseRawJsonToVideos(responseBody.string(), "Поиск: $query")
         } catch (e: Exception) {
             Log.e("VideoRepository", "searchVideosPage error", e)
             emptyList<Video>() to null
@@ -106,10 +104,9 @@ class VideoRepository(
     private suspend fun fetchCategoryPage(slug: String, categoryName: String, page: Int): Pair<List<Video>, String?> {
         return try {
             val url = "https://rutube.ru/api/feeds/$slug/?page=$page&format=json"
-            val response = apiService.getDynamicUrl(url)
-            val videos = response.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
+            val responseBody = apiService.getRawDynamicUrl(url)
             lastFetchSource = "Rutube LIVE"
-            videos to response.next
+            return parseRawJsonToVideos(responseBody.string(), categoryName)
         } catch (e: Exception) {
             Log.e("VideoRepository", "fetchCategoryPage error for $slug", e)
             emptyList<Video>() to null
@@ -118,63 +115,163 @@ class VideoRepository(
 
     private suspend fun fetchAllCategoriesVideos(): List<Video> {
         return try {
-            val response = apiService.getPopularVideos(page = 1)
+            val responseBody = apiService.getRawDynamicUrl("https://rutube.ru/api/feeds/popular/?format=json")
             lastFetchSource = "Rutube LIVE (Популярное)"
-            response.results?.mapNotNull { toVideo(it, "Все") } ?: emptyList()
+            val (videos, _) = parseRawJsonToVideos(responseBody.string(), "Все")
+            videos
         } catch (e: Exception) {
-            Log.e("VideoRepository", "fetchAllCategoriesVideos (Popular) error", e)
+            Log.e("VideoRepository", "fetchAllCategoriesVideos error", e)
             emptyList()
         }
     }
 
-    fun toVideo(item: RutubeVideoItem, categoryName: String): Video? {
-        val videoId = item.id?.takeIf { it.isNotBlank() }
-            ?: item.videoId?.takeIf { it.isNotBlank() }
-            ?: item.code?.takeIf { it.isNotBlank() }
+    /**
+     * Универсальный парсер сырого JSON, воссоздающий логику из твоего parser.js
+     */
+    private fun parseRawJsonToVideos(jsonStr: String, categoryName: String): Pair<List<Video>, String?> {
+        val videosList = mutableListOf<Video>()
+        var nextUrl: String? = null
 
-        if (videoId == null) {
-            Log.w("VideoRepository", "Пропущено видео, пустой ID. Модель: ${item.contentType?.model}")
-            return null
+        try {
+            val jsonObj = JSONObject(jsonStr)
+            nextUrl = jsonObj.optString("next").takeIf { it.isNotBlank() && it != "null" }
+            
+            val resultsArray = jsonObj.optJSONArray("results")
+            if (resultsArray != null) {
+                for (i in 0 until resultsArray.length()) {
+                    val rawItem = resultsArray.optJSONObject(i) ?: continue
+                    
+                    // Логика из JS: проверка на вложенность (content_type + object)
+                    val contentTypeObj = rawItem.optJSONObject("content_type")
+                    val model = contentTypeObj?.optString("model") ?: "video"
+                    val nestedObject = rawItem.optJSONObject("object")
+                    
+                    // Если структура вложенная, прыгаем внутрь "object", иначе читаем корень
+                    val item = if (contentTypeObj != null && nestedObject != null) nestedObject else rawItem
+
+                    // Извлекаем ID сущности
+                    val videoId = item.optString("id").takeIf { it.isNotBlank() && it != "null" }
+                        ?: item.optString("video_id").takeIf { it.isNotBlank() && it != "null" }
+                        ?: item.optString("code").takeIf { it.isNotBlank() && it != "null" }
+
+                    if (videoId == null) {
+                        Log.w("VideoRepository", "Пропущена карточка (пустой ID). Модель: $model")
+                        continue
+                    }
+
+                    // 1. Если это КАНАЛ (userchannel)
+                    if (model == "userchannel") {
+                        val channelName = item.optString("name").takeIf { it.isNotBlank() } ?: "Безымянный канал"
+                        val avatar = item.optString("user_channel_image").takeIf { it.isNotBlank() }
+                            ?: item.optString("picture").takeIf { it.isNotBlank() }
+                            ?: item.optString("thumbnail_url")
+                        
+                        videosList.add(
+                            Video(
+                                id = videoId,
+                                title = channelName,
+                                channel = "Канал • Rutube",
+                                views = "Подписчиков: много",
+                                timeAgo = "Автор контента",
+                                duration = "ЛЕНТА",
+                                isPro = false,
+                                category = categoryName,
+                                description = item.optString("description", "Описание канала отсутствует"),
+                                thumbnailUrl = avatar ?: "",
+                                isDownloaded = false,
+                                isBookmarked = false
+                            )
+                        )
+                        continue
+                    }
+
+                    // 2. Если это ТВ-ШОУ / СЕРИАЛ (tv)
+                    if (model == "tv") {
+                        val showTitle = item.optString("title").takeIf { it.isNotBlank() }
+                            ?: item.optString("original_title").takeIf { it.isNotBlank() }
+                            ?: item.optString("name").takeIf { it.isNotBlank() }
+                            ?: "Телепередача"
+                        val poster = item.optString("poster_url").takeIf { it.isNotBlank() }
+                            ?: item.optString("thumbnail_url").takeIf { it.isNotBlank() }
+                            ?: item.optString("picture")
+
+                        videosList.add(
+                            Video(
+                                id = videoId,
+                                title = showTitle,
+                                channel = "Передача / Шоу",
+                                views = "Rutube контент",
+                                timeAgo = "Премьера",
+                                duration = "ШОУ",
+                                isPro = false,
+                                category = categoryName,
+                                description = item.optString("description", "Описание передачи отсутствует"),
+                                thumbnailUrl = poster ?: "",
+                                isDownloaded = false,
+                                isBookmarked = false
+                            )
+                        )
+                        continue
+                    }
+
+                    // 3. Если это стандартное ВИДЕО
+                    val title = item.optString("title").takeIf { it.isNotBlank() } ?: "Без названия"
+                    val description = item.optString("description", "Описание отсутствует")
+                    val thumbnail = item.optString("thumbnail_url").takeIf { it.isNotBlank() }
+                        ?: item.optString("picture_url").takeIf { it.isNotBlank() }
+                        ?: item.optString("poster_url") ?: ""
+
+                    val seconds = item.optInt("duration", -1)
+                    val durationStr = if (seconds > 0) {
+                        val h = seconds / 3600
+                        val m = (seconds % 3600) / 60
+                        val s = seconds % 60
+                        if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
+                    } else "10:00"
+
+                    val viewsCount = item.optLong("views", item.optLong("hits", item.optLong("views_count", 0)))
+                    val viewsStr = when {
+                        viewsCount >= 1_000_000 -> String.format("%.1fM", viewsCount / 1_000_000.0)
+                        viewsCount >= 1_000 -> "${viewsCount / 1_000}K"
+                        viewsCount > 0 -> "$viewsCount"
+                        else -> "0"
+                    } + " просмотров"
+
+                    // Разбор автора
+                    val authorObj = item.optJSONObject("author")
+                    val channelName = authorObj?.optString("name")?.takeIf { it.isNotBlank() }
+                        ?: item.optString("author_name").takeIf { it.isNotBlank() }
+                        ?: item.optString("feed_name").takeIf { it.isNotBlank() }
+                        ?: authorObj?.optString("username")?.takeIf { it.isNotBlank() }
+                        ?: "Канал Rutube"
+
+                    val dateStr = item.optString("created_ts").takeIf { it.isNotBlank() }
+                        ?: item.optString("publication_ts").takeIf { it.isNotBlank() }
+                        ?: "Недавно"
+
+                    videosList.add(
+                        Video(
+                            id = videoId,
+                            title = title,
+                            channel = channelName,
+                            views = viewsStr,
+                            timeAgo = if (dateStr != "Недавно") "Опубликовано" else dateStr,
+                            duration = durationStr,
+                            isPro = false,
+                            category = categoryName,
+                            description = description,
+                            thumbnailUrl = thumbnail,
+                            isDownloaded = false,
+                            isBookmarked = false
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("VideoRepository", "Ошибка парсинга сырого JSON", e)
         }
 
-        val title = item.title?.takeIf { it.isNotBlank() } ?: "Без названия"
-        val description = item.description ?: "Описание отсутствует"
-        val thumbnail = item.thumbnailUrl ?: ""
-
-        val durationStr = item.duration?.let { seconds ->
-            val hours = seconds / 3600
-            val minutes = (seconds % 3600) / 60
-            val secs = seconds % 60
-            if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, secs)
-            else String.format("%02d:%02d", minutes, secs)
-        } ?: "10:00"
-
-        val viewsCount = (item.views ?: item.hits ?: 0).toLong()
-        val viewsStr = when {
-            viewsCount >= 1_000_000 -> String.format("%.1fM", viewsCount / 1_000_000.0)
-            viewsCount >= 1_000 -> "${viewsCount / 1_000}K"
-            viewsCount > 0 -> "$viewsCount"
-            else -> "0"
-        } + " просмотров"
-
-        val channelName = item.author?.name?.takeIf { it.isNotBlank() }
-            ?: item.author?.username?.takeIf { it.isNotBlank() }
-            ?: "Канал Rutube"
-
-        return Video(
-            id = videoId,
-            title = title,
-            channel = channelName,
-            views = viewsStr,
-            timeAgo = item.createdTs?.let { "Опубликовано" } ?: "Недавно",
-            duration = durationStr,
-            isPro = false,
-            category = categoryName,
-            description = description,
-            thumbnailUrl = thumbnail,
-            isDownloaded = false,
-            isBookmarked = false
-        )
+        return videosList to nextUrl
     }
 
     suspend fun deleteVideoById(videoId: String) {
