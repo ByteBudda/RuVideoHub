@@ -1,5 +1,6 @@
 package com.example.data.rutube
 
+import okhttp3.ResponseBody
 import retrofit2.http.GET
 import retrofit2.http.Query
 import retrofit2.http.Url
@@ -20,4 +21,7 @@ interface RutubeApiService {
 
     @GET
     suspend fun getDynamicUrl(@Url url: String): RutubeSearchResponse
+
+    @GET
+    suspend fun getRawDynamicUrl(@Url url: String): ResponseBody
 }
