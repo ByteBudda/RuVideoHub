@@ -394,7 +394,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
             try {
                 val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
                 val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-                val responseBody = apiService.getDynamicUrl("https://rutube.ru/api/search/person/?query=$encoded&format=json")
+                // Custom endpoint suggested by user for channel-targeted search queries
+                val responseBody = apiService.getDynamicUrl("https://rutube.ru/api/search/video/?query=$encoded&content_type=channel&format=json")
                 val jsonStr = responseBody.string()
                 val jsonObj = JSONObject(jsonStr)
                 val resultsArray = jsonObj.optJSONArray("results")
@@ -402,33 +403,34 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 if (resultsArray != null && resultsArray.length() > 0) {
                     for (i in 0 until resultsArray.length()) {
                         val item = resultsArray.optJSONObject(i) ?: continue
-                        val id = item.optString("id", "")
-                        val name = item.optString("name", item.optString("title", item.optString("username", "")))
+                        val id = item.optString("id", item.optString("channel_id", item.optString("owner_id", "")))
+                        val name = item.optString("name", item.optString("title", item.optString("channel_name", item.optString("username", ""))))
                         if (name.isBlank()) continue
                         
                         var avatarUrl: String? = null
                         val avatarObj = item.optJSONObject("avatar")
                         if (avatarObj != null) {
-                            avatarUrl = avatarObj.optString("avatar_url", null)
-                        } else {
-                            avatarUrl = item.optString("avatar_url", null)
+                            avatarUrl = avatarObj.optString("avatar_url", avatarObj.optString("url", null))
+                        }
+                        if (avatarUrl.isNullOrBlank()) {
+                            avatarUrl = item.optString("avatar_url", item.optString("avatar", item.optString("picture_url", null)))
                         }
                         
-                        val subscribersCount = item.optInt("subscribers_count", 0)
+                        val subscribersCount = item.optInt("subscribers_count", item.optInt("subscribers", 0))
                         val subsStr = if (subscribersCount > 0) {
                             if (subscribersCount >= 1_000_000) {
-                                String.format(java.util.Locale.US, "%.1fM млн подписчиков", subscribersCount.toFloat() / 1_000_000)
+                                String.format(java.util.Locale.US, "%.1f млн подписчиков", subscribersCount.toFloat() / 1_000_000)
                             } else if (subscribersCount >= 1_000) {
-                                String.format(java.util.Locale.US, "%.1fK тыс. подписчиков", subscribersCount.toFloat() / 1_000)
+                                String.format(java.util.Locale.US, "%.1f тыс. подписчиков", subscribersCount.toFloat() / 1_000)
                             } else {
                                 "$subscribersCount подписчиков"
                             }
                         } else {
-                            val formats = listOf("142 тыс. подписчиков", "855 подписчиков", "1.2 млн подписчиков")
+                            val formats = listOf("142 тыс. подписчиков", "855 подписчиков", "1.2 млн подписчиков", "54 тыс. подписчиков")
                             formats[Math.abs((name + id).hashCode()) % formats.size]
                         }
                         
-                        val description = item.optString("description", "Официальный канал на RuTube")
+                        val description = item.optString("description", item.optString("about", "Официальный канал на RuTube"))
                         
                         parsed.add(
                             SearchChannel(
@@ -436,7 +438,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                                 name = name,
                                 avatarUrl = avatarUrl,
                                 subscribers = subsStr,
-                                description = description
+                                description = description.ifBlank { "Канал о $query на Rutube" }
                             )
                         )
                     }
@@ -449,7 +451,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                             name = "$query Official Channel",
                             avatarUrl = "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop",
                             subscribers = "4.2 млн подписчиков",
-                            description = "Главные выпуски и эклюзивные материалы по теме $query"
+                            description = "Главные выпуски и эксклюзивные материалы по теме $query"
                         )
                     )
                     parsed.add(
@@ -472,7 +474,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                         name = "$query Official Channel",
                         avatarUrl = "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop",
                         subscribers = "4.2 млн подписчиков",
-                        description = "Главные выпуски и эклюзивные материалы по теме $query"
+                        description = "Главные выпуски и эксклюзивные материалы по теме $query"
                     ),
                     SearchChannel(
                         id = "fallback_2_${query}",
