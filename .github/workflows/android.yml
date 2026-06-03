@@ -22,27 +22,37 @@ jobs:
         java-version: '17'
         cache: 'gradle'
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    # Умный поиск gradlew: находим папку, где он лежит, и даем права
+    - name: Find and Grant execute permission for gradlew
+      run: |
+        GRADLEW_PATH=$(find . -name "gradlew" -print -quit)
+        if [ -z "$GRADLEW_PATH" ]; then
+          echo "Error: gradlew not found anywhere in the repository!"
+          exit 1
+        fi
+        GRADLE_DIR=$(dirname "$GRADLEW_PATH")
+        echo "GRADLE_DIR=$GRADLE_DIR" >> $GITHUB_ENV
+        chmod +x "$GRADLEW_PATH"
 
-    # Собираем релизный APK
+    # Собираем релизный APK внутри правильной папки
     - name: Build Release APK
-      run: ./gradlew assembleRelease
+      run: |
+        cd ${{ env.GRADLE_DIR }}
+        ./gradlew assembleRelease
 
-    # Генерируем рандомный ключ и сразу подписываем им билд
+    # Авто-генерация ключа и подпись плеера
     - name: Sign Release APK (Auto Generated Key)
       uses: r0adkll/sign-android-release@v1
       id: sign_app
       with:
-        releaseDirectory: app/build/outputs/apk/release
-        # Передаем пароли из секретов
+        # Указываем динамический путь к собранному APK
+        releaseDirectory: ${{ env.GRADLE_DIR }}/app/build/outputs/apk/release
         keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
         keyPassword: ${{ secrets.KEY_PASSWORD }}
-        # Эти параметры заставят экшен САМОМУ создать валидный ключ с рандомным алиасом
         alias: auto-generated-alias
         singleKeyStore: true
 
-    # Забираем готовый подписанный APK
+    # Вытаскиваем готовый подписанный APK на страницу билда
     - name: Upload Signed APK Artifact
       uses: actions/upload-artifact@v4
       with:
