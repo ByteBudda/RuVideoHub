@@ -72,21 +72,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentSelectedVideo = MutableStateFlow<Video?>(null)
     val currentSelectedVideo = _currentSelectedVideo.asStateFlow()
 
-    // --- NEW: Active direct stream URL for media player ---
-    private val _hlsStreamUrl = MutableStateFlow<String?>(null)
-    val hlsStreamUrl = _hlsStreamUrl.asStateFlow()
-
-    // --- NEW: Retain playback position globally for Fullscreen seamless transition ---
-    private val _currentPlaybackPositionMs = MutableStateFlow<Long>(0L)
-    val currentPlaybackPositionMs = _currentPlaybackPositionMs.asStateFlow()
-
-    fun updatePlaybackPosition(positionMs: Long) {
-        _currentPlaybackPositionMs.value = positionMs
-        _currentSelectedVideo.value?.id?.let { videoId ->
-            saveVideoPosition(videoId, positionMs)
-        }
-    }
-
     // Simulated active player states
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
@@ -135,51 +120,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Инициализация...")
 
     init {
-        // Проверяем куки из WebView при старте приложения
-        checkCookiesAndSyncState()
-
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        val savedSessionId = sharedPrefs.getString("sessionid", null)
+        val savedCsrfToken = sharedPrefs.getString("csrftoken", null)
+        val savedUsername = sharedPrefs.getString("username", "Сергей Петров")
+        if (!savedSessionId.isNullOrBlank()) {
+            _authSessionId.value = savedSessionId
+            _authCsrfToken.value = savedCsrfToken
+            _isAuthorized.value = true
+            _username.value = savedUsername ?: "Сергей Петров"
+            
+            com.example.data.rutube.RutubeRetrofitClient.sessionId = savedSessionId
+            com.example.data.rutube.RutubeRetrofitClient.csrfToken = savedCsrfToken
+        }
         fetchRealVideos()
         fetchRealCategories()
-    }
-
-    /**
-     * Метод проверяет наличие сессии в CookieManager устройства
-     * и синхронизирует состояние авторизации внутри ViewModel.
-     */
-    fun checkCookiesAndSyncState() {
-        val cookieManager = android.webkit.CookieManager.getInstance()
-        cookieManager.flush()
-        val cookies = cookieManager.getCookie("https://rutube.ru")
-        
-        var sessionId: String? = null
-        var csrfToken: String? = null
-
-        if (!cookies.isNullOrBlank()) {
-            cookies.split("; ").forEach { pair ->
-                val parts = pair.split("=")
-                if (parts.size == 2) {
-                    when (parts[0].trim()) {
-                        "sessionid" -> sessionId = parts[1].trim()
-                        "csrftoken" -> csrfToken = parts[1].trim()
-                    }
-                }
-            }
-        }
-
-        if (!sessionId.isNullOrBlank()) {
-            _authSessionId.value = sessionId
-            _authCsrfToken.value = csrfToken
-            _isAuthorized.value = true
-            
-            // Также подтягиваем имя, если оно было сохранено ранее
-            val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
-            _username.value = sharedPrefs.getString("username", "Сергей Петров") ?: "Сергей Петров"
-        } else {
-            // Если кук нет или они просрочены — сбрасываем стейт авторизации
-            _authSessionId.value = null
-            _authCsrfToken.value = null
-            _isAuthorized.value = false
-        }
     }
 
     private var currentPage = 1
@@ -391,9 +346,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         currentActiveApiEndpoint = "https://rutube.ru/api/metainfo/tv/$tvId/video/"
                         currentPage = 1
                         isEndReached = false
-
-                        // Start stream resolution with retry logic for embed player
-                        resolveStreamUrlWithRetries(firstEpisode.id)
                     } else {
                         setSearchQuery(video.title)
                         selectTab("home")
@@ -434,15 +386,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         currentActiveApiEndpoint = "https://rutube.ru/api/video/person/$channelId/"
                         currentPage = 1
                         isEndReached = false
-
-                        if (loadedVideos.isNotEmpty()) {
-                            val firstVid = loadedVideos.first()
-                            _currentSelectedVideo.value = firstVid
-                            _isPlaying.value = true
-                            _playProgress.value = 0f
-                            startPlaybackTicker()
-                            resolveStreamUrlWithRetries(firstVid.id)
-                        }
                     } else {
                         setSearchQuery(video.title)
                         selectTab("home")
@@ -463,46 +406,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         if (video != null) {
             _isPlaying.value = true
             _playProgress.value = 0f
-            
-            // Restore previous global layout positioning state to avoid reset
-            _currentPlaybackPositionMs.value = getVideoPosition(video.id)
-            
             startPlaybackTicker()
             loadComments(video.id)
             addToRecentHistory(video)
-
-            // Resolve the HLS stream with maximum two sequential tries
-            resolveStreamUrlWithRetries(video.id)
         } else {
             _isPlaying.value = false
             _playProgress.value = 0f
-            _hlsStreamUrl.value = null
-            _currentPlaybackPositionMs.value = 0L
             stopPlaybackTicker()
-        }
-    }
-
-    // --- NEW: Helper routine to execute up to 2 attempts for link fetch and trigger instant auto-playback ---
-    private fun resolveStreamUrlWithRetries(videoId: String) {
-        viewModelScope.launch {
-            _hlsStreamUrl.value = null // clear old buffer state
-            var streamUrl: String? = null
-            var attempts = 0
-            
-            while (streamUrl == null && attempts < 2) {
-                attempts++
-                streamUrl = fetchHlsStreamUrl(videoId)
-                if (streamUrl == null && attempts < 2) {
-                    delay(800) // minor grace backoff before attempt 2
-                }
-            }
-            
-            if (streamUrl != null) {
-                _hlsStreamUrl.value = streamUrl
-                _isPlaying.value = true // Ensure live autoplay target active flags
-            } else {
-                android.util.Log.e("VideoViewModel", "Failed to resolve stream after 2 attempts.")
-            }
         }
     }
 
@@ -1018,6 +928,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
                     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
                 )
+                // Use a deterministic choice of fallback URL based on video id so we download a consistent size
                 val indexChoice = Math.abs(id.hashCode()) % backupUrls.size
                 val chosenBackupUrl = backupUrls[indexChoice]
 
@@ -1086,6 +997,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                     }
                                 }
 
+                                // Small delay to show smooth visual loading state over high-speed networks
                                 delay(15)
                             }
                         }
@@ -1114,6 +1026,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 delay(400)
                 log("[yt-dlp] Downloaded and merged into standard MP4 stream successfully!")
                 
+                // Commit to offline Room repository
                 repository.toggleDownload(video)
                 
                 _activeDownloads.value[id]?.let { currentDl ->
@@ -1126,6 +1039,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 delay(3000)
                 
+                // Clear active queue
                 _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             } else {
                 log("[error] yt-dlp aborted download pipelines with exit code 1.")
@@ -1143,6 +1057,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleMicrophone(status: Boolean) {
         _isMicrophoneActive.value = status
         if (status) {
+            // Simulate voice dictation search query search trigger
             viewModelScope.launch {
                 delay(1800)
                 setSearchQuery("API")
@@ -1151,6 +1066,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Helper functions to convert string duration parsed values (e.g. "12:44") to elapsed playback string
     fun getFormattedElapsedTime(durationStr: String, progress: Float): String {
         val totalSeconds = parseDurationToSeconds(durationStr)
         val elapsedSeconds = (progress * totalSeconds).toInt()
@@ -1170,7 +1086,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 val seconds = parts[2].toInt()
                 hours * 3600 + minutes * 60 + seconds
             } else {
-                300
+                300 // fallback 5 min
             }
         } catch (e: Exception) {
             300
@@ -1195,6 +1111,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCommentsLoading = MutableStateFlow(false)
     val isCommentsLoading = _isCommentsLoading.asStateFlow()
 
+
+
     fun setCredentials(sessionId: String, csrfToken: String, user: String = "Сергей Петров") {
         _authSessionId.value = sessionId
         _authCsrfToken.value = csrfToken
@@ -1208,12 +1126,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             .putString("username", user)
             .apply()
 
-        // Записываем куки принудительно в системный CookieManager
-        val cookieManager = android.webkit.CookieManager.getInstance()
-        cookieManager.setAcceptCookie(true)
-        cookieManager.setCookie("https://rutube.ru", "sessionid=$sessionId")
-        cookieManager.setCookie("https://rutube.ru", "csrftoken=$csrfToken")
-        cookieManager.flush()
+        com.example.data.rutube.RutubeRetrofitClient.sessionId = sessionId
+        com.example.data.rutube.RutubeRetrofitClient.csrfToken = csrfToken
     }
 
     fun logout() {
@@ -1224,11 +1138,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
         sharedPrefs.edit().clear().apply()
 
-        // Полностью очищаем куки в WebView
+        com.example.data.rutube.RutubeRetrofitClient.sessionId = null
+        com.example.data.rutube.RutubeRetrofitClient.csrfToken = null
+
+        // Clear webview cookies as well so they can log in cleanly
         try {
-            val cookieManager = android.webkit.CookieManager.getInstance()
-            cookieManager.removeAllCookies(null)
-            cookieManager.flush()
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
         } catch (e: Exception) {
             // Ignore if WebView is not fully configured
         }
@@ -1350,6 +1265,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _comments.value = commentsList
             } catch (e: java.lang.Exception) {
                 android.util.Log.e("VideoViewModel", "Error fetching comments", e)
+                // Use robust fallback mock comments if network is unavailable or blocked!
                 _comments.value = listOf(
                     RutubeComment("c1", "Иван Иванов", "Отличное качество видео, спасибо!", "2 часа назад", 14),
                     RutubeComment("c2", "Елена К.", "Смотрю с удовольствием, отличная подборка!", "5 часов назад", 8),
@@ -1361,6 +1277,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Factory helper in case we instantiate standard lifecycle
     class Factory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
