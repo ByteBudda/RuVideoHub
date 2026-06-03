@@ -297,8 +297,9 @@ class VideoRepository(private val dao: SavedVideoDao) {
         val saved = dao.getVideoById(video.id)
         val termBookmark = !(saved?.isBookmarked ?: false)
         val termDownload = saved?.isDownloaded ?: false
+        val termWatched = saved?.isWatched ?: false
 
-        if (!termBookmark && !termDownload) {
+        if (!termBookmark && !termDownload && !termWatched) {
             dao.deleteById(video.id)
         } else {
             val updated = SavedVideo(
@@ -312,7 +313,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 category = video.category,
                 isDownloaded = termDownload,
                 isBookmarked = termBookmark,
-                thumbnailUrl = video.thumbnailUrl
+                thumbnailUrl = video.thumbnailUrl,
+                isWatched = termWatched
             )
             dao.insertOrUpdate(updated)
         }
@@ -322,8 +324,9 @@ class VideoRepository(private val dao: SavedVideoDao) {
         val saved = dao.getVideoById(video.id)
         val termDownload = !(saved?.isDownloaded ?: false)
         val termBookmark = saved?.isBookmarked ?: false
+        val termWatched = saved?.isWatched ?: false
 
-        if (!termBookmark && !termDownload) {
+        if (!termBookmark && !termDownload && !termWatched) {
             dao.deleteById(video.id)
         } else {
             val updated = SavedVideo(
@@ -337,7 +340,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 category = video.category,
                 isDownloaded = termDownload,
                 isBookmarked = termBookmark,
-                thumbnailUrl = video.thumbnailUrl
+                thumbnailUrl = video.thumbnailUrl,
+                isWatched = termWatched
             )
             dao.insertOrUpdate(updated)
         }

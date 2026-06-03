@@ -225,6 +225,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     // List of ALL viewed/saved items (Recent/History list), sorted by savedAt DESC
     val recentSavedVideos: StateFlow<List<SavedVideo>> = repository.getSavedVideosOnly()
+        .map { list -> list.filter { it.isWatched } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun addToRecentHistory(video: Video) {
@@ -254,15 +255,26 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteRecentItem(video: Video) {
-        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "${video.id}.mp4")
         viewModelScope.launch {
-            if (targetFile.exists()) {
-                targetFile.delete()
-            }
-            repository.deleteVideoById(video.id)
-            if (_currentSelectedVideo.value?.id == video.id) {
-                _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
+            val db = com.example.data.AppDatabase.getDatabase(getApplication())
+            val existing = db.savedVideoDao().getVideoById(video.id)
+            if (existing != null) {
+                if (existing.isDownloaded || existing.isBookmarked) {
+                    // Keep the download and bookmark intact, just remove from watch history
+                    val updated = existing.copy(isWatched = false)
+                    db.savedVideoDao().insertOrUpdate(updated)
+                } else {
+                    // Free to remove completely from DB and disk since there are no bookmarks/downloads
+                    val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                    val targetFile = File(downloadFolder, "${video.id}.mp4")
+                    if (targetFile.exists()) {
+                        targetFile.delete()
+                    }
+                    repository.deleteVideoById(video.id)
+                    if (_currentSelectedVideo.value?.id == video.id) {
+                        _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
+                    }
+                }
             }
         }
     }
