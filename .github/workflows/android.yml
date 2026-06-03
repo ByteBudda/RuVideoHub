@@ -24,12 +24,12 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # Собираем релизный APK через глобальный gradle в папке ./app
-      - name: Build with Gradle (Release)
-        run: gradle assembleRelease --no-daemon --no-configuration-cache
+      # ИСПРАВЛЕНО: Добавили флаги, которые отключают поиск локального файла jks при сборке
+      - name: Build with Gradle (Release Unsigned)
+        run: gradle assembleRelease -Pandroid.injected.signing.store.file="" --no-daemon --no-configuration-cache
         working-directory: ./app
 
-      # Автоматически генерируем ключ и подписываем им APK
+      # Автоматически генерируем ключ и подписываем им получившийся APK
       - name: Sign Release APK (Auto Generated Key)
         uses: r0adkll/sign-android-release@v1
         id: sign_app
@@ -40,7 +40,7 @@ jobs:
           alias: auto-generated-alias
           singleKeyStore: true
 
-      # Вытаскиваем готовый подписанный APK на страницу билда (теперь отступы ровные)
+      # Вытаскиваем готовый подписанный APK на страницу билда
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
