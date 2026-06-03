@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 class VideoRepository(
@@ -32,7 +33,6 @@ class VideoRepository(
         "Технологии" to "technologies"
     )
 
-    // Flow для сохранённых видео
     fun getVideosFlow(): Flow<List<Video>> {
         return dao.getAllSavedVideos().map { savedList ->
             savedList.map { saved ->
@@ -54,29 +54,24 @@ class VideoRepository(
         }
     }
 
-    // Метод для PagingSource – загрузка одной страницы
     suspend fun fetchVideosPage(query: String?, category: String?, pageUrl: String?): Pair<List<Video>, String?> {
         return withContext(Dispatchers.IO) {
             val effectiveCategory = category ?: "Все"
             val effectiveQuery = query?.trim() ?: ""
 
-            // Если есть URL следующей страницы – просто грузим его
             if (!pageUrl.isNullOrBlank()) {
                 return@withContext loadPageByUrl(pageUrl, effectiveCategory)
             }
 
-            // Поиск
             if (effectiveQuery.isNotEmpty()) {
                 return@withContext searchVideosPage(effectiveQuery, 1)
             }
 
-            // Конкретная категория (не "Все")
             val slug = categorySlugs[effectiveCategory] ?: dynamicCategoryTargets[effectiveCategory]
             if (slug != null && effectiveCategory != "Все") {
-                return@withContext fetchCategoryFirstPage(slug, effectiveCategory)
+                return@withContext fetchCategoryPage(slug, effectiveCategory, 1)
             }
 
-            // Категория "Все" – собираем статически (без бесконечной пагинации)
             if (effectiveCategory == "Все") {
                 val allVideos = fetchAllCategoriesVideos()
                 return@withContext allVideos to null
@@ -101,6 +96,7 @@ class VideoRepository(
         return try {
             val response = apiService.searchVideos(query, page = page)
             val videos = response.results?.mapNotNull { toVideo(it, "Поиск: $query") } ?: emptyList()
+            lastFetchSource = "Rutube LIVE (поиск)"
             videos to response.next
         } catch (e: Exception) {
             Log.e("VideoRepository", "searchVideosPage error", e)
@@ -108,15 +104,15 @@ class VideoRepository(
         }
     }
 
-    private suspend fun fetchCategoryFirstPage(slug: String, categoryName: String): Pair<List<Video>, String?> {
+    private suspend fun fetchCategoryPage(slug: String, categoryName: String, page: Int): Pair<List<Video>, String?> {
         return try {
-            // Получаем первую страницу через feeds slug с ?page=1
-            val url = "https://rutube.ru/api/feeds/$slug/?page=1&format=json"
+            val url = "https://rutube.ru/api/feeds/$slug/?page=$page&format=json"
             val response = apiService.getDynamicUrl(url)
             val videos = response.results?.mapNotNull { toVideo(it, categoryName) } ?: emptyList()
+            lastFetchSource = "Rutube LIVE"
             videos to response.next
         } catch (e: Exception) {
-            Log.e("VideoRepository", "fetchCategoryFirstPage error for $slug", e)
+            Log.e("VideoRepository", "fetchCategoryPage error for $slug", e)
             emptyList<Video>() to null
         }
     }
@@ -128,16 +124,16 @@ class VideoRepository(
                 val url = "https://rutube.ru/api/feeds/$slug/?page=1&format=json"
                 val response = apiService.getDynamicUrl(url)
                 val videos = response.results?.mapNotNull { toVideo(it, slug) } ?: emptyList()
-                allVideos.addAll(videos.take(10)) // берём по 10 из каждой категории, чтобы не перегружать
+                allVideos.addAll(videos.take(10))
             } catch (e: Exception) {
                 Log.e("VideoRepository", "fetchAllCategoriesVideos error for $slug", e)
             }
         }
+        lastFetchSource = "Rutube LIVE (сборка категорий)"
         return allVideos.shuffled()
     }
 
-    // Конвертация RutubeVideoItem → Video
-    private fun toVideo(item: RutubeVideoItem, categoryName: String): Video? {
+    fun toVideo(item: RutubeVideoItem, categoryName: String): Video? {
         val videoId = item.id?.takeIf { it.isNotBlank() }
             ?: item.videoId?.takeIf { it.isNotBlank() }
             ?: item.code?.takeIf { it.isNotBlank() }
@@ -183,37 +179,10 @@ class VideoRepository(
         )
     }
 
-    // Получение сохранённых видео (офлайн fallback)
-    private suspend fun getOfflineVideos(query: String, category: String): List<Video> {
-        lastFetchSource = "Локальный оффлайн"
-        return try {
-            val savedList = dao.getAllSavedVideos().first()
-            savedList.map { saved ->
-                Video(
-                    id = saved.id,
-                    title = saved.title,
-                    channel = saved.channel,
-                    views = saved.views,
-                    timeAgo = saved.timeAgo,
-                    duration = saved.duration,
-                    isPro = saved.isPro,
-                    category = saved.category,
-                    description = "Офлайн-просмотр сохраненного видео",
-                    thumbnailUrl = saved.thumbnailUrl,
-                    isDownloaded = saved.isDownloaded,
-                    isBookmarked = saved.isBookmarked
-                )
-            }.filter { video ->
-                val matchCat = category.isBlank() || category == "Все" || video.category.equals(category, ignoreCase = true)
-                val matchQuery = query.isBlank() || video.title.contains(query, ignoreCase = true)
-                matchCat && matchQuery
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+    suspend fun deleteVideoById(videoId: String) {
+        dao.deleteById(videoId)
     }
 
-    // Методы для закладок и скачивания (без изменений)
     suspend fun toggleBookmark(video: Video) {
         val saved = dao.getVideoById(video.id)
         val newBookmark = !(saved?.isBookmarked ?: false)
@@ -268,7 +237,8 @@ class VideoRepository(
         val categoriesList = mutableListOf<RutubeCategory>()
         try {
             val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
-            val jsonObj = org.json.JSONObject(response.toString()) // здесь упрощённо, лучше через Moshi
+            val jsonStr = response.toString()
+            val jsonObj = JSONObject(jsonStr)
             val resultsArray = jsonObj.optJSONArray("results")
             if (resultsArray != null) {
                 for (i in 0 until resultsArray.length()) {
@@ -289,4 +259,30 @@ class VideoRepository(
         }
         return categoriesList
     }
+
+    suspend fun fetchRealVideos(query: String?, category: String?, page: Int = 1): List<Video> {
+        return withContext(Dispatchers.IO) {
+            val effectiveQuery = query?.trim() ?: ""
+            val effectiveCategory = category ?: "Все"
+
+            if (effectiveQuery.isNotEmpty()) {
+                val (videos, _) = searchVideosPage(effectiveQuery, page)
+                return@withContext videos
+            }
+
+            val slug = categorySlugs[effectiveCategory] ?: dynamicCategoryTargets[effectiveCategory]
+            if (slug != null && effectiveCategory != "Все") {
+                val (videos, _) = fetchCategoryPage(slug, effectiveCategory, page)
+                return@withContext videos
+            }
+
+            if (effectiveCategory == "Все") {
+                return@withContext fetchAllCategoriesVideos()
+            }
+
+            emptyList()
+        }
+    }
+
+    fun getSavedVideosOnly(): Flow<List<SavedVideo>> = dao.getAllSavedVideos()
 }
