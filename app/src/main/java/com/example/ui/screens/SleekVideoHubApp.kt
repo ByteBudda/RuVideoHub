@@ -1,4 +1,4 @@
-package com.example.torrflix.ui.player // Замени на свой актуальный package
+package com.example.ui.screens // Твой package из логов гитхаба
 
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
@@ -32,15 +32,17 @@ import kotlinx.coroutines.delay
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-// Предполагается, что эти элементы (Primary, VlcVideoView, VideoViewModel) импортируются из твоего проекта.
-// Если цвета или вьюхи лежат в других пакетах, поправь импорты выше.
-val Primary = Color(0xFFE50914) // Твой дефолтный красный/акцентный цвет
+// Если эти классы/цвета лежат в другом месте — допиши импорты
+// import com.example.torrflix.ui.player.VlcVideoView 
+// import com.example.torrflix.ui.player.VideoViewModel
+
+val Primary = Color(0xFFE50914)
 
 enum class VlcAspectRatio(val displayName: String) {
     FIT("Вписать"),
     FILL("Растянуть"),
-    16_9("16:9"),
-    4_3("4:3");
+    NONE("16:9"), // Переименовал во избежание конфликтов парсинга чисел в enum-константах
+    FOUR_THREE("4:3");
 
     fun next(): VlcAspectRatio {
         val values = values()
@@ -82,7 +84,7 @@ fun RutubeVideoPlayer(
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
     var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
 
-    // Position & duration states for custom controls
+    // Явно задаем тип ссылки на плеер, чтобы компилятор не блуждал в трех соснах
     var videoViewRef by remember { mutableStateOf<VlcVideoView?>(null) }
     var isPlayingState by remember { mutableStateOf(true) }
     var currentPos by remember { mutableLongStateOf(0L) }
@@ -90,10 +92,8 @@ fun RutubeVideoPlayer(
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var controlsVisible by remember { mutableStateOf(true) }
 
-    // HUD message for aspect ratio cycle
     var hudMessage by remember { mutableStateOf<String?>(null) }
 
-    // 1. Автоматический фоллбек при первой загрузке
     LaunchedEffect(videoId) {
         if (offlineFile.exists()) {
             hlsUrl = offlineFile.absolutePath
@@ -107,14 +107,12 @@ fun RutubeVideoPlayer(
                 hlsUrl = resolvedUrl
                 isLoading = false
             } else {
-                // Вместо вывода ошибки — молча прыгаем в embed
                 useEmbedPlayer = true
                 isLoading = false
             }
         }
     }
 
-    // Auto-hide controls after 4 seconds of inactivity
     LaunchedEffect(controlsVisible, lastInteractionTime) {
         if (controlsVisible) {
             delay(4000)
@@ -124,7 +122,6 @@ fun RutubeVideoPlayer(
         }
     }
 
-    // Clear HUD message after 1.5 seconds
     LaunchedEffect(hudMessage) {
         if (hudMessage != null) {
             delay(1500)
@@ -132,10 +129,10 @@ fun RutubeVideoPlayer(
         }
     }
 
-    // Progress update loop
+    // Progress update loop с явным приведением типа в let
     LaunchedEffect(videoViewRef, isPlayingState) {
         while (isPlayingState && videoViewRef != null) {
-            videoViewRef?.let { view ->
+            videoViewRef?.let { view: VlcVideoView ->
                 if (view.isPlaying) {
                     currentPos = view.currentPosition.toLong()
                     val dur = view.duration.toLong()
@@ -205,7 +202,6 @@ fun RutubeVideoPlayer(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Overlay Controls inside embed player web layout
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -229,7 +225,6 @@ fun RutubeVideoPlayer(
 
                     IconButton(
                         onClick = { 
-                            // Позволяем вручную сбросить и попробовать снова запросить HLS
                             useEmbedPlayer = false 
                             isLoading = true
                             hlsUrl = null 
@@ -249,7 +244,6 @@ fun RutubeVideoPlayer(
                 }
             }
         } else if (loadError != null) {
-            // Этот блок теперь сработает только если упадет сам плеер, у которого не получилось переключить стейт
             Column(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -284,7 +278,6 @@ fun RutubeVideoPlayer(
                 }
             }
         } else if (hlsUrl != null) {
-            // Video View Container
             AndroidView(
                 factory = { ctx ->
                     VlcVideoView(ctx).apply {
@@ -314,11 +307,11 @@ fun RutubeVideoPlayer(
                                 seekTo(savedPos.toInt())
                                 currentPos = savedPos
                             }
+                            // Тот самый вызов! Теперь он внутри контекста VlcVideoView, всё ок
                             start()
                         }
                         
                         setOnErrorListener { _, _, _ ->
-                            // 2. Если нативный плеер упал на лету — сразу молча уводим в эмбед
                             useEmbedPlayer = true
                             hlsUrl = null
                             true
@@ -334,7 +327,6 @@ fun RutubeVideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Transparent overlay for Controls
             AnimatedVisibility(
                 visible = controlsVisible,
                 enter = fadeIn(),
@@ -353,7 +345,7 @@ fun RutubeVideoPlayer(
                             controlsVisible = false
                         }
                 ) {
-                    // Top Bar Controls
+                    // Top Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -380,7 +372,7 @@ fun RutubeVideoPlayer(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ArrowBack,
-                                        contentDescription = "Выйти из полного экрана",
+                                        contentDescription = "Назад",
                                         tint = Color.White
                                     )
                                 }
@@ -396,7 +388,6 @@ fun RutubeVideoPlayer(
                             )
                         }
 
-                        // Right actions (Aspect ratio & Share)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -440,7 +431,7 @@ fun RutubeVideoPlayer(
                         }
                     }
 
-                    // Center playback buttons
+                    // Center Buttons (Явное указание типов во всех лямбдах)
                     Row(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -454,7 +445,7 @@ fun RutubeVideoPlayer(
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
-                                videoViewRef?.let { view ->
+                                videoViewRef?.let { view: VlcVideoView ->
                                     val newPos = (view.currentPosition - 10000).coerceAtLeast(0)
                                     view.seekTo(newPos.toInt())
                                     currentPos = newPos.toLong()
@@ -475,7 +466,7 @@ fun RutubeVideoPlayer(
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
-                                videoViewRef?.let { view ->
+                                videoViewRef?.let { view: VlcVideoView ->
                                     if (view.isPlaying) {
                                         view.pause()
                                         isPlayingState = false
@@ -500,7 +491,7 @@ fun RutubeVideoPlayer(
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
-                                videoViewRef?.let { view ->
+                                videoViewRef?.let { view: VlcVideoView ->
                                     val newPos = (view.currentPosition + 10000).coerceAtMost(view.duration)
                                     view.seekTo(newPos.toInt())
                                     currentPos = newPos.toLong()
@@ -519,7 +510,7 @@ fun RutubeVideoPlayer(
                         }
                     }
 
-                    // Bottom Bar Controls with Slider
+                    // Bottom Bar
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -583,7 +574,7 @@ fun RutubeVideoPlayer(
                             ) {
                                 Icon(
                                     imageVector = if (isFullscreen) Icons.Default.Close else Icons.Default.AspectRatio,
-                                    contentDescription = "Во весь экран",
+                                    contentDescription = "Экран",
                                     tint = Color.White,
                                     modifier = Modifier.size(16.dp)
                                 )
