@@ -36,7 +36,6 @@ import javax.crypto.spec.SecretKeySpec
 class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
-    // Передаем только Dao, как требует обновленный конструктор VideoRepository
     private val repository = VideoRepository(db.savedVideoDao())
 
     private val _currentTab = MutableStateFlow("home")
@@ -174,7 +173,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Исправлено: убрали лишний параметр page для соответствия сигнатуре репозитория
                 _dynamicVideos.value = repository.fetchRealVideos(query, category)
             } catch (e: Exception) {
                 Log.e("VideoViewModel", "Error fetching videos", e)
@@ -191,7 +189,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isMoreLoading.value = true
             try {
                 val nextPage = currentPage + 1
-                // Исправлено: убрали лишний аргумент из вызова fetchRealVideos
                 val newVideos = repository.fetchRealVideos(currentQuery, currentCategory)
                 if (newVideos.isEmpty()) {
                     isEndReached = true
@@ -275,8 +272,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val apiService = RutubeRetrofitClient.apiService
                     val response = apiService.getDynamicUrl("https://rutube.ru/api/metainfo/tv/$tvId/video/?format=json")
-                    // Парсим JSON через строку/структуру репозитория, обрабатывая результаты
-                    val jsonObject = JSONObject(response.string())
+                    val jsonStr = response.toString()
+                    val jsonObject = JSONObject(jsonStr)
                     val resultsArr = jsonObject.optJSONArray("results")
                     val episodes = mutableListOf<Video>()
                     if (resultsArr != null) {
@@ -317,7 +314,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     var loadedVideos: List<Video> = emptyList()
                     try {
                         val response = apiService.getDynamicUrl("https://rutube.ru/api/video/person/$channelId/?format=json")
-                        val jsonObject = JSONObject(response.string())
+                        val jsonObject = JSONObject(response.toString())
                         val resultsArr = jsonObject.optJSONArray("results")
                         val episodes = mutableListOf<Video>()
                         if (resultsArr != null) {
@@ -493,9 +490,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     thumbnailUrl = video.thumbnailUrl, progress = 0f,
                     speed = "0 B/s", eta = "--:--", status = "В очереди", logs = logs.toList()
                 )
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                    this[id] = updatedDl
-                }
+                // Явно указываем типы для mutableMap, чтобы Котлин не терял контекст при сборке в CI
+                val mutableMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                mutableMap[id] = updatedDl
+                _activeDownloads.value = mutableMap
             }
 
             fun resolveUrl(baseUrl: String, relativeUrl: String): String {
@@ -533,13 +531,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             log("[Core] Инициализация загрузки видео с Rutube...")
             log("[Core] Идентификатор медиафайла: $id")
             
-            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                this[id] = RutubeDownload(
-                    id = id, title = video.title, channel = video.channel,
-                    thumbnailUrl = video.thumbnailUrl, progress = 0.01f,
-                    speed = "0 B/s", eta = "--:--", status = "Анализ", logs = logs.toList()
-                )
-            }
+            val initMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+            initMap[id] = RutubeDownload(
+                id = id, title = video.title, channel = video.channel,
+                thumbnailUrl = video.thumbnailUrl, progress = 0.01f,
+                speed = "0 B/s", eta = "--:--", status = "Анализ", logs = logs.toList()
+            )
+            _activeDownloads.value = initMap
 
             log("[Rutube API] Запрос конфигурации медиа-балансера через /api/play/options/")
             var extractedStreamUrl: String? = null
@@ -550,7 +548,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val apiService = RutubeRetrofitClient.apiService
                     val playOptionsResponse = apiService.getDynamicUrl("https://rutube.ru/api/play/options/$id/?format=json")
-                    val playOptionsBody = playOptionsResponse.string() // Исправлено на .string()
+                    val playOptionsBody = playOptionsResponse.toString()
                     val jsonObject = JSONObject(playOptionsBody)
                     val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
                     if (videoBalancerObj != null) {
@@ -598,9 +596,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             log("[HTTP] Каталог назначения: /Android/data/${getApplication<Application>().packageName}/files/Download")
             
             _activeDownloads.value[id]?.let { currentDl ->
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                    this[id] = currentDl.copy(status = "Скачивание", progress = 0.05f)
-                }
+                val dlMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                dlMap[id] = currentDl.copy(status = "Скачивание", progress = 0.05f)
+                _activeDownloads.value = dlMap
             }
 
             val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -777,16 +775,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                     index + 1, segments.size, ((index + 1) * 100) / segments.size, sizeMBytes, speedStr, etaStr))
                             }
                             
-                            // Исправлено: Удален критический вызов отмены контекста корутины
-                            
                             _activeDownloads.value[id]?.let { currentDl ->
-                                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                    this[id] = currentDl.copy(
-                                        progress = progressValue,
-                                        speed = speedStr,
-                                        eta = etaStr
-                                    )
-                                }
+                                val updateMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                                updateMap[id] = currentDl.copy(
+                                    progress = progressValue,
+                                    speed = speedStr,
+                                    eta = etaStr
+                                )
+                                _activeDownloads.value = updateMap
                             }
                         }
                     }
@@ -803,24 +799,28 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 log("[Core] Все фрагменты HLS успешно выкачаны и объединены.")
                 repository.toggleDownload(video)
                 _activeDownloads.value[id]?.let { currentDl ->
-                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                        this[id] = currentDl.copy(status = "Готово", progress = 1f)
-                    }
+                    val successMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                    successMap[id] = currentDl.copy(status = "Готово", progress = 1f)
+                    _activeDownloads.value = successMap
                 }
                 if (_currentSelectedVideo.value?.id == id) {
                     _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
                 }
                 delay(2000)
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
+                val cleanMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                cleanMap.remove(id)
+                _activeDownloads.value = cleanMap
             } else {
                 log("[Ошибка] Процесс обработки прерван из-за критического сбоя сети.")
                 _activeDownloads.value[id]?.let { currentDl ->
-                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                        this[id] = currentDl.copy(status = "Ошибка")
-                    }
+                    val failMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                    failMap[id] = currentDl.copy(status = "Ошибка")
+                    _activeDownloads.value = failMap
                 }
                 delay(4000)
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
+                val cleanMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                cleanMap.remove(id)
+                _activeDownloads.value = cleanMap
             }
         }
     }
@@ -951,7 +951,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val apiService = RutubeRetrofitClient.apiService
                 val response = apiService.getDynamicUrl("https://rutube.ru/api/v2/comments/?video_id=$videoId&format=json")
-                val jsonStr = response.string() // Исправлено на .string()
+                val jsonStr = response.toString()
                 val jsonObject = JSONObject(jsonStr)
                 val resultsArr = jsonObject.optJSONArray("results")
                 val commentsList = mutableListOf<RutubeComment>()
@@ -1015,18 +1015,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         thumbnailUrl = "", progress = 0f,
                         speed = "0 B/s", eta = "--:--", status = "В очереди", logs = logs.toList()
                     )
-                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                        this[cleanId] = updatedDl
-                    }
+                    val updateMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                    updateMap[cleanId] = updatedDl
+                    _activeDownloads.value = updateMap
                 }
                 log("[Core] Попытка разбора прямой ссылки медиаресурса...")
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                    this[cleanId] = RutubeDownload(
-                        id = cleanId, title = finalTitle, channel = "Прямой поток",
-                        thumbnailUrl = "", progress = 0.01f,
-                        speed = "0 B/s", eta = "--:--", status = "Анализ", logs = logs.toList()
-                    )
-                }
+                
+                val initMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                initMap[cleanId] = RutubeDownload(
+                    id = cleanId, title = finalTitle, channel = "Прямой поток",
+                    thumbnailUrl = "", progress = 0.01f,
+                    speed = "0 B/s", eta = "--:--", status = "Анализ", logs = logs.toList()
+                )
+                _activeDownloads.value = initMap
+
                 val isM3u8 = trimmedUrl.contains(".m3u8")
                 val isDirectMp4 = trimmedUrl.contains(".mp4") || trimmedUrl.contains(".mkv") || trimmedUrl.contains(".mov") || trimmedUrl.contains(".avi")
                 val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -1044,9 +1046,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     } else if (isDirectMp4) {
                         log("[HTTP] Обнаружена прямая ссылка на медиафайл MP4/контейнер.")
                         _activeDownloads.value[cleanId]?.let { currentDl ->
-                            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                this[cleanId] = currentDl.copy(status = "Скачивание", progress = 0.05f)
-                            }
+                            val dlMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                            dlMap[cleanId] = currentDl.copy(status = "Скачивание", progress = 0.05f)
+                            _activeDownloads.value = dlMap
                         }
                         val client = OkHttpClient.Builder().connectTimeout(20, TimeUnit.SECONDS).build()
                         val request = Request.Builder()
@@ -1076,9 +1078,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                             val speedStr = if (speed > 1024 * 1024) String.format("%.1f МБ/с", speed.toFloat() / (1024 * 1024)) else "${speed / 1024} КБ/с"
                                             log("[HTTP] Скачано: ${(pct * 100).toInt()}% • Скорость: $speedStr")
                                             _activeDownloads.value[cleanId]?.let { currentDl ->
-                                                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                                    this[cleanId] = currentDl.copy(progress = pct.coerceIn(0f, 0.99f), speed = speedStr, status = "Скачивание")
-                                                }
+                                                val progressMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                                                progressMap[cleanId] = currentDl.copy(progress = pct.coerceIn(0f, 0.99f), speed = speedStr, status = "Скачивание")
+                                                _activeDownloads.value = progressMap
                                             }
                                             lastLogUpdate = now
                                         }
@@ -1095,19 +1097,23 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         db.savedVideoDao().insertOrUpdate(saved)
                         _activeDownloads.value[cleanId]?.let { currentDl ->
-                            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                                this[cleanId] = currentDl.copy(status = "Готово", progress = 1.0f, speed = "0 Б/с")
-                            }
+                            val readyMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                            readyMap[cleanId] = currentDl.copy(status = "Готово", progress = 1.0f, speed = "0 Б/с")
+                            _activeDownloads.value = readyMap
                         }
                         delay(1500)
-                        _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(cleanId) }
+                        val cleanMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                        cleanMap.remove(cleanId)
+                        _activeDownloads.value = cleanMap
                     } else {
                         throw Exception("Неподдерживаемый тип ссылки или медиа-ресурса.")
                     }
                 } catch (err: Exception) {
                     log("[Ошибка] Загрузка отменена или произошел сбой: ${err.message}")
                     delay(3000)
-                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(cleanId) }
+                    val cleanMap = _activeDownloads.value.toMutableMap() as MutableMap<String, RutubeDownload>
+                    cleanMap.remove(cleanId)
+                    _activeDownloads.value = cleanMap
                 }
             }
         }
@@ -1123,3 +1129,23 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
+
+data class RutubeDownload(
+    val id: String,
+    val title: String,
+    val channel: String,
+    val thumbnailUrl: String?,
+    val progress: Float,
+    val speed: String,
+    val eta: String,
+    val status: String,
+    val logs: List<String>
+)
+
+data class RutubeComment(
+    val id: String,
+    val author: String,
+    val text: String,
+    val date: String?,
+    val likes: Int
+)
