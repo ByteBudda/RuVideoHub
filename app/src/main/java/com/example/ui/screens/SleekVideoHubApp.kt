@@ -138,10 +138,10 @@ fun LibraryTabScreen(
                             },
                             // Блок onRelease гарантирует, что WebView не останется в памяти после закрытия диалога
                             onRelease = { webView ->
-                                webView.stopLoading()
-                                webView.webViewClient = null
-                                webView.clearHistory()
-                                webView.destroy()
+    webView.stopLoading()
+    webView.webViewClient = WebViewClient() // Вместо null пишем дефолтный пустой клиент
+    webView.destroy()
+}
                             },
                             modifier = Modifier.fillMaxSize()
                         )
