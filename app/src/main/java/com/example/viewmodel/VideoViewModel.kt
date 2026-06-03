@@ -93,6 +93,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
 
+    private val _searchedChannels = MutableStateFlow<List<com.example.data.SearchChannel>>(emptyList())
+    val searchedChannels = _searchedChannels.asStateFlow()
+
+    private val _subscribedChannelIds = MutableStateFlow<Set<String>>(emptySet())
+    val subscribedChannelIds = _subscribedChannelIds.asStateFlow()
+
+    fun toggleSubscribeChannel(channelId: String) {
+        if (_subscribedChannelIds.value.contains(channelId)) {
+            _subscribedChannelIds.value = _subscribedChannelIds.value - channelId
+        } else {
+            _subscribedChannelIds.value = _subscribedChannelIds.value + channelId
+        }
+    }
+
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
         while (true) {
@@ -142,6 +156,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
             try {
                 _dynamicVideos.value = repository.fetchRealVideos(query, targetCategory, page = 1)
+                
+                // Fetch Channels concurrently if we have a non-blank search query
+                if (!query.isNullOrBlank()) {
+                    try {
+                        _searchedChannels.value = repository.fetchChannels(query)
+                    } catch (ex: Exception) {
+                        _searchedChannels.value = emptyList()
+                    }
+                } else {
+                    _searchedChannels.value = emptyList()
+                }
             } catch (e: Exception) {
                 // Ignore or log error gracefully
             } finally {

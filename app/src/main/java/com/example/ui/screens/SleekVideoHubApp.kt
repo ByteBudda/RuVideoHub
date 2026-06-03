@@ -236,6 +236,8 @@ fun HomeTabScreen(
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
     val apiSource by viewModel.apiSource.collectAsStateWithLifecycle()
+    val searchedChannels by viewModel.searchedChannels.collectAsStateWithLifecycle()
+    val subscribedChannelIds by viewModel.subscribedChannelIds.collectAsStateWithLifecycle()
 
     val categories = listOf("Фильмы", "Сериалы", "Телепередачи", "Музыка", "Мультфильмы", "Спорт", "Юмор", "Видеоигры", "Технологии")
 
@@ -299,6 +301,34 @@ fun HomeTabScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
+                if (searchQuery.isNotEmpty() && searchedChannels.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Найдено каналов",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Primary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(searchedChannels, key = { "channel_" + it.id }) { channel ->
+                                val isSubscribed = subscribedChannelIds.contains(channel.id)
+                                ChannelSearchCard(
+                                    channel = channel,
+                                    isSubscribed = isSubscribed,
+                                    onSubscribeToggle = { viewModel.toggleSubscribeChannel(channel.id) }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Section recommended (header + hero card)
                 val heroVideo = filteredVideos.first()
                 item {
@@ -2496,6 +2526,7 @@ fun RutubeVideoPlayer(
     var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
     var isLoading by remember(videoId) { mutableStateOf(true) }
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
+    var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
 
     // Position & duration states for custom controls
     var videoViewRef by remember { mutableStateOf<VlcVideoView?>(null) }
@@ -2515,6 +2546,7 @@ fun RutubeVideoPlayer(
         } else {
             isLoading = true
             loadError = null
+            useEmbedPlayer = false
             val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId)
             if (resolvedUrl != null) {
                 hlsUrl = resolvedUrl
@@ -2591,6 +2623,73 @@ fun RutubeVideoPlayer(
                     fontWeight = FontWeight.Medium
                 )
             }
+        } else if (useEmbedPlayer) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            settings.apply {
+                                javaScriptEnabled = true
+                                domStorageEnabled = true
+                                useWideViewPort = true
+                                loadWithOverviewMode = true
+                                mediaPlaybackRequiresUserGesture = false
+                                databaseEnabled = true
+                            }
+                            webViewClient = WebViewClient()
+                            webChromeClient = WebChromeClient()
+                            val embedUrl = "https://rutube.ru/play/embed/$videoId/"
+                            loadUrl(embedUrl)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Overlay Controls inside embed player web layout
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onToggleFullscreen,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            contentDescription = "Во весь экран",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { 
+                            useEmbedPlayer = false 
+                            hlsUrl = null 
+                            loadError = "Переключен назад на стандартный плеер." 
+                        },
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Стандартный плеер",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         } else if (loadError != null) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -2611,18 +2710,35 @@ fun RutubeVideoPlayer(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     lineHeight = 15.sp
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        isLoading = true
-                        loadError = null
-                        hlsUrl = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.height(32.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Повторить", fontSize = 11.sp)
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            loadError = null
+                            hlsUrl = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Повторить", fontSize = 11.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            useEmbedPlayer = true
+                            loadError = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Embed-плеер", fontSize = 11.sp, color = Color.White)
+                    }
                 }
             }
         } else if (hlsUrl != null) {
@@ -3067,5 +3183,79 @@ fun formatMillis(ms: Long): String {
     val min = totalSec / 60
     val sec = totalSec % 60
     return String.format("%02d:%02d", min, sec)
+}
+
+@Composable
+fun ChannelSearchCard(
+    channel: com.example.data.SearchChannel,
+    isSubscribed: Boolean,
+    onSubscribeToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+        border = BorderStroke(1.dp, if (isSubscribed) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color(0xFF2C2C2C)),
+        modifier = modifier
+            .width(150.dp)
+            .testTag("channel_card_${channel.id}")
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            AsyncImage(
+                model = channel.avatarUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop",
+                contentDescription = channel.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(Color.DarkGray)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = channel.name,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = channel.subscribers,
+                fontSize = 9.sp,
+                color = GreyText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Button(
+                onClick = onSubscribeToggle,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isSubscribed) Color(0xFF10B981) else Primary,
+                    contentColor = if (isSubscribed) Color.White else MaterialTheme.colorScheme.onPrimary
+                ),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier
+                    .height(26.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    text = if (isSubscribed) "В подписках" else "Подписаться",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
 }
 
