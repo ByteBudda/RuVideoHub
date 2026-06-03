@@ -1992,79 +1992,69 @@ fun SleekPlayerDetailOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val progress by viewModel.playProgress.collectAsStateWithLifecycle()
     val allVideos by viewModel.allVideos.collectAsStateWithLifecycle()
 
     val formattedElapsed = viewModel.getFormattedElapsedTime(video.duration, progress)
 
-    var isFullscreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    var selectedAspectRatio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(VlcAspectRatio.FIT) }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
+    var selectedAspectRatio by rememberSaveable { mutableStateOf(VlcAspectRatio.FIT) }
     var showDownloadOptionsDialog by remember { mutableStateOf(false) }
+    
+    val playerKey by remember(video.id) {
+        derivedStateOf { video.id }
+    }
 
-    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions: Map<String, Boolean> ->
-        val readGranted = permissions[android.Manifest.permission.READ_EXTERNAL_STORAGE] ?: false
-        val writeGranted = permissions[android.Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false
-        if (readGranted || writeGranted || android.os.Build.VERSION.SDK_INT >= 29) {
+        val readGranted = permissions[Manifest.permission.READ_EXTERNAL_STORAGE] ?: false
+        val writeGranted = permissions[Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false
+        if (readGranted || writeGranted || Build.VERSION.SDK_INT >= 29) {
             viewModel.saveToDevice(video, context) { success, message ->
-                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             }
         } else {
-            android.widget.Toast.makeText(context, "Разрешение на работу с файлами отклонено", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Разрешение на работу с файлами отклонено", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // Immersive mode orientation and system bar control
-    val activity = context as? android.app.Activity
-    LaunchedEffect(isFullscreen) {
-        val window = activity?.window
+    val activity = context as? Activity
+    DisposableEffect(isFullscreen) {
         if (isFullscreen) {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            window?.let {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    it.insetsController?.hide(
-                        android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            activity?.window?.let { window ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.insetsController?.hide(
+                        WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
                     )
                 } else {
                     @Suppress("DEPRECATION")
-                    it.decorView.systemUiVisibility = (
-                        android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
-                        android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                        android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    window.decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     )
                 }
             }
         } else {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            window?.let {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    it.insetsController?.show(
-                        android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.window?.let { window ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.insetsController?.show(
+                        WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
                     )
                 } else {
                     @Suppress("DEPRECATION")
-                    it.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                    window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
                 }
             }
         }
-    }
-
-    DisposableEffect(Unit) {
         onDispose {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            val window = activity?.window
-            window?.let {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    it.insetsController?.show(
-                        android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
-                    )
-                } else {
-                    @Suppress("DEPRECATION")
-                    it.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
-                }
+            if (!isFullscreen) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
         }
     }
@@ -2075,20 +2065,22 @@ fun SleekPlayerDetailOverlay(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            RutubeVideoPlayer(
-                videoId = video.id,
-                viewModel = viewModel,
-                videoTitle = video.title,
-                aspectMode = selectedAspectRatio,
-                isFullscreen = true,
-                onToggleFullscreen = { isFullscreen = !isFullscreen },
-                onChangeAspectRatio = { selectedAspectRatio = it },
-                onShare = { shareVideo(context, video) },
-                modifier = Modifier.fillMaxSize()
-            )
+            key(playerKey) {
+                RutubeVideoPlayer(
+                    videoId = video.id,
+                    viewModel = viewModel,
+                    videoTitle = video.title,
+                    aspectMode = selectedAspectRatio,
+                    isFullscreen = true,
+                    onToggleFullscreen = { isFullscreen = false },
+                    onChangeAspectRatio = { selectedAspectRatio = it },
+                    onShare = { shareVideo(context, video) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
-        androidx.activity.compose.BackHandler {
+        BackHandler {
             isFullscreen = false
         }
     } else {
@@ -2097,7 +2089,6 @@ fun SleekPlayerDetailOverlay(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Player header bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2122,36 +2113,25 @@ fun SleekPlayerDetailOverlay(
                     letterSpacing = 0.5.sp
                 )
 
-                Box(modifier = Modifier.size(24.dp)) // empty spacer for symmetry
+                Box(modifier = Modifier.size(24.dp))
             }
 
-            // Active Player Canvas Render Box (16:9 Aspect ratio)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .background(Color.Black)
             ) {
-                if (isPlaying) {
+                key(playerKey) {
                     RutubeVideoPlayer(
                         videoId = video.id,
                         viewModel = viewModel,
                         videoTitle = video.title,
                         aspectMode = selectedAspectRatio,
                         isFullscreen = false,
-                        onToggleFullscreen = { isFullscreen = !isFullscreen },
+                        onToggleFullscreen = { isFullscreen = true },
                         onChangeAspectRatio = { selectedAspectRatio = it },
                         onShare = { shareVideo(context, video) },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    VideoThumbnail(
-                        id = video.id,
-                        duration = video.duration,
-                        thumbnailUrl = video.thumbnailUrl,
-                        hasPlayOverlay = true,
-                        isPlaying = false,
-                        onPlayClick = { viewModel.togglePlayPause() },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -2159,7 +2139,6 @@ fun SleekPlayerDetailOverlay(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Detail descriptions and channels metadata
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2167,7 +2146,6 @@ fun SleekPlayerDetailOverlay(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // Title descriptor
                 Text(
                     text = video.title,
                     fontSize = 16.sp,
@@ -2176,7 +2154,6 @@ fun SleekPlayerDetailOverlay(
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                // Stats info
                 Text(
                     text = "${video.channel} • ${video.views} • ${video.timeAgo}",
                     fontSize = 11.sp,
@@ -2184,7 +2161,6 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
                 )
 
-                // Direct active action layout pills
                 val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
                 val activeDownload = activeDownloads[video.id]
 
@@ -2192,7 +2168,6 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Download action state button
                     Button(
                         onClick = {
                             if (video.isDownloaded) {
@@ -2247,7 +2222,6 @@ fun SleekPlayerDetailOverlay(
                         )
                     }
 
-                    // Bookmark action state button
                     Button(
                         onClick = { viewModel.toggleBookmark(video) },
                         shape = RoundedCornerShape(20.dp),
@@ -2273,7 +2247,6 @@ fun SleekPlayerDetailOverlay(
                         )
                     }
 
-                    // Share action state button
                     Button(
                         onClick = { shareVideo(context, video) },
                         shape = RoundedCornerShape(20.dp),
@@ -2300,7 +2273,6 @@ fun SleekPlayerDetailOverlay(
                     }
                 }
 
-                // Beautiful visual active download card info below buttons
                 if (activeDownload != null) {
                     Spacer(modifier = Modifier.height(14.dp))
                     Card(
@@ -2367,9 +2339,8 @@ fun SleekPlayerDetailOverlay(
                     }
                 }
 
-                // Download options Alert Dialog
                 if (showDownloadOptionsDialog) {
-                    androidx.compose.material3.AlertDialog(
+                    AlertDialog(
                         onDismissRequest = { showDownloadOptionsDialog = false },
                         title = {
                             Text(
@@ -2394,15 +2365,15 @@ fun SleekPlayerDetailOverlay(
                                 Button(
                                     onClick = {
                                         showDownloadOptionsDialog = false
-                                        if (android.os.Build.VERSION.SDK_INT >= 29) {
+                                        if (Build.VERSION.SDK_INT >= 29) {
                                             viewModel.saveToDevice(video, context) { success, message ->
-                                                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                                             }
                                         } else {
                                             permissionLauncher.launch(
                                                 arrayOf(
-                                                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                                                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                                                    Manifest.permission.WRITE_EXTERNAL_STORAGE
                                                 )
                                             )
                                         }
@@ -2415,7 +2386,7 @@ fun SleekPlayerDetailOverlay(
                                     Text("Сохранить на устройство", fontSize = 11.sp)
                                 }
 
-                                androidx.compose.material3.TextButton(
+                                TextButton(
                                     onClick = {
                                         showDownloadOptionsDialog = false
                                         viewModel.deleteDownload(video)
@@ -2428,7 +2399,7 @@ fun SleekPlayerDetailOverlay(
                                     Text("Удалить из кэша", fontSize = 11.sp)
                                 }
 
-                                androidx.compose.material3.TextButton(
+                                TextButton(
                                     onClick = { showDownloadOptionsDialog = false },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -2440,90 +2411,87 @@ fun SleekPlayerDetailOverlay(
                     )
                 }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-            // Expandable Description Box card
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "Описание медиафайла",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = video.description,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        color = GreyText
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Related videos segment
-            Text(
-                text = "Рекомендуем далее",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-
-            // Select 2 related videos matching different categories
-            val relatedList = allVideos.filter { it.id != video.id }.take(3)
-            relatedList.forEach { related ->
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clickable { viewModel.selectVideo(related) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, SurfaceVariant)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Описание медиафайла",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = video.description,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            color = GreyText
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Рекомендуем далее",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+
+                val relatedList = allVideos.filter { it.id != video.id }.take(3)
+                relatedList.forEach { related ->
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(vertical = 4.dp)
+                            .clickable { viewModel.selectVideo(related) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, SurfaceVariant)
                     ) {
-                        VideoThumbnail(
-                            id = related.id,
-                            duration = related.duration,
-                            thumbnailUrl = related.thumbnailUrl,
+                        Row(
                             modifier = Modifier
-                                .width(72.dp)
-                                .height(44.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = related.title,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                .fillMaxWidth()
+                                .padding(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            VideoThumbnail(
+                                id = related.id,
+                                duration = related.duration,
+                                thumbnailUrl = related.thumbnailUrl,
+                                modifier = Modifier
+                                    .width(72.dp)
+                                    .height(44.dp)
                             )
-                            Text(
-                                text = related.channel,
-                                fontSize = 9.sp,
-                                color = GreyText
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = related.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = related.channel,
+                                    fontSize = 9.sp,
+                                    color = GreyText
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
-    }
     }
 }
 
@@ -2593,17 +2561,25 @@ fun RutubeVideoPlayer(
     var isLoading by remember(videoId) { mutableStateOf(true) }
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
     var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
+    var failedAttempts by remember(videoId) { mutableStateOf(0) }
+    var savedPlayerState by remember(videoId) { mutableStateOf<PlayerSavedState?>(null) }
 
-    // Position & duration states for custom controls
     var videoViewRef by remember { mutableStateOf<VlcVideoView?>(null) }
     var isPlayingState by remember { mutableStateOf(true) }
     var currentPos by remember { mutableLongStateOf(0L) }
     var totalDuration by remember { mutableLongStateOf(0L) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var controlsVisible by remember { mutableStateOf(true) }
-
-    // HUD message for aspect ratio cycle
     var hudMessage by remember { mutableStateOf<String?>(null) }
+
+    val forceSwitchToEmbed = remember {
+        {
+            useEmbedPlayer = true
+            isLoading = false
+            loadError = null
+            failedAttempts = 0
+        }
+    }
 
     LaunchedEffect(videoId) {
         if (offlineFile.exists()) {
@@ -2617,14 +2593,19 @@ fun RutubeVideoPlayer(
             if (resolvedUrl != null) {
                 hlsUrl = resolvedUrl
                 isLoading = false
+                failedAttempts = 0
             } else {
-                loadError = "Не удалось открыть онлайн-поток. Пожалуйста, попробуйте снова или проверьте соединение."
-                isLoading = false
+                failedAttempts++
+                if (failedAttempts >= 2) {
+                    forceSwitchToEmbed()
+                } else {
+                    loadError = "Не удалось открыть онлайн-поток. Попытка ${failedAttempts}/2..."
+                    isLoading = false
+                }
             }
         }
     }
 
-    // Auto-hide controls after 4 seconds of inactivity
     LaunchedEffect(controlsVisible, lastInteractionTime) {
         if (controlsVisible) {
             kotlinx.coroutines.delay(4000)
@@ -2634,7 +2615,6 @@ fun RutubeVideoPlayer(
         }
     }
 
-    // Clear HUD message after 1.5 seconds
     LaunchedEffect(hudMessage) {
         if (hudMessage != null) {
             kotlinx.coroutines.delay(1500)
@@ -2642,7 +2622,6 @@ fun RutubeVideoPlayer(
         }
     }
 
-    // Progress update loop
     LaunchedEffect(videoViewRef, isPlayingState) {
         while (isPlayingState && videoViewRef != null) {
             videoViewRef?.let { view ->
@@ -2683,7 +2662,7 @@ fun RutubeVideoPlayer(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Получение видеопотока...",
+                    text = if (failedAttempts > 0) "Повторная попытка ${failedAttempts}/2..." else "Получение видеопотока...",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
@@ -2704,18 +2683,48 @@ fun RutubeVideoPlayer(
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
                                 mediaPlaybackRequiresUserGesture = false
+                                setMediaPlaybackRequiresUserGesture(false)
                                 databaseEnabled = true
+                                cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                             }
-                            webViewClient = WebViewClient()
-                            webChromeClient = WebChromeClient()
-                            val embedUrl = "https://rutube.ru/play/embed/$videoId/"
+                            
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    view?.evaluateJavascript(
+                                        """
+                                        (function() {
+                                            var video = document.querySelector('video');
+                                            if (video) {
+                                                video.muted = false;
+                                                video.play().catch(function(e) {
+                                                    var playBtn = document.querySelector('.video-play-btn, .play-button, [class*="play"]');
+                                                    if (playBtn) playBtn.click();
+                                                });
+                                            }
+                                            var rutubePlayBtn = document.querySelector('[class*="play-button"], [data-testid="playButton"], .ui-video__play-button');
+                                            if (rutubePlayBtn) rutubePlayBtn.click();
+                                        })();
+                                        """.trimIndent(),
+                                        null
+                                    )
+                                }
+                            }
+                            
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                                    super.onShowCustomView(view, callback)
+                                }
+                            }
+                            
+                            val embedUrl = "https://rutube.ru/play/embed/$videoId/?autoplay=1&mute=0"
                             loadUrl(embedUrl)
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Overlay Controls inside embed player web layout
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -2732,24 +2741,6 @@ fun RutubeVideoPlayer(
                         Icon(
                             imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                             contentDescription = "Во весь экран",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { 
-                            useEmbedPlayer = false 
-                            hlsUrl = null 
-                            loadError = "Переключен назад на стандартный плеер." 
-                        },
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                            .size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Стандартный плеер",
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
@@ -2777,10 +2768,8 @@ fun RutubeVideoPlayer(
                     lineHeight = 15.sp
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                
+                if (failedAttempts < 2) {
                     Button(
                         onClick = {
                             isLoading = true
@@ -2791,24 +2780,11 @@ fun RutubeVideoPlayer(
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Text("Повторить", fontSize = 11.sp)
-                    }
-
-                    Button(
-                        onClick = {
-                            useEmbedPlayer = true
-                            loadError = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Embed-плеер", fontSize = 11.sp, color = Color.White)
+                        Text("Повторить (${2 - failedAttempts} попытки осталось)", fontSize = 11.sp)
                     }
                 }
             }
         } else if (hlsUrl != null) {
-            // Video View Container
             AndroidView(
                 factory = { ctx ->
                     VlcVideoView(ctx).apply {
@@ -2818,7 +2794,11 @@ fun RutubeVideoPlayer(
                         )
                         this.aspectMode = aspectMode
                         
-                        // Check if online or local URI
+                        savedPlayerState?.let { state ->
+                            currentPos = state.position
+                            isPlayingState = state.isPlaying
+                        }
+                        
                         if (offlineFile.exists()) {
                             setVideoPath(offlineFile.absolutePath)
                         } else {
@@ -2834,16 +2814,32 @@ fun RutubeVideoPlayer(
                             updateVideoSize(mediaPlayer.videoWidth, mediaPlayer.videoHeight)
                             mediaPlayer.isLooping = false
                             totalDuration = mediaPlayer.duration.toLong()
-                            val savedPos = viewModel.getVideoPosition(videoId)
-                            if (savedPos > 0L && savedPos < totalDuration) {
-                                seekTo(savedPos.toInt())
-                                currentPos = savedPos
+                            
+                            if (savedPlayerState != null && savedPlayerState!!.position > 0) {
+                                seekTo(savedPlayerState!!.position.toInt())
+                                currentPos = savedPlayerState!!.position
+                                if (savedPlayerState!!.isPlaying) {
+                                    start()
+                                } else {
+                                    pause()
+                                }
+                            } else {
+                                val savedPos = viewModel.getVideoPosition(videoId)
+                                if (savedPos > 0L && savedPos < totalDuration) {
+                                    seekTo(savedPos.toInt())
+                                    currentPos = savedPos
+                                }
+                                start()
                             }
-                            start()
                         }
                         
                         setOnErrorListener { _, _, _ ->
-                            loadError = "Ошибка медиаплеера при воспроизведении потока."
+                            failedAttempts++
+                            if (failedAttempts >= 2) {
+                                forceSwitchToEmbed()
+                            } else {
+                                loadError = "Ошибка медиаплеера. Попытка ${failedAttempts}/2..."
+                            }
                             true
                         }
                         videoViewRef = this
@@ -2857,7 +2853,6 @@ fun RutubeVideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Transparent overlay for Controls
             androidx.compose.animation.AnimatedVisibility(
                 visible = controlsVisible,
                 enter = androidx.compose.animation.fadeIn(),
@@ -2876,7 +2871,6 @@ fun RutubeVideoPlayer(
                             controlsVisible = false
                         }
                 ) {
-                    // Top Bar Controls
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2898,6 +2892,12 @@ fun RutubeVideoPlayer(
                                 IconButton(
                                     onClick = {
                                         lastInteractionTime = System.currentTimeMillis()
+                                        videoViewRef?.let { view ->
+                                            savedPlayerState = PlayerSavedState(
+                                                position = view.currentPosition.toLong(),
+                                                isPlaying = view.isPlaying
+                                            )
+                                        }
                                         onToggleFullscreen()
                                     }
                                 ) {
@@ -2919,12 +2919,10 @@ fun RutubeVideoPlayer(
                             )
                         }
 
-                        // Right actions (Aspect ratio & Share)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Cycle Aspect Ratio option like VLC
                             Button(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
@@ -2947,7 +2945,6 @@ fun RutubeVideoPlayer(
                                 Text(aspectMode.displayName, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
 
-                            // Share video link
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
@@ -2965,14 +2962,13 @@ fun RutubeVideoPlayer(
                         }
                     }
 
-                    // Center playback buttons (Rewind, Play/Pause, Forward)
                     Row(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
-                            ) {}, // consume clicks to avoid hiding controls
+                            ) {},
                         horizontalArrangement = Arrangement.spacedBy(28.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -3044,7 +3040,6 @@ fun RutubeVideoPlayer(
                         }
                     }
 
-                    // Bottom Bar Controls with Slider
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -3058,9 +3053,8 @@ fun RutubeVideoPlayer(
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
-                            ) {} // Consume touch events
+                            ) {}
                     ) {
-                        // Progress Slider Row
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -3100,10 +3094,15 @@ fun RutubeVideoPlayer(
                                 fontWeight = FontWeight.Bold
                             )
 
-                            // Fullscreen Toggle action
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
+                                    videoViewRef?.let { view ->
+                                        savedPlayerState = PlayerSavedState(
+                                            position = view.currentPosition.toLong(),
+                                            isPlaying = view.isPlaying
+                                        )
+                                    }
                                     onToggleFullscreen()
                                 },
                                 modifier = Modifier.size(24.dp)
@@ -3120,7 +3119,6 @@ fun RutubeVideoPlayer(
                 }
             }
 
-            // HUD notification for Aspect Ratio cycles
             hudMessage?.let { msg ->
                 Box(
                     modifier = Modifier
@@ -3231,7 +3229,6 @@ class VlcVideoView(context: android.content.Context) : android.widget.VideoView(
         }
     }
 }
-
 // Share Video Intent launcher
 fun shareVideo(context: android.content.Context, video: Video) {
     val sendIntent = android.content.Intent().apply {
@@ -3249,5 +3246,9 @@ fun formatMillis(ms: Long): String {
     val min = totalSec / 60
     val sec = totalSec % 60
     return String.format("%02d:%02d", min, sec)
+data class PlayerSavedState(
+    val position: Long,
+    val isPlaying: Boolean
+)
 }
 
