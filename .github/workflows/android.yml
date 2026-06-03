@@ -24,8 +24,7 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # Собираем релизный APK (используем твою рабочую команду gradle)
-      # Заменили assembleDebug на assembleRelease
+      # Собираем релизный APK через глобальный gradle в папке ./app
       - name: Build with Gradle (Release)
         run: gradle assembleRelease --no-daemon --no-configuration-cache
         working-directory: ./app
@@ -35,16 +34,15 @@ jobs:
         uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
-          # Указываем путь к собранному релизному APK внутри твоей папки ./app
           releaseDirectory: app/build/outputs/apk/release
           keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
           alias: auto-generated-alias
           singleKeyStore: true
 
-      # Вытаскиваем готовый подписанный APK на страницу билда
+      # Вытаскиваем готовый подписанный APK на страницу билда (теперь отступы ровные)
       - name: Upload Signed APK Artifact
-         uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: RutubeApp-Release-Signed
           path: ${{ steps.sign_app.outputs.signedReleaseFile }}
