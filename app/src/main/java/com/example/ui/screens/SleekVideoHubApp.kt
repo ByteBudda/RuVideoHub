@@ -1199,6 +1199,8 @@ fun DownloadsTabScreen(
     modifier: Modifier = Modifier
 ) {
     val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
+    val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+    val activeList = androidx.compose.runtime.remember(activeDownloads) { activeDownloads.values.toList() }
 
     Column(
         modifier = modifier
@@ -1219,7 +1221,7 @@ fun DownloadsTabScreen(
             )
         }
 
-        if (downloadedVideos.isEmpty()) {
+        if (downloadedVideos.isEmpty() && activeList.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1259,6 +1261,88 @@ fun DownloadsTabScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
+                if (activeList.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Активные загрузки",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Primary,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                    items(activeList, key = { "active_" + it.id }) { active ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    VideoThumbnail(
+                                        id = active.id,
+                                        duration = active.eta,
+                                        thumbnailUrl = active.thumbnailUrl,
+                                        modifier = Modifier
+                                            .width(100.dp)
+                                            .height(60.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = active.title,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                        Text(
+                                            text = "${active.channel} • ${active.status}",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "Скорость: ${active.speed} • Осталось: ${active.eta}",
+                                            fontSize = 9.sp,
+                                            color = GreyText
+                                        )
+                                    }
+                                    CircularProgressIndicator(
+                                        progress = { active.progress },
+                                        modifier = Modifier.size(20.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = { active.progress },
+                                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Сохраненные видео ( " + downloadedVideos.size + " )",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
                 items(downloadedVideos, key = { it.id }) { saved ->
                     val videoRuntime = Video(
                         id = saved.id,
@@ -2005,6 +2089,9 @@ fun SleekPlayerDetailOverlay(
                 )
 
                 // Direct active action layout pills
+                val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+                val activeDownload = activeDownloads[video.id]
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -2015,27 +2102,50 @@ fun SleekPlayerDetailOverlay(
                             if (video.isDownloaded) {
                                 showDownloadOptionsDialog = true
                             } else {
-                                viewModel.toggleDownload(video)
+                                if (activeDownload == null) {
+                                    viewModel.toggleDownload(video)
+                                }
                             }
                         },
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (video.isDownloaded) Color(0xFF10B981) else PrimaryContainer,
-                            contentColor = if (video.isDownloaded) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = when {
+                                video.isDownloaded -> Color(0xFF10B981)
+                                activeDownload != null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                else -> PrimaryContainer
+                            },
+                            contentColor = when {
+                                video.isDownloaded -> Color.White
+                                activeDownload != null -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onPrimaryContainer
+                            }
                         ),
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
                             .testTag("player_action_download")
                     ) {
-                        Icon(
-                            imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        if (activeDownload != null) {
+                            CircularProgressIndicator(
+                                progress = { activeDownload.progress },
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (video.isDownloaded) "Скачано" else "Скачать",
+                            text = when {
+                                video.isDownloaded -> "Скачано"
+                                activeDownload != null -> "${(activeDownload.progress * 100).toInt()}%"
+                                else -> "Скачать"
+                            },
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -2091,6 +2201,73 @@ fun SleekPlayerDetailOverlay(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+
+                // Beautiful visual active download card info below buttons
+                if (activeDownload != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth().testTag("active_download_progress_card"),
+                        colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Скачивание во внутреннюю память...",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Text(
+                                    text = activeDownload.status,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { activeDownload.progress },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Скорость: ${activeDownload.speed}",
+                                    fontSize = 10.sp,
+                                    color = GreyText
+                                )
+                                Text(
+                                    text = "Осталось: ${activeDownload.eta}",
+                                    fontSize = 10.sp,
+                                    color = GreyText
+                                )
+                            }
+                        }
                     }
                 }
 
