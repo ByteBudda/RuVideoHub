@@ -1808,6 +1808,93 @@ fun VoiceListeningOverlay(
     }
 }
 
+data class EpisodeInfo(
+    val baseTitle: String,
+    val season: Int,
+    val episode: Int,
+    val rawNum: Int
+)
+
+fun parseEpisode(title: String): EpisodeInfo {
+    val lower = title.lowercase()
+    
+    // Find "сезон X" or "X сезон"
+    var season = 1
+    val seasonRegex1 = Regex("""сезон\s*(\d+)""")
+    val seasonRegex2 = Regex("""(\d+)\s*сезон""")
+    seasonRegex1.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
+        ?: seasonRegex2.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
+        
+    // Find "серия Y" or "Y серия" or "эпизод Y" or "выпуск Y" or "часть Y"
+    var episode = 1
+    var rawNum = -1
+    val epRegex1 = Regex("""(?:серия|эпизод|выпуск|часть)\s*(\d+)""")
+    val epRegex2 = Regex("""(\d+)\s*(?:серия|эпизод|выпуск|часть)""")
+    epRegex1.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+        ?: epRegex2.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+        
+    if (rawNum == -1) {
+        val numberRegex = Regex("""\b(\d+)\b""")
+        val matches = numberRegex.findAll(lower).toList()
+        if (matches.isNotEmpty()) {
+            matches.last().groupValues.get(1).toIntOrNull()?.let { episode = it; rawNum = it }
+        }
+    }
+    
+    var baseTitle = title
+        .replace(Regex("""(?i)\b\d+\s*сезон\w*\b"""), "")
+        .replace(Regex("""(?i)\bсезон\w*\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*сери\w*\b"""), "")
+        .replace(Regex("""(?i)\bсери\w*\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*эпизод\w*\b"""), "")
+        .replace(Regex("""(?i)\bэпизод\w*\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*выпуск\w*\b"""), "")
+        .replace(Regex("""(?i)\bвыпуск\w*\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*част\w*\b"""), "")
+        .replace(Regex("""(?i)\bчаст\w*\s*\d+\b"""), "")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+        
+    if (baseTitle.length < 3) {
+        baseTitle = title.take(15)
+    }
+    
+    return EpisodeInfo(baseTitle, season, episode, if (rawNum != -1) rawNum else 1)
+}
+
+fun getSortedEpisodes(currentVideo: Video, allVideos: List<Video>): List<Video> {
+    val currentInfo = parseEpisode(currentVideo.title)
+    
+    // Find all videos with similar base titles, or same channel & same base title word, or same channel
+    val matching = allVideos.filter { item ->
+        val itemInfo = parseEpisode(item.title)
+        val shareBaseTitle = itemInfo.baseTitle.lowercase().split(" ").filter { it.length > 3 }
+            .any { word -> currentInfo.baseTitle.lowercase().contains(word) }
+        
+        shareBaseTitle || item.channel == currentVideo.channel
+    }
+    
+    val sorted = matching.distinctBy { it.id }.sortedWith(compareBy<Video> { 
+        val info = parseEpisode(it.title)
+        info.season
+    }.thenBy { 
+        val info = parseEpisode(it.title)
+        info.episode
+    })
+    
+    if (sorted.size > 1) {
+        return sorted
+    }
+    
+    // If no distinct multiple episodes, treat same category as episodes playlist
+    val categoryVideos = allVideos.filter { it.category == currentVideo.category }
+    if (categoryVideos.size > 1) {
+        return categoryVideos
+    }
+    
+    return allVideos.take(10)
+}
+
 @Composable
 fun SleekPlayerDetailOverlay(
     video: Video,
@@ -1819,6 +1906,11 @@ fun SleekPlayerDetailOverlay(
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val progress by viewModel.playProgress.collectAsStateWithLifecycle()
     val allVideos by viewModel.allVideos.collectAsStateWithLifecycle()
+
+    val currentEpList = remember(video, allVideos) {
+        getSortedEpisodes(video, allVideos)
+    }
+    val currentIndex = currentEpList.indexOfFirst { it.id == video.id }
 
     val formattedElapsed = viewModel.getFormattedElapsedTime(video.duration, progress)
 
@@ -2120,6 +2212,100 @@ fun SleekPlayerDetailOverlay(
                     }
                 }
 
+                // Navigation buttons for series: Prev Episode / Next Episode
+                if (currentEpList.size > 1) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SecondaryBackground, shape = RoundedCornerShape(16.dp))
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val hasPrev = currentIndex > 0
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                if (hasPrev) {
+                                    viewModel.selectVideo(currentEpList[currentIndex - 1])
+                                }
+                            },
+                            enabled = hasPrev,
+                            modifier = Modifier.weight(1.2f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowBack,
+                                    contentDescription = "Предыдущая серия",
+                                    tint = if (hasPrev) MaterialTheme.colorScheme.onBackground else GreyText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Пред. серия",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (hasPrev) MaterialTheme.colorScheme.onBackground else GreyText
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.width(1.dp).height(24.dp).background(SurfaceVariant))
+                        
+                        val currentInfo = parseEpisode(video.title)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1.3f)
+                        ) {
+                            Text(
+                                text = "Серия ${currentInfo.episode}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Primary
+                            )
+                            Text(
+                                text = "Сезон ${currentInfo.season}",
+                                fontSize = 9.sp,
+                                color = GreyText
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(1.dp).height(24.dp).background(SurfaceVariant))
+                        
+                        val hasNext = currentIndex < currentEpList.size - 1
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                if (hasNext) {
+                                    viewModel.selectVideo(currentEpList[currentIndex + 1])
+                                }
+                            },
+                            enabled = hasNext,
+                            modifier = Modifier.weight(1.2f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "След. серия",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (hasNext) MaterialTheme.colorScheme.onBackground else GreyText
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowForward,
+                                    contentDescription = "Следующая серия",
+                                    tint = if (hasNext) MaterialTheme.colorScheme.onBackground else GreyText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Beautiful visual active download card info below buttons
                 if (activeDownload != null) {
                     Spacer(modifier = Modifier.height(14.dp))
@@ -2260,53 +2446,57 @@ fun SleekPlayerDetailOverlay(
                     )
                 }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-            // Expandable Description Box card
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "Описание медиафайла",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = video.description,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        color = GreyText
-                    )
+                // Expandable Description Box card
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Описание медиафайла",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = video.description,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            color = GreyText
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
             // Related videos segment
             Text(
-                text = "Рекомендуем далее",
+                text = if (currentEpList.size > 1) "Список серий по порядку" else "Рекомендуем далее",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(bottom = 10.dp)
             )
 
-            // Select 2 related videos matching different categories
-            val relatedList = allVideos.filter { it.id != video.id }.take(3)
-            relatedList.forEach { related ->
+            currentEpList.forEach { ep ->
+                val isActive = ep.id == video.id
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .clickable { viewModel.selectVideo(related) },
+                        .clickable { viewModel.selectVideo(ep) },
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, SurfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
+                    )
                 ) {
                     Row(
                         modifier = Modifier
@@ -2315,27 +2505,63 @@ fun SleekPlayerDetailOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        VideoThumbnail(
-                            id = related.id,
-                            duration = related.duration,
-                            thumbnailUrl = related.thumbnailUrl,
-                            modifier = Modifier
-                                .width(72.dp)
-                                .height(44.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            VideoThumbnail(
+                                id = ep.id,
+                                duration = ep.duration,
+                                thumbnailUrl = ep.thumbnailUrl,
+                                modifier = Modifier
+                                    .width(80.dp)
+                                    .height(48.dp)
+                            )
+                            if (isActive) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(80.dp)
+                                        .height(48.dp)
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Играет сейчас",
+                                        tint = Primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
                         Column(modifier = Modifier.weight(1f)) {
+                            val epInfo = parseEpisode(ep.title)
                             Text(
-                                text = related.title,
+                                text = ep.title,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
+                                color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Text(
-                                text = related.channel,
-                                fontSize = 9.sp,
-                                color = GreyText
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Сезон ${epInfo.season} • Серия ${epInfo.episode}",
+                                    fontSize = 9.sp,
+                                    color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else GreyText
+                                )
+                                if (isActive) {
+                                    Text(
+                                        text = "Воспроизведение",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Primary,
+                                        modifier = Modifier
+                                            .background(Primary.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -2415,7 +2641,6 @@ fun RutubeVideoPlayer(
     var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
 
     // Position & duration states for custom controls
-    var videoViewRef by remember { mutableStateOf<VlcVideoView?>(null) }
     var isPlayingState by remember { mutableStateOf(true) }
     var currentPos by remember { mutableLongStateOf(0L) }
     var totalDuration by remember { mutableLongStateOf(0L) }
@@ -2444,6 +2669,59 @@ fun RutubeVideoPlayer(
         }
     }
 
+    val exoPlayer = remember(videoId, hlsUrl) {
+        if (hlsUrl == null) null else {
+            androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+                playWhenReady = isPlayingState
+                val uri = if (offlineFile.exists()) {
+                    android.net.Uri.fromFile(offlineFile)
+                } else {
+                    android.net.Uri.parse(hlsUrl)
+                }
+
+                if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
+                    val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                        .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                        .setDefaultRequestProperties(mapOf(
+                            "Accept" to "*/*",
+                            "Referer" to "https://rutube.ru/"
+                        ))
+                    val mediaSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
+                        .createMediaSource(androidx.media3.common.MediaItem.fromUri(uri))
+                    setMediaSource(mediaSource)
+                } else {
+                    setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
+                }
+
+                prepare()
+
+                val savedPos = viewModel.getVideoPosition(videoId)
+                if (savedPos > 0L) {
+                    seekTo(savedPos)
+                    currentPos = savedPos
+                }
+            }
+        }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose {
+            exoPlayer?.release()
+        }
+    }
+
+    LaunchedEffect(isPlayingState, exoPlayer) {
+        exoPlayer?.playWhenReady = isPlayingState
+    }
+
+    LaunchedEffect(exoPlayer) {
+        exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                useEmbedPlayer = true
+            }
+        })
+    }
+
     // Auto-hide controls after 4 seconds of inactivity
     LaunchedEffect(controlsVisible, lastInteractionTime) {
         if (controlsVisible) {
@@ -2463,19 +2741,17 @@ fun RutubeVideoPlayer(
     }
 
     // Progress update loop
-    LaunchedEffect(videoViewRef, isPlayingState) {
-        while (isPlayingState && videoViewRef != null) {
-            videoViewRef?.let { view ->
-                if (view.isPlaying) {
-                    val pos = view.currentPosition.toLong()
-                    if (pos > 0L) {
-                        currentPos = pos
-                        val dur = view.duration.toLong()
-                        if (dur > 0L) {
-                            totalDuration = dur
-                        }
-                        viewModel.saveVideoPosition(videoId, currentPos)
+    LaunchedEffect(exoPlayer, isPlayingState) {
+        while (isPlayingState && exoPlayer != null) {
+            if (exoPlayer.isPlaying) {
+                val pos = exoPlayer.currentPosition
+                if (pos > 0L) {
+                    currentPos = pos
+                    val dur = exoPlayer.duration
+                    if (dur > 0L) {
+                        totalDuration = dur
                     }
+                    viewModel.saveVideoPosition(videoId, currentPos)
                 }
             }
             kotlinx.coroutines.delay(250)
@@ -2634,47 +2910,28 @@ fun RutubeVideoPlayer(
             // Video View Container
             AndroidView(
                 factory = { ctx ->
-                    VlcVideoView(ctx).apply {
+                    androidx.media3.ui.PlayerView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        this.aspectMode = aspectMode
-                        
-                        // Check if online or local URI
-                        if (offlineFile.exists()) {
-                            setVideoPath(offlineFile.absolutePath)
-                        } else {
-                            val headers = mapOf(
-                                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                                "Accept" to "*/*",
-                                "Referer" to "https://rutube.ru/"
-                            )
-                            setVideoURI(android.net.Uri.parse(hlsUrl), headers)
+                        useController = false
+                        player = exoPlayer
+                        resizeMode = when (aspectMode) {
+                            VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                            VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         }
-                        
-                        setOnPreparedListener { mediaPlayer ->
-                            updateVideoSize(mediaPlayer.videoWidth, mediaPlayer.videoHeight)
-                            mediaPlayer.isLooping = false
-                            totalDuration = mediaPlayer.duration.toLong()
-                            val savedPos = viewModel.getVideoPosition(videoId)
-                            if (savedPos > 0L && savedPos < totalDuration) {
-                                seekTo(savedPos.toInt())
-                                currentPos = savedPos
-                            }
-                            start()
-                        }
-                        
-                        setOnErrorListener { _, _, _ ->
-                            useEmbedPlayer = true
-                            true
-                        }
-                        videoViewRef = this
                     }
                 },
-                update = { videoView ->
-                    if (videoView.aspectMode != aspectMode) {
-                        videoView.aspectMode = aspectMode
+                update = { playerView ->
+                    playerView.player = exoPlayer
+                    playerView.resizeMode = when (aspectMode) {
+                        VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -2805,10 +3062,10 @@ fun RutubeVideoPlayer(
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
-                                videoViewRef?.let { view ->
-                                    val newPos = (view.currentPosition - 10000).coerceAtLeast(0)
-                                    view.seekTo(newPos.toInt())
-                                    currentPos = newPos.toLong()
+                                exoPlayer?.let { player ->
+                                    val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
+                                    player.seekTo(newPos)
+                                    currentPos = newPos
                                 }
                             },
                             modifier = Modifier
@@ -2826,12 +3083,12 @@ fun RutubeVideoPlayer(
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
-                                videoViewRef?.let { view ->
-                                    if (view.isPlaying) {
-                                        view.pause()
+                                exoPlayer?.let { player ->
+                                    if (player.isPlaying) {
+                                        player.pause()
                                         isPlayingState = false
                                     } else {
-                                        view.start()
+                                        player.play()
                                         isPlayingState = true
                                     }
                                 }
@@ -2851,10 +3108,10 @@ fun RutubeVideoPlayer(
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
-                                videoViewRef?.let { view ->
-                                    val newPos = (view.currentPosition + 10000).coerceAtMost(view.duration)
-                                    view.seekTo(newPos.toInt())
-                                    currentPos = newPos.toLong()
+                                exoPlayer?.let { player ->
+                                    val newPos = (player.currentPosition + 10000).coerceAtMost(player.duration)
+                                    player.seekTo(newPos)
+                                    currentPos = newPos
                                 }
                             },
                             modifier = Modifier
@@ -2906,7 +3163,7 @@ fun RutubeVideoPlayer(
                                 onValueChange = { newValue ->
                                     lastInteractionTime = System.currentTimeMillis()
                                     currentPos = newValue.toLong()
-                                    videoViewRef?.seekTo(newValue.toInt())
+                                    exoPlayer?.seekTo(newValue.toLong())
                                 },
                                 valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
                                 colors = androidx.compose.material3.SliderDefaults.colors(
@@ -2977,87 +3234,6 @@ enum class VlcAspectRatio(val displayName: String) {
     fun next(): VlcAspectRatio {
         val entries = values()
         return entries[(ordinal + 1) % entries.size]
-    }
-}
-
-// Custom VideoView subclass to force measurements according to dynamic scaling configurations
-class VlcVideoView(context: android.content.Context) : android.widget.VideoView(context) {
-    var aspectMode: VlcAspectRatio = VlcAspectRatio.FIT
-        set(value) {
-            field = value
-            requestLayout()
-        }
-    private var vWidth: Int = 0
-    private var vHeight: Int = 0
-
-    fun updateVideoSize(w: Int, h: Int) {
-        vWidth = w
-        vHeight = h
-        requestLayout()
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val defaultWidth = getDefaultSize(vWidth, widthMeasureSpec)
-        val defaultHeight = getDefaultSize(vHeight, heightMeasureSpec)
-        if (vWidth == 0 || vHeight == 0) {
-            setMeasuredDimension(defaultWidth, defaultHeight)
-            return
-        }
-
-        when (aspectMode) {
-            VlcAspectRatio.STRETCH -> {
-                // Ignore aspects completely, fill layout
-                setMeasuredDimension(defaultWidth, defaultHeight)
-            }
-            VlcAspectRatio.FIT -> {
-                // Default fit-to-inside logic
-                var width = vWidth
-                var height = vHeight
-                val viewWidth = defaultWidth
-                val viewHeight = defaultHeight
-
-                if (width * viewHeight < viewWidth * height) {
-                    width = viewWidth * height / viewHeight
-                    setMeasuredDimension(width, viewHeight)
-                } else if (width * viewHeight > viewWidth * height) {
-                    height = viewWidth * height / width
-                    setMeasuredDimension(viewWidth, height)
-                } else {
-                    setMeasuredDimension(viewWidth, viewHeight)
-                }
-            }
-            VlcAspectRatio.FILL -> {
-                // Zoom-crop center fill
-                val viewWidth = defaultWidth
-                val viewHeight = defaultHeight
-                val scaleX = viewWidth.toFloat() / vWidth.toFloat()
-                val scaleY = viewHeight.toFloat() / vHeight.toFloat()
-                val scale = Math.max(scaleX, scaleY)
-                setMeasuredDimension((vWidth * scale).toInt(), (vHeight * scale).toInt())
-            }
-            VlcAspectRatio.RATIO_16_9 -> {
-                val viewWidth = defaultWidth
-                val viewHeight = defaultHeight
-                val targetRatio = 16f / 9f
-                val containerRatio = viewWidth.toFloat() / viewHeight.toFloat()
-                if (containerRatio > targetRatio) {
-                    setMeasuredDimension((viewHeight * targetRatio).toInt(), viewHeight)
-                } else {
-                    setMeasuredDimension(viewWidth, (viewWidth / targetRatio).toInt())
-                }
-            }
-            VlcAspectRatio.RATIO_4_3 -> {
-                val viewWidth = defaultWidth
-                val viewHeight = defaultHeight
-                val targetRatio = 4f / 3f
-                val containerRatio = viewWidth.toFloat() / viewHeight.toFloat()
-                if (containerRatio > targetRatio) {
-                    setMeasuredDimension((viewHeight * targetRatio).toInt(), viewHeight)
-                } else {
-                    setMeasuredDimension(viewWidth, (viewWidth / targetRatio).toInt())
-                }
-            }
-        }
     }
 }
 
