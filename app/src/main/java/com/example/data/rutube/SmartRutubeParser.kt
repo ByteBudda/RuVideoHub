@@ -301,14 +301,22 @@ object SmartRutubeParser {
             var id = data.optString("id", "").takeIf { it.isNotBlank() && it != "null" }
                 ?: data.optString("person_id", "").takeIf { it.isNotBlank() && it != "null" }
                 ?: data.optString("author_id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optJSONObject("author")?.optString("id", "")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optJSONObject("author")?.optString("person_id", "")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optJSONObject("owner")?.optString("id", "")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optJSONObject("owner")?.optString("person_id", "")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optJSONObject("user")?.optString("id", "")?.takeIf { it.isNotBlank() && it != "null" }
                 ?: ""
             
             if (id.isBlank()) {
                 val urlToParse = data.optString("channel_url", data.optString("url", ""))
                 if (urlToParse.isNotBlank()) {
-                    val match = "/person/(\\d+)".toRegex().find(urlToParse)
+                    val match = "/(?:person|channel)/([^/?#\\s]+)".toRegex().find(urlToParse)
                     if (match != null) {
-                        id = match.groupValues[1]
+                        val candidate = match.groupValues[1]
+                        if (candidate.isNotBlank() && candidate != "null") {
+                            id = candidate
+                        }
                     }
                 }
             }
