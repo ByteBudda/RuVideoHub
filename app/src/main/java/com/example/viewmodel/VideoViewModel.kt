@@ -246,6 +246,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         urlToFetch = matched?.target
                     }
                     if (urlToFetch.isNullOrBlank()) {
+                        val slug = repository.dynamicCategoryTargets[targetCategory]
+                        urlToFetch = if (slug != null) "/api/feeds/$slug/" else null
+                    }
+                    if (urlToFetch.isNullOrBlank()) {
                         val slug = categorySlugs[targetCategory]
                         urlToFetch = if (slug != null) "/api/feeds/$slug/" else null
                     }

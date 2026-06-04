@@ -59,6 +59,17 @@ fun SleekVideoHubApp(
 ) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val currentSelectedVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+
+    if (currentSelectedVideo == null && (currentTab != "home" || searchQuery.isNotEmpty())) {
+        androidx.activity.compose.BackHandler {
+            if (currentTab != "home") {
+                viewModel.selectTab("home")
+            } else if (searchQuery.isNotEmpty()) {
+                viewModel.setSearchQuery("")
+            }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Scaffold(
@@ -226,11 +237,8 @@ fun HomeTabScreen(
     modifier: Modifier = Modifier
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
     val apiSource by viewModel.apiSource.collectAsStateWithLifecycle()
-
-    val categories = listOf("Фильмы", "Сериалы", "Телепередачи", "Музыка", "Мультфильмы", "Спорт", "Юмор", "Видеоигры", "Технологии")
 
     Column(modifier = modifier.fillMaxSize()) {
         // App search header
@@ -238,13 +246,6 @@ fun HomeTabScreen(
             searchQuery = searchQuery,
             onSearchQueryChanged = { viewModel.setSearchQuery(it) },
             apiSource = apiSource
-        )
-
-        // Filter chips list
-        CategoryRow(
-            categories = categories,
-            selectedCategory = selectedCategory,
-            onCategorySelected = { viewModel.selectCategory(it) }
         )
 
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
@@ -1472,242 +1473,6 @@ fun LibraryTabScreen(
             modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
         )
 
-        val isAuthorized by viewModel.isAuthorized.collectAsStateWithLifecycle()
-        val username by viewModel.username.collectAsStateWithLifecycle()
-        val userAvatar by viewModel.userAvatar.collectAsStateWithLifecycle()
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SecondaryBackground)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                if (isAuthorized) {
-                    AsyncImage(
-                        model = userAvatar,
-                        contentDescription = "Аватар",
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = username,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Авторизован через сессию Rutube",
-                            fontSize = 10.sp,
-                            color = Color(0xFF10B981),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.logout() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Выйти", fontSize = 10.sp, color = Color.White)
-                    }
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = "Профиль",
-                        tint = GreyText,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Вход в аккаунт",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Войдите для синхронизации с Rutube",
-                            fontSize = 10.sp,
-                            color = GreyText
-                        )
-                    }
-                    
-                    var showAuthDialog by remember { mutableStateOf(false) }
-                    
-                    Button(
-                        onClick = { showAuthDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Войти", fontSize = 10.sp)
-                    }
-
-                    if (showAuthDialog) {
-                        LaunchedEffect(showAuthDialog) {
-                            while (showAuthDialog) {
-                                val cookieManager = android.webkit.CookieManager.getInstance()
-                                var sessionid: String? = null
-                                var csrftoken: String? = null
-                                
-                                val targets = listOf("https://rutube.ru", "https://.rutube.ru", "https://pass.media", "https://rutube.ru/multipass", "https://pass.rt.ru", "https://auth.yandex.ru")
-                                for (url in targets) {
-                                    val cookiesString = cookieManager.getCookie(url) ?: continue
-                                    val cookies = cookiesString.split(";")
-                                    for (cookie in cookies) {
-                                        val parts = cookie.trim().split("=")
-                                        if (parts.size >= 2) {
-                                            val name = parts[0].trim()
-                                            val value = parts.subList(1, parts.size).joinToString("=").trim()
-                                            if (name.equals("sessionid", ignoreCase = true) || name.equals("sessionid_secure", ignoreCase = true)) {
-                                                sessionid = value
-                                            } else if (name.equals("csrftoken", ignoreCase = true)) {
-                                                csrftoken = value
-                                            }
-                                        }
-                                    }
-                                }
-                                if (!sessionid.isNullOrBlank()) {
-                                    viewModel.setCredentials(sessionid, csrftoken ?: "csrf_default", "Пользователь Rutube")
-                                    showAuthDialog = false
-                                    break
-                                }
-                                kotlinx.coroutines.delay(500)
-                            }
-                        }
-
-                        androidx.compose.ui.window.Dialog(
-                            onDismissRequest = { showAuthDialog = false },
-                            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-                        ) {
-                            androidx.compose.material3.Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth(0.95f)
-                                    .fillMaxHeight(0.85f)
-                                    .clip(RoundedCornerShape(16.dp)),
-                                color = MaterialTheme.colorScheme.background,
-                                border = BorderStroke(1.dp, SurfaceVariant)
-                            ) {
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(SecondaryBackground)
-                                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(
-                                                text = "Вход в аккаунт Rutube",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = MaterialTheme.colorScheme.onBackground
-                                            )
-                                            Text(
-                                                text = "Войдите на сайте. Мы автоматически перехватим сессию.",
-                                                fontSize = 10.sp,
-                                                color = GreyText
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = { showAuthDialog = false },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Закрыть",
-                                                tint = MaterialTheme.colorScheme.onBackground,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
-
-                                    var isWebViewLoading by remember { mutableStateOf(true) }
-
-                                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                        androidx.compose.ui.viewinterop.AndroidView(
-                                            factory = { context ->
-                                                android.webkit.WebView(context).apply {
-                                                    layoutParams = android.view.ViewGroup.LayoutParams(
-                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                                    )
-                                                    
-                                                    android.webkit.CookieManager.getInstance().setAcceptCookie(true)
-                                                    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-                                                    
-                                                    settings.apply {
-                                                        javaScriptEnabled = true
-                                                        domStorageEnabled = true
-                                                        databaseEnabled = true
-                                                        userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                                    }
-
-                                                    webViewClient = object : android.webkit.WebViewClient() {
-                                                        override fun onPageStarted(view: android.webkit.WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                                                            super.onPageStarted(view, url, favicon)
-                                                            isWebViewLoading = true
-                                                        }
-
-                                                        override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
-                                                            super.onPageFinished(view, url)
-                                                            isWebViewLoading = false
-
-                                                            val cookiesString = android.webkit.CookieManager.getInstance().getCookie("https://rutube.ru")
-                                                            if (cookiesString != null) {
-                                                                var sessionid: String? = null
-                                                                var csrftoken: String? = null
-                                                                
-                                                                val cookies = cookiesString.split(";")
-                                                                for (cookie in cookies) {
-                                                                    val parts = cookie.trim().split("=")
-                                                                    if (parts.size >= 2) {
-                                                                        val name = parts[0].trim()
-                                                                        val value = parts.subList(1, parts.size).joinToString("=").trim()
-                                                                        if (name.equals("sessionid", ignoreCase = true) || name.equals("sessionid_secure", ignoreCase = true)) {
-                                                                            sessionid = value
-                                                                        } else if (name.equals("csrftoken", ignoreCase = true)) {
-                                                                            csrftoken = value
-                                                                        }
-                                                                    }
-                                                                }
-                                                                
-                                                                if (!sessionid.isNullOrBlank()) {
-                                                                    viewModel.setCredentials(sessionid, csrftoken ?: "csrf_default", "Пользователь Rutube")
-                                                                    showAuthDialog = false
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-
-                                                    loadUrl("https://rutube.ru/multipass/login/?client=wdp&referer=https%3A%2F%2Frutube.ru%2F&themeId=dark2021&snake-startForm=gid-otp-init&context=glavnaya&new-next=https%3A%2F%2Frutube.ru%2F")
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-
-                                        if (isWebViewLoading) {
-                                            androidx.compose.material3.CircularProgressIndicator(
-                                                color = Primary,
-                                                modifier = Modifier.run { align(Alignment.Center) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         // Simple Stats Row
         Row(
             modifier = Modifier
@@ -2128,9 +1893,11 @@ fun SleekPlayerDetailOverlay(
         }
     }
 
-    if (isFullscreen) {
-        androidx.activity.compose.BackHandler {
+    androidx.activity.compose.BackHandler {
+        if (isFullscreen) {
             isFullscreen = false
+        } else {
+            onDismiss()
         }
     }
 

@@ -11,7 +11,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
     var lastFetchSource: String = "Инициализация"
         private set
 
-    private val dynamicCategoryTargets = java.util.concurrent.ConcurrentHashMap<String, String>()
+    val dynamicCategoryTargets = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     fun getVideosFlow(): Flow<List<Video>> {
         return dao.getAllSavedVideos().map { savedList ->
@@ -361,33 +361,60 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val parsedResult = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, "https://rutube.ru/api/v1/feeds/promogroup/382/")
             
             for (card in parsedResult.items) {
-                if (card is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard) {
-                    val target = card.actionUrl ?: ""
-                    if (card.title.isNotBlank()) {
-                        categoriesList.add(
-                            RutubeCategory(
-                                id = card.id.hashCode(),
-                                title = card.title,
-                                picture = card.thumbnail ?: "",
-                                target = target
-                            )
+                var title = ""
+                var thumbnail = ""
+                var actionUrl = ""
+                val idVal = card.hashCode()
+
+                when (card) {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
+                        title = card.title
+                        thumbnail = card.thumbnail ?: ""
+                        actionUrl = card.actionUrl ?: ""
+                    }
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
+                        title = card.title
+                        thumbnail = card.thumbnail ?: ""
+                        actionUrl = card.actionUrl ?: ""
+                    }
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvShowCard -> {
+                        title = card.title
+                        thumbnail = card.poster ?: ""
+                        actionUrl = "/feeds/tv/"
+                    }
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
+                        title = card.title
+                        thumbnail = card.thumbnail ?: ""
+                        actionUrl = "/feeds/video/"
+                    }
+                    else -> {}
+                }
+
+                if (title.isNotBlank()) {
+                    categoriesList.add(
+                        RutubeCategory(
+                            id = idVal,
+                            title = title,
+                            picture = thumbnail,
+                            target = actionUrl
                         )
-                        val slug = target.removePrefix("/feeds/").removeSuffix("/")
-                        if (slug.isNotBlank()) {
-                            dynamicCategoryTargets[card.title] = slug
-                        }
+                    )
+                    val slug = actionUrl.replace("/api/feeds/", "").replace("/feeds/", "").replace("/api/v1/feeds/", "").trim('/')
+                    if (slug.isNotBlank()) {
+                        dynamicCategoryTargets[title] = slug
                     }
                 }
             }
+
             if (categoriesList.isEmpty()) {
                 val resultsArray = jsonObj.optJSONArray("results")
                 if (resultsArray != null) {
                     for (i in 0 until resultsArray.length()) {
                         val item = resultsArray.optJSONObject(i) ?: continue
-                        val id = item.optInt("id")
+                        val id = item.optInt("id", item.hashCode())
                         val title = item.optString("title")
-                        val picture = item.optString("picture")
-                        val target = item.optString("target")
+                        val picture = item.optString("picture", item.optString("image", ""))
+                        val target = item.optString("target", item.optString("url", ""))
                         if (title.isNotBlank()) {
                             categoriesList.add(
                                 RutubeCategory(
@@ -397,7 +424,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                                     target = target
                                 )
                             )
-                            val slug = target.removePrefix("/feeds/").removeSuffix("/")
+                            val slug = target.replace("/api/feeds/", "").replace("/feeds/", "").replace("/api/v1/feeds/", "").trim('/')
                             if (slug.isNotBlank()) {
                                 dynamicCategoryTargets[title] = slug
                             }
@@ -408,6 +435,40 @@ class VideoRepository(private val dao: SavedVideoDao) {
         } catch (ex: Exception) {
             android.util.Log.e("VideoRepository", "Error fetching real categories", ex)
         }
+
+        // Fill in high-quality rich default categories if not already present
+        val defaultCategories = listOf(
+            RutubeCategory(1001, "Фильмы", "https://pic.rutubelist.ru/promo-category/movies", "/api/feeds/movies/"),
+            RutubeCategory(1002, "Сериалы", "https://pic.rutubelist.ru/promo-category/serials", "/api/feeds/serials/"),
+            RutubeCategory(1003, "Телепередачи", "https://pic.rutubelist.ru/promo-category/tv", "/api/feeds/tv/"),
+            RutubeCategory(1004, "Мультфильмы", "https://pic.rutubelist.ru/promo-category/cartoons", "/api/feeds/cartoons/"),
+            RutubeCategory(1005, "Музыка", "https://pic.rutubelist.ru/promo-category/music", "/api/feeds/music/"),
+            RutubeCategory(1006, "Спорт", "https://pic.rutubelist.ru/promo-category/sport", "/api/feeds/sport/"),
+            RutubeCategory(1007, "Юмор", "https://pic.rutubelist.ru/promo-category/umor", "/api/feeds/umor/"),
+            RutubeCategory(1008, "Видеоигры", "https://pic.rutubelist.ru/promo-category/games", "/api/feeds/games/"),
+            RutubeCategory(1009, "Технологии", "https://pic.rutubelist.ru/promo-category/technologies", "/api/feeds/technologies/"),
+            RutubeCategory(1010, "Блоги", "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=500", "/api/feeds/blogs/"),
+            RutubeCategory(1011, "Новости", "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500", "/api/feeds/news/"),
+            RutubeCategory(1012, "Лайфхаки", "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=500", "/api/feeds/lifehacks/"),
+            RutubeCategory(1013, "Детям", "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=500", "/api/feeds/kids/"),
+            RutubeCategory(1014, "Авто-мото", "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=500", "/api/feeds/auto/"),
+            RutubeCategory(1015, "Обучение", "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500", "/api/feeds/education/"),
+            RutubeCategory(1016, "Путешествия", "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500", "/api/feeds/travel/"),
+            RutubeCategory(1017, "Кулинария", "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500", "/api/feeds/food/"),
+            RutubeCategory(1018, "Аниме", "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500", "/api/feeds/anime/")
+        )
+
+        for (defaultCat in defaultCategories) {
+            val exists = categoriesList.any { it.title.equals(defaultCat.title, ignoreCase = true) }
+            if (!exists) {
+                categoriesList.add(defaultCat)
+                val slug = defaultCat.target?.replace("/api/feeds/", "")?.replace("/feeds/", "")?.replace("/api/v1/feeds/", "")?.trim('/') ?: ""
+                if (slug.isNotBlank()) {
+                    dynamicCategoryTargets[defaultCat.title] = slug
+                }
+            }
+        }
+
         return categoriesList
     }
 }
