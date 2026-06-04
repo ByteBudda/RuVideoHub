@@ -368,17 +368,40 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
                     var loadedVideos: List<Video> = emptyList()
+                    
+                    // Attempt 1: person API
                     try {
                         val response = apiService.getDynamicUrl("https://rutube.ru/api/video/person/$channelId/?format=json")
                         val bodyStr = response.string()
                         loadedVideos = repository.parseVideoListJson(bodyStr, video.category)
                     } catch (ex: Exception) {
-                        android.util.Log.e("VideoViewModel", "Dynamic person load failed, falling back to search", ex)
+                        android.util.Log.e("VideoViewModel", "Attempt 1: person API failed", ex)
+                    }
+                    
+                    // Attempt 2: feeds person API
+                    if (loadedVideos.isEmpty()) {
+                        try {
+                            val response = apiService.getDynamicUrl("https://rutube.ru/api/feeds/person/$channelId/?format=json")
+                            val bodyStr = response.string()
+                            loadedVideos = repository.parseVideoListJson(bodyStr, video.category)
+                        } catch (ex: Exception) {
+                            android.util.Log.e("VideoViewModel", "Attempt 2: feeds person API failed", ex)
+                        }
+                    }
+                    
+                    // Attempt 3: feeds person video API
+                    if (loadedVideos.isEmpty()) {
+                        try {
+                            val response = apiService.getDynamicUrl("https://rutube.ru/api/feeds/person/$channelId/video/?format=json")
+                            val bodyStr = response.string()
+                            loadedVideos = repository.parseVideoListJson(bodyStr, video.category)
+                        } catch (ex: Exception) {
+                            android.util.Log.e("VideoViewModel", "Attempt 3: feeds person video API failed", ex)
+                        }
                     }
                     
                     if (loadedVideos.isNotEmpty()) {
                         _dynamicVideos.value = loadedVideos
-                        _selectedCategory.value = "Фильмы"
                         _searchQuery.value = ""
                         selectTab("home")
                         
@@ -399,6 +422,74 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             return
+        }
+
+        if (video != null && video.id.startsWith("unknown_")) {
+            val parts = video.id.substringAfter("unknown_").split("__")
+            val actionUrl = parts.getOrNull(1) ?: ""
+            if (actionUrl.isNotBlank() && actionUrl != "null") {
+                viewModelScope.launch {
+                    _isLoading.value = true
+                    try {
+                        val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                        val normalizedUrl = if (actionUrl.startsWith("http")) actionUrl else "https://rutube.ru${if (actionUrl.startsWith("/")) "" else "/"}$actionUrl"
+                        val finalUrl = if (normalizedUrl.contains("?")) "$normalizedUrl&format=json" else "$normalizedUrl?format=json"
+                        
+                        val response = apiService.getDynamicUrl(finalUrl)
+                        val bodyStr = response.string()
+                        
+                        var loadedVideos = repository.parseVideoListJson(bodyStr, video.category)
+                        if (loadedVideos.isEmpty()) {
+                            // Try parsing tab resources if it is a feed (Matryoshka structure)
+                            val jsonObj = org.json.JSONObject(bodyStr)
+                            val tabsArray = jsonObj.optJSONArray("tabs")
+                            val urls = mutableListOf<String>()
+                            if (tabsArray != null) {
+                                for (i in 0 until tabsArray.length()) {
+                                    val tabObj = tabsArray.optJSONObject(i) ?: continue
+                                    val resArray = tabObj.optJSONArray("resources")
+                                    if (resArray != null) {
+                                        for (j in 0 until resArray.length()) {
+                                            val resUrl = resArray.optJSONObject(j)?.optString("url")
+                                            if (!resUrl.isNullOrBlank()) {
+                                                urls.add(resUrl)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (urls.isNotEmpty()) {
+                                val subUrlRaw = urls.first()
+                                val subUrl = if (subUrlRaw.startsWith("http")) subUrlRaw else "https://rutube.ru${if (subUrlRaw.startsWith("/")) "" else "/"}$subUrlRaw"
+                                val subFinalUrl = if (subUrl.contains("?")) "$subUrl&format=json" else "$subUrl?format=json"
+                                val subResponse = apiService.getDynamicUrl(subFinalUrl)
+                                loadedVideos = repository.parseVideoListJson(subResponse.string(), video.category)
+                            }
+                        }
+
+                        if (loadedVideos.isNotEmpty()) {
+                            _dynamicVideos.value = loadedVideos
+                            _searchQuery.value = ""
+                            selectTab("home")
+                            
+                            val cleanEndpoint = if (normalizedUrl.contains("?")) normalizedUrl.substringBefore("?") else normalizedUrl
+                            currentActiveApiEndpoint = cleanEndpoint
+                            currentPage = 1
+                            isEndReached = false
+                        } else {
+                            setSearchQuery(video.title)
+                            selectTab("home")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoViewModel", "Error resolving unknown/container Matryoshka card", e)
+                        setSearchQuery(video.title)
+                        selectTab("home")
+                    } finally {
+                        _isLoading.value = false
+                    }
+                }
+                return
+            }
         }
 
         _currentSelectedVideo.value = video

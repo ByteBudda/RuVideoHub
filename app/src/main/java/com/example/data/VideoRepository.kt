@@ -127,15 +127,15 @@ class VideoRepository(private val dao: SavedVideoDao) {
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
                 Video(
-                    id = "unknown_${Math.random()}",
+                    id = "unknown_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
-                    channel = card.rawType ?: "Неизвестно",
-                    views = "0 просмотров",
-                    timeAgo = "Опубликовано недавно",
-                    duration = "00:00",
+                    channel = card.rawType ?: "Раздел каталога",
+                    views = "Коллекция",
+                    timeAgo = "Открыть раздел",
+                    duration = "КАТАЛОГ",
                     isPro = false,
                     category = defaultCategoryName,
-                    description = "Элемент каталога",
+                    description = "Элемент каталога • Нажмите для открытия",
                     thumbnailUrl = card.thumbnail
                 )
             }

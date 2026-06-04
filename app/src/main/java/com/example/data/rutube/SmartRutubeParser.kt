@@ -175,9 +175,11 @@ object SmartRutubeParser {
         ) : NormalizedCard()
 
         data class UnknownCard(
+            val id: String,
             val title: String,
             val thumbnail: String?,
-            val rawType: String?
+            val rawType: String?,
+            val actionUrl: String? = null
         ) : NormalizedCard()
     }
 
@@ -203,10 +205,15 @@ object SmartRutubeParser {
                 return normalizeVideo(data)
             }
 
+            val actionUrl = data.optString("target").takeIf { it.isNotBlank() } ?: data.optString("url", "").takeIf { it.isNotBlank() }
+            val rawId = data.optString("id", "").takeIf { it.isNotBlank() } ?: data.optString("code", "").takeIf { it.isNotBlank() } ?: (100000..999999).random().toString()
+
             return NormalizedCard.UnknownCard(
+                id = rawId,
                 title = data.optString("name", data.optString("title", "Untitled")),
                 thumbnail = data.optString("thumbnail_url", data.optString("picture", data.optString("poster_url", ""))),
-                rawType = model
+                rawType = model,
+                actionUrl = actionUrl
             )
         }
 
@@ -291,7 +298,24 @@ object SmartRutubeParser {
         }
 
         fun normalizeChannel(data: JSONObject): NormalizedCard.ChannelCard {
-            val id = data.optString("id", "")
+            var id = data.optString("id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("person_id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("author_id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: ""
+            
+            if (id.isBlank()) {
+                val urlToParse = data.optString("channel_url", data.optString("url", ""))
+                if (urlToParse.isNotBlank()) {
+                    val match = "/person/(\\d+)".toRegex().find(urlToParse)
+                    if (match != null) {
+                        id = match.groupValues[1]
+                    }
+                }
+            }
+            if (id.isBlank()) {
+                id = (1000000..9999999).random().toString()
+            }
+
             val name = data.optString("name", "Untitled")
             val avatar = data.optString("user_channel_image")
                 .takeIf { it.isNotBlank() }

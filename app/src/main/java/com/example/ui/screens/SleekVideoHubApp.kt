@@ -115,12 +115,6 @@ fun SleekVideoHubApp(
                 )
             }
         }
-
-        // Voice search active pulse simulation overlay
-        val isMicActive by viewModel.isMicrophoneActive.collectAsStateWithLifecycle()
-        if (isMicActive) {
-            VoiceListeningOverlay(onCancel = { viewModel.toggleMicrophone(false) })
-        }
     }
 }
 
@@ -232,7 +226,6 @@ fun HomeTabScreen(
     modifier: Modifier = Modifier
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val isMicActive by viewModel.isMicrophoneActive.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
     val apiSource by viewModel.apiSource.collectAsStateWithLifecycle()
@@ -244,8 +237,6 @@ fun HomeTabScreen(
         SleekHeader(
             searchQuery = searchQuery,
             onSearchQueryChanged = { viewModel.setSearchQuery(it) },
-            isMicActive = isMicActive,
-            onMicToggle = { viewModel.toggleMicrophone(it) },
             apiSource = apiSource
         )
 
@@ -347,8 +338,6 @@ fun HomeTabScreen(
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
-    isMicActive: Boolean,
-    onMicToggle: (Boolean) -> Unit,
     apiSource: String,
     modifier: Modifier = Modifier
 ) {
@@ -395,7 +384,7 @@ fun SleekHeader(
                 decorationBox = { innerTextField ->
                     if (searchQuery.isEmpty()) {
                         Text(
-                            text = if (isMicActive) "Слушаю..." else "Поиск видео на Rutube",
+                            text = "Поиск видео на Rutube",
                             color = GreyText,
                             fontSize = 14.sp
                         )
@@ -416,21 +405,6 @@ fun SleekHeader(
                         modifier = Modifier.size(16.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-
-            IconButton(
-                onClick = { onMicToggle(!isMicActive) },
-                modifier = Modifier
-                    .size(28.dp)
-                    .testTag("mic_button")
-            ) {
-                Icon(
-                    imageVector = if (isMicActive) Icons.Default.Mic else Icons.Default.MicNone,
-                    contentDescription = "Голосовой поиск",
-                    tint = if (isMicActive) Primary else GreyText,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
 
@@ -1523,6 +1497,38 @@ fun LibraryTabScreen(
                     }
 
                     if (showAuthDialog) {
+                        LaunchedEffect(showAuthDialog) {
+                            while (showAuthDialog) {
+                                val cookieManager = android.webkit.CookieManager.getInstance()
+                                var sessionid: String? = null
+                                var csrftoken: String? = null
+                                
+                                val targets = listOf("https://rutube.ru", "https://pass.media", "https://rutube.ru/multipass")
+                                for (url in targets) {
+                                    val cookiesString = cookieManager.getCookie(url) ?: continue
+                                    val cookies = cookiesString.split(";")
+                                    for (cookie in cookies) {
+                                        val parts = cookie.trim().split("=")
+                                        if (parts.size >= 2) {
+                                            val name = parts[0].trim()
+                                            val value = parts.subList(1, parts.size).joinToString("=").trim()
+                                            if (name.equals("sessionid", ignoreCase = true)) {
+                                                sessionid = value
+                                            } else if (name.equals("csrftoken", ignoreCase = true)) {
+                                                csrftoken = value
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!sessionid.isNullOrBlank()) {
+                                    viewModel.setCredentials(sessionid, csrftoken ?: "csrf_default", "Пользователь Rutube")
+                                    showAuthDialog = false
+                                    break
+                                }
+                                kotlinx.coroutines.delay(500)
+                            }
+                        }
+
                         androidx.compose.ui.window.Dialog(
                             onDismissRequest = { showAuthDialog = false },
                             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
@@ -2070,93 +2076,88 @@ fun SleekPlayerDetailOverlay(
     }
 
     if (isFullscreen) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            RutubeVideoPlayer(
-                videoId = video.id,
-                viewModel = viewModel,
-                videoTitle = video.title,
-                aspectMode = selectedAspectRatio,
-                isFullscreen = true,
-                onToggleFullscreen = { isFullscreen = !isFullscreen },
-                onChangeAspectRatio = { selectedAspectRatio = it },
-                onShare = { shareVideo(context, video) },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
         androidx.activity.compose.BackHandler {
             isFullscreen = false
         }
-    } else {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Player header bar - collapses during fullscreen to avoid layout structure alterations
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isFullscreen) 0.dp else 56.dp)
         ) {
-            // Player header bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player")) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Закрыть плеер",
-                        tint = MaterialTheme.colorScheme.onBackground
+            if (!isFullscreen) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player")) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Закрыть плеер",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    Text(
+                        text = "${video.category} • Воспроизведение",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Primary,
+                        letterSpacing = 0.5.sp
                     )
+
+                    Box(modifier = Modifier.size(24.dp)) // empty spacer for symmetry
                 }
-
-                Text(
-                    text = "${video.category} • Воспроизведение",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary,
-                    letterSpacing = 0.5.sp
-                )
-
-                Box(modifier = Modifier.size(24.dp)) // empty spacer for symmetry
             }
+        }
 
-            // Active Player Canvas Render Box (16:9 Aspect ratio)
-            Box(
-                modifier = Modifier
+        // Active Player Canvas Render Box (16:9 Standard Aspect ratio or Fill Screen when Landscape Fullscreen)
+        Box(
+            modifier = if (isFullscreen) {
+                Modifier.weight(1f).fillMaxWidth()
+            } else {
+                Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(Color.Black)
-            ) {
-                if (isPlaying) {
-                    RutubeVideoPlayer(
-                        videoId = video.id,
-                        viewModel = viewModel,
-                        videoTitle = video.title,
-                        aspectMode = selectedAspectRatio,
-                        isFullscreen = false,
-                        onToggleFullscreen = { isFullscreen = !isFullscreen },
-                        onChangeAspectRatio = { selectedAspectRatio = it },
-                        onShare = { shareVideo(context, video) },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    VideoThumbnail(
-                        id = video.id,
-                        duration = video.duration,
-                        thumbnailUrl = video.thumbnailUrl,
-                        hasPlayOverlay = true,
-                        isPlaying = false,
-                        onPlayClick = { viewModel.togglePlayPause() },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+            }.background(Color.Black)
+        ) {
+            if (isPlaying) {
+                RutubeVideoPlayer(
+                    videoId = video.id,
+                    viewModel = viewModel,
+                    videoTitle = video.title,
+                    aspectMode = selectedAspectRatio,
+                    isFullscreen = isFullscreen,
+                    onToggleFullscreen = { isFullscreen = !isFullscreen },
+                    onChangeAspectRatio = { selectedAspectRatio = it },
+                    onShare = { shareVideo(context, video) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                VideoThumbnail(
+                    id = video.id,
+                    duration = video.duration,
+                    thumbnailUrl = video.thumbnailUrl,
+                    hasPlayOverlay = true,
+                    isPlaying = false,
+                    onPlayClick = { viewModel.togglePlayPause() },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
+        }
 
+        if (!isFullscreen) {
             Spacer(modifier = Modifier.height(12.dp))
 
             // Detail descriptions and channels metadata
@@ -2618,7 +2619,7 @@ fun RutubeVideoPlayer(
                 hlsUrl = resolvedUrl
                 isLoading = false
             } else {
-                loadError = "Не удалось открыть онлайн-поток. Пожалуйста, попробуйте снова или проверьте соединение."
+                useEmbedPlayer = true
                 isLoading = false
             }
         }
@@ -2708,7 +2709,7 @@ fun RutubeVideoPlayer(
                             }
                             webViewClient = WebViewClient()
                             webChromeClient = WebChromeClient()
-                            val embedUrl = "https://rutube.ru/play/embed/$videoId/"
+                            val embedUrl = "https://rutube.ru/play/embed/$videoId/?autoplay=1"
                             loadUrl(embedUrl)
                         }
                     },
@@ -2843,7 +2844,7 @@ fun RutubeVideoPlayer(
                         }
                         
                         setOnErrorListener { _, _, _ ->
-                            loadError = "Ошибка медиаплеера при воспроизведении потока."
+                            useEmbedPlayer = true
                             true
                         }
                         videoViewRef = this
