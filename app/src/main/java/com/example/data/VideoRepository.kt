@@ -352,7 +352,37 @@ class VideoRepository(private val dao: SavedVideoDao) {
     }
 
     suspend fun fetchRealCategories(): List<RutubeCategory> {
+        val defaultCategories = listOf(
+            RutubeCategory(1001, "Фильмы", "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500", "/api/feeds/movies/"),
+            RutubeCategory(1002, "Сериалы", "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=500", "/api/feeds/serials/"),
+            RutubeCategory(1003, "Телепередачи", "https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=500", "/api/feeds/tv/"),
+            RutubeCategory(1004, "Мультфильмы", "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500", "/api/feeds/cartoons/"),
+            RutubeCategory(1005, "Музыка", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500", "/api/feeds/music/"),
+            RutubeCategory(1006, "Спорт", "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=500", "/api/feeds/sport/"),
+            RutubeCategory(1007, "Юмор", "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500", "/api/feeds/umor/"),
+            RutubeCategory(1008, "Видеоигры", "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=500", "/api/feeds/games/"),
+            RutubeCategory(1009, "Технологии", "https://images.unsplash.com/photo-1518770660439-4636190af475?w=500", "/api/feeds/technologies/"),
+            RutubeCategory(1010, "Блоги", "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=500", "/api/feeds/blogs/"),
+            RutubeCategory(1011, "Новости", "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500", "/api/feeds/news/"),
+            RutubeCategory(1012, "Лайфхаки", "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=500", "/api/feeds/lifehacks/"),
+            RutubeCategory(1013, "Детям", "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=500", "/api/feeds/kids/"),
+            RutubeCategory(1014, "Авто-мото", "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=500", "/api/feeds/auto/"),
+            RutubeCategory(1015, "Обучение", "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500", "/api/feeds/education/"),
+            RutubeCategory(1016, "Путешествия", "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500", "/api/feeds/travel/"),
+            RutubeCategory(1017, "Кулинария", "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500", "/api/feeds/food/"),
+            RutubeCategory(1018, "Аниме", "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500", "/api/feeds/anime/")
+        )
+
         val categoriesList = mutableListOf<RutubeCategory>()
+        categoriesList.addAll(defaultCategories)
+
+        for (defaultCat in defaultCategories) {
+            val slug = defaultCat.target?.replace("/api/feeds/", "")?.replace("/feeds/", "")?.replace("/api/v1/feeds/", "")?.trim('/') ?: ""
+            if (slug.isNotBlank()) {
+                dynamicCategoryTargets[defaultCat.title] = slug
+            }
+        }
+
         try {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
             val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
@@ -390,7 +420,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     else -> {}
                 }
 
-                if (title.isNotBlank()) {
+                if (title.isNotBlank() && categoriesList.none { it.title.equals(title, ignoreCase = true) }) {
                     categoriesList.add(
                         RutubeCategory(
                             id = idVal,
@@ -406,67 +436,32 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 }
             }
 
-            if (categoriesList.isEmpty()) {
-                val resultsArray = jsonObj.optJSONArray("results")
-                if (resultsArray != null) {
-                    for (i in 0 until resultsArray.length()) {
-                        val item = resultsArray.optJSONObject(i) ?: continue
-                        val id = item.optInt("id", item.hashCode())
-                        val title = item.optString("title")
-                        val picture = item.optString("picture", item.optString("image", ""))
-                        val target = item.optString("target", item.optString("url", ""))
-                        if (title.isNotBlank()) {
-                            categoriesList.add(
-                                RutubeCategory(
-                                    id = id,
-                                    title = title,
-                                    picture = picture,
-                                    target = target
-                                )
+            val resultsArray = jsonObj.optJSONArray("results")
+            if (resultsArray != null) {
+                for (i in 0 until resultsArray.length()) {
+                    val item = resultsArray.optJSONObject(i) ?: continue
+                    val id = item.optInt("id", item.hashCode())
+                    val title = item.optString("title")
+                    val picture = item.optString("picture", item.optString("image", ""))
+                    val target = item.optString("target", item.optString("url", ""))
+                    if (title.isNotBlank() && categoriesList.none { it.title.equals(title, ignoreCase = true) }) {
+                        categoriesList.add(
+                            RutubeCategory(
+                                id = id,
+                                title = title,
+                                picture = picture,
+                                target = target
                             )
-                            val slug = target.replace("/api/feeds/", "").replace("/feeds/", "").replace("/api/v1/feeds/", "").trim('/')
-                            if (slug.isNotBlank()) {
-                                dynamicCategoryTargets[title] = slug
-                            }
+                        )
+                        val slug = target.replace("/api/feeds/", "").replace("/feeds/", "").replace("/api/v1/feeds/", "").trim('/')
+                        if (slug.isNotBlank()) {
+                            dynamicCategoryTargets[title] = slug
                         }
                     }
                 }
             }
         } catch (ex: Exception) {
             android.util.Log.e("VideoRepository", "Error fetching real categories", ex)
-        }
-
-        // Fill in high-quality rich default categories if not already present
-        val defaultCategories = listOf(
-            RutubeCategory(1001, "Фильмы", "https://pic.rutubelist.ru/promo-category/movies", "/api/feeds/movies/"),
-            RutubeCategory(1002, "Сериалы", "https://pic.rutubelist.ru/promo-category/serials", "/api/feeds/serials/"),
-            RutubeCategory(1003, "Телепередачи", "https://pic.rutubelist.ru/promo-category/tv", "/api/feeds/tv/"),
-            RutubeCategory(1004, "Мультфильмы", "https://pic.rutubelist.ru/promo-category/cartoons", "/api/feeds/cartoons/"),
-            RutubeCategory(1005, "Музыка", "https://pic.rutubelist.ru/promo-category/music", "/api/feeds/music/"),
-            RutubeCategory(1006, "Спорт", "https://pic.rutubelist.ru/promo-category/sport", "/api/feeds/sport/"),
-            RutubeCategory(1007, "Юмор", "https://pic.rutubelist.ru/promo-category/umor", "/api/feeds/umor/"),
-            RutubeCategory(1008, "Видеоигры", "https://pic.rutubelist.ru/promo-category/games", "/api/feeds/games/"),
-            RutubeCategory(1009, "Технологии", "https://pic.rutubelist.ru/promo-category/technologies", "/api/feeds/technologies/"),
-            RutubeCategory(1010, "Блоги", "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=500", "/api/feeds/blogs/"),
-            RutubeCategory(1011, "Новости", "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500", "/api/feeds/news/"),
-            RutubeCategory(1012, "Лайфхаки", "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=500", "/api/feeds/lifehacks/"),
-            RutubeCategory(1013, "Детям", "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=500", "/api/feeds/kids/"),
-            RutubeCategory(1014, "Авто-мото", "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=500", "/api/feeds/auto/"),
-            RutubeCategory(1015, "Обучение", "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500", "/api/feeds/education/"),
-            RutubeCategory(1016, "Путешествия", "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500", "/api/feeds/travel/"),
-            RutubeCategory(1017, "Кулинария", "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500", "/api/feeds/food/"),
-            RutubeCategory(1018, "Аниме", "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500", "/api/feeds/anime/")
-        )
-
-        for (defaultCat in defaultCategories) {
-            val exists = categoriesList.any { it.title.equals(defaultCat.title, ignoreCase = true) }
-            if (!exists) {
-                categoriesList.add(defaultCat)
-                val slug = defaultCat.target?.replace("/api/feeds/", "")?.replace("/feeds/", "")?.replace("/api/v1/feeds/", "")?.trim('/') ?: ""
-                if (slug.isNotBlank()) {
-                    dynamicCategoryTargets[defaultCat.title] = slug
-                }
-            }
         }
 
         return categoriesList

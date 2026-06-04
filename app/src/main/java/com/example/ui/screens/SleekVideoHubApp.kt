@@ -302,10 +302,9 @@ fun HomeTabScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                // Section recommended (header + hero card)
+                // Section recommended (hero card)
                 val heroVideo = filteredVideos.first()
                 item {
-                    RecommendedSectionHeader()
                     HeroVideoCard(
                         video = heroVideo,
                         onVideoClick = { viewModel.selectVideo(heroVideo) },
