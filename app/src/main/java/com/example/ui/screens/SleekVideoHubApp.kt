@@ -1818,40 +1818,42 @@ data class EpisodeInfo(
 fun parseEpisode(title: String): EpisodeInfo {
     val lower = title.lowercase()
     
-    // Find "сезон X" or "X сезон"
+    // Find "сезон X" or "X сезон" or "X-й сезон" or "X-ый сезон" or "сезон-X"
     var season = 1
-    val seasonRegex1 = Regex("""сезон\s*(\d+)""")
-    val seasonRegex2 = Regex("""(\d+)\s*сезон""")
-    seasonRegex1.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
-        ?: seasonRegex2.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
+    val seasonPrefixRegex = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)""")
+    val seasonSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ_]{1,3})?\s*сезон""")
+    
+    seasonPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
+        ?: seasonSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
         
-    // Find "серия Y" or "Y серия" or "эпизод Y" or "выпуск Y" or "часть Y"
+    // Find "серия Y" or "Y серия" or "эпизод Y" or "выпуск Y" or "часть Y" with potential dashes and ordinal suffixes
     var episode = 1
     var rawNum = -1
-    val epRegex1 = Regex("""(?:серия|эпизод|выпуск|часть)\s*(\d+)""")
-    val epRegex2 = Regex("""(\d+)\s*(?:серия|эпизод|выпуск|часть)""")
-    epRegex1.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
-        ?: epRegex2.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+    val epPrefixRegex = Regex("""(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)""")
+    val epSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ_]{1,3})?\s*(?:серия|эпизод|выпуск|часть)""")
+    
+    epPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+        ?: epSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
         
     if (rawNum == -1) {
-        val numberRegex = Regex("""\b(\d+)\b""")
-        val matches = numberRegex.findAll(lower).toList()
+        val digitRegex = Regex("""\d+""")
+        val matches = digitRegex.findAll(lower).toList()
         if (matches.isNotEmpty()) {
-            matches.last().groupValues.get(1).toIntOrNull()?.let { episode = it; rawNum = it }
+            matches.last().groupValues.get(0).toIntOrNull()?.let { episode = it; rawNum = it }
         }
     }
     
     var baseTitle = title
-        .replace(Regex("""(?i)\b\d+\s*сезон\w*\b"""), "")
-        .replace(Regex("""(?i)\bсезон\w*\s*\d+\b"""), "")
-        .replace(Regex("""(?i)\b\d+\s*сери\w*\b"""), "")
-        .replace(Regex("""(?i)\bсери\w*\s*\d+\b"""), "")
-        .replace(Regex("""(?i)\b\d+\s*эпизод\w*\b"""), "")
-        .replace(Regex("""(?i)\bэпизод\w*\s*\d+\b"""), "")
-        .replace(Regex("""(?i)\b\d+\s*выпуск\w*\b"""), "")
-        .replace(Regex("""(?i)\bвыпуск\w*\s*\d+\b"""), "")
-        .replace(Regex("""(?i)\b\d+\s*част\w*\b"""), "")
-        .replace(Regex("""(?i)\bчаст\w*\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*сезон\w*\b"""), "")
+        .replace(Regex("""(?i)\bсезон\w*\s*(?:-|–|—)?\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*сери\w*\b"""), "")
+        .replace(Regex("""(?i)\bсери\w*\s*(?:-|–|—)?\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*эпизод\w*\b"""), "")
+        .replace(Regex("""(?i)\bэпизод\w*\s*(?:-|–|—)?\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*выпуск\w*\b"""), "")
+        .replace(Regex("""(?i)\bвыпуск\w*\s*(?:-|–|—)?\s*\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*част\w*\b"""), "")
+        .replace(Regex("""(?i)\bчаст\w*\s*(?:-|–|—)?\s*\d+\b"""), "")
         .replace(Regex("""\s+"""), " ")
         .trim()
         
