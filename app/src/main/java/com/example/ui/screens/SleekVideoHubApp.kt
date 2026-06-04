@@ -247,6 +247,17 @@ fun HomeTabScreen(
             onCategorySelected = { viewModel.selectCategory(it) }
         )
 
+        val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
+        val selectedFeedTab by viewModel.selectedFeedTab.collectAsStateWithLifecycle()
+
+        if (feedTabs.isNotEmpty()) {
+            FeedTabRow(
+                tabs = feedTabs,
+                selectedTab = selectedFeedTab,
+                onTabSelected = { viewModel.selectFeedTab(it) }
+            )
+        }
+
         Spacer(modifier = Modifier.height(4.dp))
 
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -483,6 +494,48 @@ fun CategoryRow(
                     text = cat,
                     color = if (isSelected) Color.White else GreyText,
                     fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FeedTabRow(
+    tabs: List<com.example.data.rutube.SmartRutubeParser.TabInfo>,
+    selectedTab: com.example.data.rutube.SmartRutubeParser.TabInfo?,
+    onTabSelected: (com.example.data.rutube.SmartRutubeParser.TabInfo) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (tabs.isEmpty()) return
+    
+    LazyRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(tabs) { tab ->
+            val isSelected = tab == selectedTab
+            
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(100.dp))
+                    .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        shape = RoundedCornerShape(100.dp)
+                    )
+                    .clickable { onTabSelected(tab) }
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = tab.name ?: "Раздел",
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -918,7 +971,7 @@ fun ExploreTabScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                                 .clickable {
-                                    viewModel.selectCategory(firstItem.title)
+                                    viewModel.selectCategory(firstItem.title, firstItem.target)
                                     viewModel.setSearchQuery("")
                                     viewModel.selectTab("home")
                                 }
@@ -959,7 +1012,7 @@ fun ExploreTabScreen(
                                     .clip(RoundedCornerShape(16.dp))
                                     .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                                     .clickable {
-                                        viewModel.selectCategory(secondItem.title)
+                                        viewModel.selectCategory(secondItem.title, secondItem.target)
                                         viewModel.setSearchQuery("")
                                         viewModel.selectTab("home")
                                     }
@@ -1503,7 +1556,7 @@ fun LibraryTabScreen(
                                 var sessionid: String? = null
                                 var csrftoken: String? = null
                                 
-                                val targets = listOf("https://rutube.ru", "https://pass.media", "https://rutube.ru/multipass")
+                                val targets = listOf("https://rutube.ru", "https://.rutube.ru", "https://pass.media", "https://rutube.ru/multipass", "https://pass.rt.ru", "https://auth.yandex.ru")
                                 for (url in targets) {
                                     val cookiesString = cookieManager.getCookie(url) ?: continue
                                     val cookies = cookiesString.split(";")
@@ -1512,7 +1565,7 @@ fun LibraryTabScreen(
                                         if (parts.size >= 2) {
                                             val name = parts[0].trim()
                                             val value = parts.subList(1, parts.size).joinToString("=").trim()
-                                            if (name.equals("sessionid", ignoreCase = true)) {
+                                            if (name.equals("sessionid", ignoreCase = true) || name.equals("sessionid_secure", ignoreCase = true)) {
                                                 sessionid = value
                                             } else if (name.equals("csrftoken", ignoreCase = true)) {
                                                 csrftoken = value
@@ -1618,7 +1671,7 @@ fun LibraryTabScreen(
                                                                     if (parts.size >= 2) {
                                                                         val name = parts[0].trim()
                                                                         val value = parts.subList(1, parts.size).joinToString("=").trim()
-                                                                        if (name.equals("sessionid", ignoreCase = true)) {
+                                                                        if (name.equals("sessionid", ignoreCase = true) || name.equals("sessionid_secure", ignoreCase = true)) {
                                                                             sessionid = value
                                                                         } else if (name.equals("csrftoken", ignoreCase = true)) {
                                                                             csrftoken = value
@@ -2648,12 +2701,15 @@ fun RutubeVideoPlayer(
         while (isPlayingState && videoViewRef != null) {
             videoViewRef?.let { view ->
                 if (view.isPlaying) {
-                    currentPos = view.currentPosition.toLong()
-                    val dur = view.duration.toLong()
-                    if (dur > 0L) {
-                        totalDuration = dur
+                    val pos = view.currentPosition.toLong()
+                    if (pos > 0L) {
+                        currentPos = pos
+                        val dur = view.duration.toLong()
+                        if (dur > 0L) {
+                            totalDuration = dur
+                        }
+                        viewModel.saveVideoPosition(videoId, currentPos)
                     }
-                    viewModel.saveVideoPosition(videoId, currentPos)
                 }
             }
             kotlinx.coroutines.delay(250)
@@ -2899,6 +2955,9 @@ fun RutubeVideoPlayer(
                                 IconButton(
                                     onClick = {
                                         lastInteractionTime = System.currentTimeMillis()
+                                        if (currentPos > 0) {
+                                            viewModel.saveVideoPosition(videoId, currentPos)
+                                        }
                                         onToggleFullscreen()
                                     }
                                 ) {
@@ -3105,6 +3164,9 @@ fun RutubeVideoPlayer(
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
+                                    if (currentPos > 0) {
+                                        viewModel.saveVideoPosition(videoId, currentPos)
+                                    }
                                     onToggleFullscreen()
                                 },
                                 modifier = Modifier.size(24.dp)

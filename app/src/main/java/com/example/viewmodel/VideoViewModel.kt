@@ -105,6 +105,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCategoriesLoading = MutableStateFlow(false)
     val isCategoriesLoading = _isCategoriesLoading.asStateFlow()
 
+    private val _feedTabs = MutableStateFlow<List<com.example.data.rutube.SmartRutubeParser.TabInfo>>(emptyList())
+    val feedTabs = _feedTabs.asStateFlow()
+
+    private val _selectedFeedTab = MutableStateFlow<com.example.data.rutube.SmartRutubeParser.TabInfo?>(null)
+    val selectedFeedTab = _selectedFeedTab.asStateFlow()
+
     // yt-dlp downloading state parameters
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
@@ -160,8 +166,63 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val categorySlugs = mapOf(
+        "Фильмы" to "movies",
+        "Сериалы" to "serials",
+        "Телепередачи" to "tv",
+        "Музыка" to "music",
+        "Мультфильмы" to "cartoons",
+        "Спорт" to "sport",
+        "Юмор" to "umor",
+        "Видеоигры" to "games",
+        "Технологии" to "technologies"
+    )
+
+    fun selectCategory(category: String, targetUrl: String? = null) {
+        _selectedCategory.value = category
+        _searchQuery.value = ""
+        fetchRealVideos(query = null, category = category, targetUrl = targetUrl)
+    }
+
+    fun selectFeedTab(tab: com.example.data.rutube.SmartRutubeParser.TabInfo) {
+        _selectedFeedTab.value = tab
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val combined = mutableListOf<Video>()
+                for (resource in tab.resources.take(3)) {
+                    val rawUrl = resource.url ?: continue
+                    val normalizedUrl = if (rawUrl.startsWith("http")) rawUrl else "https://rutube.ru${if (rawUrl.startsWith("/")) "" else "/"}$rawUrl"
+                    val finalUrl = if (normalizedUrl.contains("?")) "$normalizedUrl&format=json" else "$normalizedUrl?format=json"
+                    
+                    try {
+                        val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(finalUrl)
+                        val bodyStr = response.string()
+                        val parsedVideos = repository.parseVideoListJson(bodyStr, _selectedCategory.value)
+                        combined.addAll(parsedVideos)
+                        currentActiveApiEndpoint = normalizedUrl
+                    } catch (resEx: Exception) {
+                        android.util.Log.e("VideoViewModel", "Sub-resource Tab fetch failure: $rawUrl", resEx)
+                    }
+                }
+                if (combined.isNotEmpty()) {
+                    _dynamicVideos.value = combined.distinctBy { it.id }
+                    currentPage = 1
+                    isEndReached = false
+                } else {
+                    _dynamicVideos.value = repository.fetchRealVideos(null, _selectedCategory.value, page = 1)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Select feed tab exception", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     private var fetchJob: Job? = null
-    fun fetchRealVideos(query: String? = null, category: String? = null) {
+    fun fetchRealVideos(query: String? = null, category: String? = null, targetUrl: String? = null) {
         fetchJob?.cancel()
         currentQuery = query
         val targetCategory = category ?: _selectedCategory.value
@@ -169,12 +230,82 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         currentPage = 1
         isEndReached = false
         currentActiveApiEndpoint = null
+        
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                _dynamicVideos.value = repository.fetchRealVideos(query, targetCategory, page = 1)
+                val q = query?.trim() ?: ""
+                if (q.isNotEmpty()) {
+                    _feedTabs.value = emptyList()
+                    _selectedFeedTab.value = null
+                    _dynamicVideos.value = repository.fetchRealVideos(q, targetCategory, page = 1)
+                } else {
+                    var urlToFetch = targetUrl
+                    if (urlToFetch.isNullOrBlank()) {
+                        val matched = _realCategories.value.firstOrNull { it.title.equals(targetCategory, ignoreCase = true) }
+                        urlToFetch = matched?.target
+                    }
+                    if (urlToFetch.isNullOrBlank()) {
+                        val slug = categorySlugs[targetCategory]
+                        urlToFetch = if (slug != null) "/api/feeds/$slug/" else null
+                    }
+                    
+                    if (!urlToFetch.isNullOrBlank()) {
+                        val normalizedUrl = if (urlToFetch.startsWith("http")) urlToFetch else "https://rutube.ru${if (urlToFetch.startsWith("/")) "" else "/"}$urlToFetch"
+                        val finalUrl = if (normalizedUrl.contains("?")) "$normalizedUrl&format=json" else "$normalizedUrl?format=json"
+                        
+                        val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(finalUrl)
+                        val bodyStr = response.string()
+                        val jsonObj = org.json.JSONObject(bodyStr)
+                        val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, finalUrl)
+                        
+                        if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.FEED && parsed.tabs.isNotEmpty()) {
+                            _feedTabs.value = parsed.tabs
+                            val firstTab = parsed.tabs.first()
+                            _selectedFeedTab.value = firstTab
+                            
+                            val combined = mutableListOf<Video>()
+                            for (resource in firstTab.resources.take(3)) {
+                                val rawUrl = resource.url ?: continue
+                                val subUrl = if (rawUrl.startsWith("http")) rawUrl else "https://rutube.ru${if (rawUrl.startsWith("/")) "" else "/"}$rawUrl"
+                                val subFinalUrl = if (subUrl.contains("?")) "$subUrl&format=json" else "$subUrl?format=json"
+                                try {
+                                    val subResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(subFinalUrl)
+                                    val subVideos = repository.parseVideoListJson(subResponse.string(), targetCategory)
+                                    combined.addAll(subVideos)
+                                    currentActiveApiEndpoint = subUrl
+                                } catch (resEx: Exception) {
+                                    android.util.Log.e("VideoViewModel", "First tab resource load failed", resEx)
+                                }
+                            }
+                            if (combined.isNotEmpty()) {
+                                _dynamicVideos.value = combined.distinctBy { it.id }
+                            } else {
+                                _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                            }
+                        } else {
+                            _feedTabs.value = emptyList()
+                            _selectedFeedTab.value = null
+                            
+                            val parsedVideos = repository.parseVideoListJson(bodyStr, targetCategory)
+                            if (parsedVideos.isNotEmpty()) {
+                                _dynamicVideos.value = parsedVideos
+                                currentActiveApiEndpoint = normalizedUrl
+                            } else {
+                                _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                            }
+                        }
+                    } else {
+                        _feedTabs.value = emptyList()
+                        _selectedFeedTab.value = null
+                        _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                    }
+                }
             } catch (e: Exception) {
-                // Ignore or log error gracefully
+                android.util.Log.e("VideoViewModel", "Error in fetchRealVideos with target", e)
+                _feedTabs.value = emptyList()
+                _selectedFeedTab.value = null
+                _dynamicVideos.value = repository.fetchRealVideos(query, targetCategory, page = 1)
             } finally {
                 _isLoading.value = false
             }

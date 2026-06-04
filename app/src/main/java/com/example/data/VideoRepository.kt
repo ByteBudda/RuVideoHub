@@ -358,26 +358,49 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
             val bodyStr = response.string()
             val jsonObj = JSONObject(bodyStr)
-            val resultsArray = jsonObj.optJSONArray("results")
-            if (resultsArray != null) {
-                for (i in 0 until resultsArray.length()) {
-                    val item = resultsArray.optJSONObject(i) ?: continue
-                    val id = item.optInt("id")
-                    val title = item.optString("title")
-                    val picture = item.optString("picture")
-                    val target = item.optString("target")
-                    if (title.isNotBlank()) {
+            val parsedResult = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, "https://rutube.ru/api/v1/feeds/promogroup/382/")
+            
+            for (card in parsedResult.items) {
+                if (card is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard) {
+                    val target = card.actionUrl ?: ""
+                    if (card.title.isNotBlank()) {
                         categoriesList.add(
                             RutubeCategory(
-                                id = id,
-                                title = title,
-                                picture = picture,
+                                id = card.id.hashCode(),
+                                title = card.title,
+                                picture = card.thumbnail ?: "",
                                 target = target
                             )
                         )
                         val slug = target.removePrefix("/feeds/").removeSuffix("/")
                         if (slug.isNotBlank()) {
-                            dynamicCategoryTargets[title] = slug
+                            dynamicCategoryTargets[card.title] = slug
+                        }
+                    }
+                }
+            }
+            if (categoriesList.isEmpty()) {
+                val resultsArray = jsonObj.optJSONArray("results")
+                if (resultsArray != null) {
+                    for (i in 0 until resultsArray.length()) {
+                        val item = resultsArray.optJSONObject(i) ?: continue
+                        val id = item.optInt("id")
+                        val title = item.optString("title")
+                        val picture = item.optString("picture")
+                        val target = item.optString("target")
+                        if (title.isNotBlank()) {
+                            categoriesList.add(
+                                RutubeCategory(
+                                    id = id,
+                                    title = title,
+                                    picture = picture,
+                                    target = target
+                                )
+                            )
+                            val slug = target.removePrefix("/feeds/").removeSuffix("/")
+                            if (slug.isNotBlank()) {
+                                dynamicCategoryTargets[title] = slug
+                            }
                         }
                     }
                 }
