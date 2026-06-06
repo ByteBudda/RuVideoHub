@@ -1767,7 +1767,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
         _iptvChannels.value = channels
         _iptvGroups.value = groups.toList().sortedWith(Comparator { g1, g2 ->
-            if (g1 == "Все") -1 else if (g2 == "Все") 1 else g1.compareTo(g2, ignoreCase = true)
+            when {
+                g1 == g2 -> 0
+                g1 == "Все" -> -1
+                g2 == "Все" -> 1
+                else -> g1.compareTo(g2, ignoreCase = true)
+            }
         })
     }
 
