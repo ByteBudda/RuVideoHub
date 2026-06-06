@@ -124,7 +124,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val activeDownloads = _activeDownloads.asStateFlow()
 
     private val _streamUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
-    private var cachedAllTvChannels: List<Video> = emptyList()
 
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
@@ -215,39 +214,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                      !tabName.equals("Новинки", ignoreCase = true))
                 )
 
-                if (_selectedCategory.value == "ТВ Каналы" || tab.resources.any { it.detectedType == com.example.data.rutube.SmartRutubeParser.EntityType.LIVE_TV }) {
-                    var tvSourceList = cachedAllTvChannels
-                    if (tvSourceList.isEmpty()) {
-                        try {
-                            val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl("https://rutube.ru/api/feeds/live/?format=json")
-                            val bodyStr = response.string()
-                            val jsonObj = org.json.JSONObject(bodyStr)
-                            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, "https://rutube.ru/api/feeds/live/?format=json")
-                            val mappedTvList = parsed.items.map { card ->
-                                repository.mapNormalizedCardToVideo(card, "ТВ Каналы")
-                            }
-                            cachedAllTvChannels = mappedTvList
-                            tvSourceList = mappedTvList
-                        } catch (e: Exception) {
-                            android.util.Log.e("VideoViewModel", "Fallback TV channels fetch failed", e)
-                        }
-                    }
-                    val filteredTv = when {
-                        tabName.contains("платн", ignoreCase = true) -> {
-                            tvSourceList.filter { it.isPro }
-                        }
-                        tabName.contains("бесплатн", ignoreCase = true) || tabName.contains("общест", ignoreCase = true) || tabName.contains("эфирн", ignoreCase = true) -> {
-                            tvSourceList.filter { !it.isPro }
-                        }
-                        else -> {
-                            tvSourceList
-                        }
-                    }
-                    _dynamicVideos.value = filteredTv
-                    currentPage = 1
-                    isEndReached = true
-                    currentActiveApiEndpoint = null
-                } else if (isFolderTab) {
+                if (isFolderTab) {
                     val folderVideos = tab.resources.map { resource ->
                         Video(
                             id = "unknown_res_${tab.id}_${resource.name.hashCode()}__${resource.url ?: ""}",
@@ -342,40 +309,29 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         val jsonObj = org.json.JSONObject(bodyStr)
                         val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, finalUrl)
                         
-                        if ((parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.FEED || parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.LIVE_TV) && parsed.tabs.isNotEmpty()) {
+                        if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.FEED && parsed.tabs.isNotEmpty()) {
                             _feedTabs.value = parsed.tabs
                             val firstTab = parsed.tabs.first()
                             _selectedFeedTab.value = firstTab
                             
-                            if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.LIVE_TV) {
-                                val tvVideos = parsed.items.map { card ->
-                                    repository.mapNormalizedCardToVideo(card, targetCategory)
+                            val combined = mutableListOf<Video>()
+                            for (resource in firstTab.resources.take(3)) {
+                                val rawUrl = resource.url ?: continue
+                                val subUrl = if (rawUrl.startsWith("http")) rawUrl else "https://rutube.ru${if (rawUrl.startsWith("/")) "" else "/"}$rawUrl"
+                                val subFinalUrl = if (subUrl.contains("?")) "$subUrl&format=json" else "$subUrl?format=json"
+                                try {
+                                    val subResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(subFinalUrl)
+                                    val subVideos = repository.parseVideoListJson(subResponse.string(), targetCategory)
+                                    combined.addAll(subVideos)
+                                    currentActiveApiEndpoint = subUrl
+                                } catch (resEx: Exception) {
+                                    android.util.Log.e("VideoViewModel", "First tab resource load failed", resEx)
                                 }
-                                cachedAllTvChannels = tvVideos
-                                _dynamicVideos.value = tvVideos
-                                currentPage = 1
-                                isEndReached = true
-                                currentActiveApiEndpoint = null
+                            }
+                            if (combined.isNotEmpty()) {
+                                _dynamicVideos.value = combined.distinctBy { it.id }
                             } else {
-                                val combined = mutableListOf<Video>()
-                                for (resource in firstTab.resources.take(3)) {
-                                    val rawUrl = resource.url ?: continue
-                                    val subUrl = if (rawUrl.startsWith("http")) rawUrl else "https://rutube.ru${if (rawUrl.startsWith("/")) "" else "/"}$rawUrl"
-                                    val subFinalUrl = if (subUrl.contains("?")) "$subUrl&format=json" else "$subUrl?format=json"
-                                    try {
-                                        val subResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(subFinalUrl)
-                                        val subVideos = repository.parseVideoListJson(subResponse.string(), targetCategory)
-                                        combined.addAll(subVideos)
-                                        currentActiveApiEndpoint = subUrl
-                                    } catch (resEx: Exception) {
-                                        android.util.Log.e("VideoViewModel", "First tab resource load failed", resEx)
-                                    }
-                                }
-                                if (combined.isNotEmpty()) {
-                                    _dynamicVideos.value = combined.distinctBy { it.id }
-                                } else {
-                                    _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
-                                }
+                                _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
                             }
                         } else {
                             _feedTabs.value = emptyList()
@@ -600,13 +556,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectVideo(video: Video?) {
-        if (video != null && (video.category == "ТВ Каналы" || video.duration?.uppercase() == "ТВ")) {
-            _currentSelectedVideo.value = video
-            _isPlaying.value = true
-            _playProgress.value = 0f
-            startPlaybackTicker()
-            return
-        }
         if (video != null && video.id.startsWith("tv_")) {
             val fullTvId = video.id.substringAfter("tv_")
             val idParts = fullTvId.split("__")
@@ -1546,11 +1495,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         if (cachedUrl != null) {
             return cachedUrl
         }
-        val cleanVideoId = if (videoId.contains("_") && (videoId.startsWith("tv_") || videoId.startsWith("channel_") || videoId.contains("__"))) {
-            videoId.substringAfter("_").substringBefore("__")
-        } else {
-            videoId
-        }
         val resolvedUrl = withContext(Dispatchers.IO) {
             try {
                 val tizenUas = listOf(
@@ -1575,7 +1519,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     .build()
 
                 val req = Request.Builder()
-                    .url("https://rutube.ru/api/play/options/$cleanVideoId/?format=json")
+                    .url("https://rutube.ru/api/play/options/$videoId/?format=json")
                     .build()
 
                 okHttpClient.newCall(req).execute().use { resp ->
