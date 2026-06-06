@@ -141,6 +141,20 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.thumbnail
                 )
             }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.LiveTvCard -> {
+                Video(
+                    id = "unknown_${card.id}__${card.apiUrl ?: ""}",
+                    title = card.name,
+                    channel = "ТВ Эфир • ${if (card.isPaid) "Платный" else "Бесплатный"}",
+                    views = "Прямой эфир",
+                    timeAgo = if (card.isPaid) "Платный канал" else "Смотреть трансляцию",
+                    duration = "ТВ",
+                    isPro = card.isPaid,
+                    category = defaultCategoryName,
+                    description = card.description ?: "Прямая трансляция телеканала на Rutube.",
+                    thumbnailUrl = card.thumbnail
+                )
+            }
         }
     }
 

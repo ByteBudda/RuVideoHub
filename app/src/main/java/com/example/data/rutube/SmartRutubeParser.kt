@@ -5,36 +5,41 @@ import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.math.floor
 
 /**
- * SMART RUTUBE PARSER for Android.
- * Mirror of the sophisticated JavaScript/Tizen structural parser.
- * Perfectly parses Rutube's nested "Matryoshka" hierarchy (Feed -> Tabs -> Resources -> Containers -> Videos/TV/Channels),
- * including standard pagination and response taxonomy mapping.
+ * SMART RUTUBE PARSER for Kotlin/Android
+ * 
+ * Поддерживает:
+ * - Обычные фиды (категории, рекомендации)
+ * - Поиск (видео + каналы через один эндпоинт)
+ * - ТВ Онлайн (/api/feeds/live/) с фильтрацией платных каналов
+ * - Пагинацию
+ * - Русские паттерны для сериалов
  */
+
 object SmartRutubeParser {
 
     enum class EntityType {
-        FEED, CONTAINER, VIDEO_LIST, VIDEO_ITEM, CHANNEL, TV_SHOW, EXTERNAL, UNKNOWN, EMPTY, PROMO_LIST
+        FEED, CONTAINER, VIDEO_LIST, VIDEO_ITEM, CHANNEL, TV_SHOW, LIVE_TV, EXTERNAL, UNKNOWN, EMPTY, PROMO_LIST
     }
 
     object UrlPatterns {
-        val FEED = "^/api/feeds/([a-z0-9_-]+)/".toRegex(RegexOption.IGNORE_CASE)
-        val CARD_GROUP = "^/api/feeds/cardgroup/(\\d+)".toRegex(RegexOption.IGNORE_CASE)
-        val TAG_PLAYLIST = "^/api/tags/video/(\\d+)/".toRegex(RegexOption.IGNORE_CASE)
-        val PERSON_CHANNEL = "^/api/video/person/(\\d+)".toRegex(RegexOption.IGNORE_CASE)
-        val TV_SHOW_VIDEOS = "^/api/metainfo/tv/(\\d+)/video/".toRegex(RegexOption.IGNORE_CASE)
-        val VIDEO_META = "^/api/video/([a-f0-9]{32})/".toRegex(RegexOption.IGNORE_CASE)
-        val SEARCH = "^/api/search/video/?".toRegex(RegexOption.IGNORE_CASE)
+        val FEED = Regex("^/api/feeds/([a-z0-9_-]+)/", RegexOption.IGNORE_CASE)
+        val CARD_GROUP = Regex("^/api/feeds/cardgroup/(\\d+)", RegexOption.IGNORE_CASE)
+        val TAG_PLAYLIST = Regex("^/api/tags/video/(\\d+)/", RegexOption.IGNORE_CASE)
+        val PERSON_CHANNEL = Regex("^/api/video/person/(\\d+)", RegexOption.IGNORE_CASE)
+        val TV_SHOW_VIDEOS = Regex("^/api/metainfo/tv/(\\d+)/video/", RegexOption.IGNORE_CASE)
+        val VIDEO_META = Regex("^/api/video/([a-f0-9]{32})/", RegexOption.IGNORE_CASE)
+        val SEARCH = Regex("^/api/search/video/?", RegexOption.IGNORE_CASE)
+        val LIVE_TV = Regex("^/api/feeds/live/?", RegexOption.IGNORE_CASE)
     }
 
     object Utils {
-        /**
-         * Standardizes a URL path to full API format.
-         */
         fun normalizeUrl(url: String?, apiBase: String = "https://rutube.ru"): String? {
             if (url.isNullOrBlank()) return null
             val cleanUrl = url.trim()
+            
             if (cleanUrl.startsWith("http")) {
                 if (cleanUrl.contains("rutube.ru")) {
                     val path = cleanUrl.substringAfter("rutube.ru")
@@ -67,8 +72,8 @@ object SmartRutubeParser {
 
         fun formatCount(num: Long?): String {
             if (num == null || num <= 0L) return "0"
-            if (num >= 1000000) return String.format(Locale.US, "%.1fM", num / 1000000.0)
-            if (num >= 1000) return String.format(Locale.US, "%.1fK", num / 1000.0)
+            if (num >= 1_000_000) return String.format(Locale.US, "%.1fM", num / 1_000_000.0)
+            if (num >= 1_000) return String.format(Locale.US, "%.1fK", num / 1000.0)
             return num.toString()
         }
 
@@ -78,8 +83,28 @@ object SmartRutubeParser {
                 val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
                 parser.timeZone = TimeZone.getTimeZone("UTC")
                 val date = parser.parse(dateString) ?: return "Недавно"
-                val formatter = SimpleDateFormat("d MMM yyyy", Locale("ru"))
-                formatter.format(date)
+                val now = System.currentTimeMillis()
+                val diff = now - date.time
+                
+                when {
+                    diff < 24 * 60 * 60 * 1000 -> {
+                        val hours = floor(diff / (60.0 * 60 * 1000)).toInt()
+                        if (hours < 1) {
+                            val minutes = floor(diff / (60.0 * 1000)).toInt()
+                            "$minutes минут назад"
+                        } else {
+                            "$hours часов назад"
+                        }
+                    }
+                    diff < 7 * 24 * 60 * 60 * 1000 -> {
+                        val days = floor(diff / (24.0 * 60 * 60 * 1000)).toInt()
+                        "$days дней назад"
+                    }
+                    else -> {
+                        val formatter = SimpleDateFormat("d MMM yyyy", Locale("ru"))
+                        formatter.format(date)
+                    }
+                }
             } catch (e: Exception) {
                 "Недавно"
             }
@@ -102,6 +127,7 @@ object SmartRutubeParser {
             } else {
                 url
             }
+            if (UrlPatterns.LIVE_TV.containsMatchIn(cleanUrl)) return EntityResponse(EntityType.LIVE_TV)
             if (UrlPatterns.FEED.containsMatchIn(cleanUrl)) return EntityResponse(EntityType.FEED)
             if (UrlPatterns.CARD_GROUP.containsMatchIn(cleanUrl)) return EntityResponse(EntityType.CONTAINER)
             if (UrlPatterns.TAG_PLAYLIST.containsMatchIn(cleanUrl)) return EntityResponse(EntityType.VIDEO_LIST)
@@ -147,7 +173,8 @@ object SmartRutubeParser {
             val published: String,
             val rating: String?,
             val isPaid: Boolean,
-            val description: String
+            val description: String,
+            val series: SeriesInfo? = null
         ) : NormalizedCard()
 
         data class TvShowCard(
@@ -165,9 +192,13 @@ object SmartRutubeParser {
             val id: String,
             val name: String,
             val avatar: String?,
+            val cover: String?,
             val description: String?,
             val subscribers: String,
+            val subscribersCount: Long,
             val videosCount: Int,
+            val views: Long?,
+            val isVerified: Boolean,
             val actionUrl: String? = null
         ) : NormalizedCard()
 
@@ -186,37 +217,87 @@ object SmartRutubeParser {
             val rawType: String?,
             val actionUrl: String? = null
         ) : NormalizedCard()
+        
+        data class LiveTvCard(
+            val id: String,                  // ID канала (object_id)
+            val name: String,                // Название канала
+            val description: String?,        // Описание
+            val thumbnail: String?,          // Превью (иконка)
+            val url: String?,                // Ссылка на страницу канала
+            val apiUrl: String?,             // API-ссылка для получения видео/эфиров
+            val isPaid: Boolean,             // Платный ли канал (из вкладки "Платные каналы" или по метке)
+            val isLiveNow: Boolean = false,  // Идет ли прямой эфир (если доступно)
+            val subscribersCount: Int = 0,   // Количество подписчиков
+            val canSubscribe: Boolean = false // Можно ли подписаться
+        ) : NormalizedCard()
+        
+        data class SeriesInfo(
+            val season: Int,
+            val episode: Int
+        )
     }
 
     object DataNormalizer {
+        
+        /**
+         * Парсинг информации о серии из заголовка
+         */
+        fun parseSeriesInfo(title: String): NormalizedCard.SeriesInfo? {
+            val lower = title.lowercase()
+            
+            val patterns = listOf(
+                Regex("""s(\d+)e(\d+)""", RegexOption.IGNORE_CASE),
+                Regex("""(\d+)x(\d+)""", RegexOption.IGNORE_CASE),
+                Regex("""(\d+)\s+сезон\s+(\d+)\s+серия""", RegexOption.IGNORE_CASE),
+                Regex("""сезон\s+(\d+)\s+серия\s+(\d+)""", RegexOption.IGNORE_CASE),
+                Regex("""(\d+)\s*сезон\s*(\d+)\s*серия""", RegexOption.IGNORE_CASE)
+            )
+            
+            for (pattern in patterns) {
+                val match = pattern.find(lower)
+                if (match != null && match.groupValues.size >= 3) {
+                    val season = match.groupValues[1].toIntOrNull() ?: 1
+                    val episode = match.groupValues[2].toIntOrNull() ?: 1
+                    return NormalizedCard.SeriesInfo(season, episode)
+                }
+            }
+            
+            return null
+        }
+        
         fun normalizeItem(item: JSONObject): NormalizedCard {
             val hasContentType = item.has("content_type")
             val isNested = hasContentType && item.has("object")
             val data = if (isNested) item.optJSONObject("object") ?: item else item
+            
+            // Получаем model из content_type (важно для определения каналов в поиске)
             val model = if (hasContentType) {
                 item.optJSONObject("content_type")?.optString("model") ?: "video"
             } else {
                 data.optString("type", "").takeIf { it.isNotBlank() } ?: data.optString("model", "video")
             }
-
-            if (model == "userchannel" || model == "person" || model == "channel" || data.has("subscribers_count")) {
-                return normalizeChannel(data)
+            
+            // Каналы в поиске приходят с model = "person"
+            if (model == "person" || model == "userchannel" || data.has("subscribers_count")) {
+                return normalizeChannel(data, item)
             }
-
+            
             if (model == "tv" || data.has("seasons_count")) {
                 return normalizeTvShow(data)
             }
-
+            
             if (data.has("duration") || data.has("video_url") || data.has("code") || data.has("video_id")) {
                 return normalizeVideo(data)
             }
-
+            
             val rawActionUrl = data.optString("target").takeIf { it.isNotBlank() && it != "null" }
                 ?: data.optString("url").takeIf { it.isNotBlank() && it != "null" }
                 ?: data.optString("absolute_url").takeIf { it.isNotBlank() && it != "null" }
                 ?: data.optString("content").takeIf { it.isNotBlank() && it != "null" }
             val actionUrl = Utils.normalizeUrl(rawActionUrl)
-            val rawId = data.optString("id", "").takeIf { it.isNotBlank() } ?: data.optString("code", "").takeIf { it.isNotBlank() } ?: (100000..999999).random().toString()
+            val rawId = data.optString("id", "").takeIf { it.isNotBlank() } 
+                ?: data.optString("code", "").takeIf { it.isNotBlank() } 
+                ?: (100000..999999).random().toString()
 
             return NormalizedCard.UnknownCard(
                 id = rawId,
@@ -261,10 +342,13 @@ object SmartRutubeParser {
                 val rawDur = data.optString("duration", "")
                 if (rawDur.contains(":")) rawDur else "10:00"
             }
+            
+            val title = data.optString("title", data.optString("name", "Untitled"))
+            val seriesInfo = parseSeriesInfo(title)
 
             return NormalizedCard.VideoCard(
                 id = id,
-                title = data.optString("title", data.optString("name", "Untitled")),
+                title = title,
                 thumbnail = data.optString("thumbnail_url", data.optString("picture_url", data.optString("poster_url", ""))),
                 previewGif = data.optString("preview_url", null),
                 duration = durationLabel,
@@ -275,7 +359,8 @@ object SmartRutubeParser {
                 published = Utils.formatDate(data.optString("publication_ts", data.optString("created_ts", ""))),
                 rating = data.optJSONObject("pg_rating")?.optString("age") ?: data.optString("age_limit", null),
                 isPaid = data.optBoolean("is_paid", false),
-                description = data.optString("description", "")
+                description = data.optString("description", ""),
+                series = seriesInfo
             )
         }
 
@@ -314,62 +399,124 @@ object SmartRutubeParser {
             )
         }
 
-        fun normalizeChannel(data: JSONObject): NormalizedCard.ChannelCard {
-            var id = data.optString("id", "").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optString("person_id", "").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optString("author_id", "").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optJSONObject("author")?.optString("id", "")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optJSONObject("author")?.optString("person_id", "")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optJSONObject("owner")?.optString("id", "")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optJSONObject("owner")?.optString("person_id", "")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optJSONObject("user")?.optString("id", "")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: ""
+        /**
+         * Нормализация канала из поисковой выдачи
+         * Каналы приходят в ТОМ ЖЕ эндпоинте /api/search/video/ с content_type.model = "person"
+         */
+        fun normalizeChannel(data: JSONObject, originalItem: JSONObject? = null): NormalizedCard.ChannelCard {
+            // Берем данные из object если есть (в поиске), либо из корня
+            val obj = if (originalItem?.has("object") == true) {
+                originalItem.optJSONObject("object") ?: data
+            } else {
+                data
+            }
             
-            if (id.isBlank()) {
-                val urlToParse = data.optString("channel_url", data.optString("url", ""))
-                if (urlToParse.isNotBlank()) {
-                    val match = "/(?:person|channel)/([^/?#\\s]+)".toRegex().find(urlToParse)
-                    if (match != null) {
-                        val candidate = match.groupValues[1]
-                        if (candidate.isNotBlank() && candidate != "null") {
-                            id = candidate
-                        }
-                    }
-                }
+            // ID канала из разных полей
+            val channelId = obj.optString("id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: obj.optString("person_id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: obj.optString("channel_id", "").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("id", "")
+            
+            // Имя канала
+            val channelName = obj.optString("name", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("title", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("username", "").takeIf { it.isNotBlank() }
+                ?: data.optString("name", "Unknown Channel")
+            
+            // Количество подписчиков
+            var subscribersCount = obj.optLong("subscribers_count", 0L)
+            if (subscribersCount == 0L) {
+                subscribersCount = obj.optLong("subscribers", 0L)
             }
-            if (id.isBlank()) {
-                id = (1000000..9999999).random().toString()
+            if (subscribersCount == 0L) {
+                subscribersCount = data.optLong("subscribers_count", 0L)
             }
-
-            val name = data.optString("name", "Untitled")
-            val avatar = data.optString("user_channel_image")
-                .takeIf { it.isNotBlank() }
-                ?: data.optString("icon")
-                .takeIf { it.isNotBlank() }
-                ?: data.optString("picture")
-                .takeIf { it.isNotBlank() }
+            
+            // Аватар
+            val avatar = obj.optString("user_channel_image", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("avatar_url", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("avatar", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("icon", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("picture", "").takeIf { it.isNotBlank() }
                 ?: data.optString("avatar_url", "")
-
-            val subsCount = data.optLong("subscribers_count", 0L)
-            val subText = Utils.formatCount(subsCount)
-
-            val rawActionUrl = data.optString("content").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optString("view_url").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optString("absolute_url").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optString("channel_url").takeIf { it.isNotBlank() && it != "null" }
-                ?: data.optString("url").takeIf { it.isNotBlank() && it != "null" }
-                ?: "/video/person/$id/"
-
-            val actionUrl = Utils.normalizeUrl(rawActionUrl)
-
+            
+            // Обложка
+            val cover = obj.optString("cover_url", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("cover", "")
+            
+            // Описание
+            val description = obj.optString("description", "").takeIf { it.isNotBlank() }
+                ?: obj.optString("about", "")
+            
+            // Количество видео
+            var videosCount = obj.optInt("video_count", 0)
+            if (videosCount == 0) {
+                videosCount = obj.optInt("videos_count", 0)
+            }
+            
+            // Просмотры
+            val views = if (obj.has("views_count")) obj.optLong("views_count") else null
+            
+            // Верификация
+            val isVerified = obj.optBoolean("is_verified", false) || obj.optBoolean("verified", false)
+            
+            val subText = Utils.formatCount(subscribersCount)
+            
+            val actionUrl = Utils.normalizeUrl("/video/person/$channelId/")
+            
             return NormalizedCard.ChannelCard(
+                id = channelId,
+                name = channelName,
+                avatar = avatar,
+                cover = cover,
+                description = description,
+                subscribers = subText,
+                subscribersCount = subscribersCount,
+                videosCount = videosCount,
+                views = views,
+                isVerified = isVerified,
+                actionUrl = actionUrl
+            )
+        }
+
+        /**
+         * Нормализация ТВ-канала из эндпоинта /api/feeds/live/
+         */
+        fun normalizeLiveTv(resource: JSONObject, isPaidTab: Boolean = false): NormalizedCard.LiveTvCard {
+            val id = resource.optString("object_id", "")
+            val name = resource.optString("name", "Без названия")
+            val description = resource.optString("description", null)
+            
+            // Иконка канала может быть в "images"
+            var thumbnail: String? = null
+            val imagesArray = resource.optJSONArray("images")
+            if (imagesArray != null && imagesArray.length() > 0) {
+                thumbnail = imagesArray.optJSONObject(0)?.optString("image")
+            }
+            if (thumbnail.isNullOrBlank()) {
+                thumbnail = resource.optString("picture", null)
+            }
+
+            val siteUrl = resource.optString("site_url", null)
+            val apiUrl = resource.optString("url", null)
+            
+            // Платность: либо явный флаг, либо канал находится во вкладке "Платные каналы"
+            val isPaid = isPaidTab || resource.optBoolean("is_paid", false)
+            
+            val subscribersCount = resource.optInt("subscribers_count", 0)
+            val canSubscribe = resource.optBoolean("can_subscribe", false)
+
+            return NormalizedCard.LiveTvCard(
                 id = id,
                 name = name,
-                avatar = avatar,
-                description = data.optString("description", null),
-                subscribers = subText,
-                videosCount = data.optInt("video_count", 0),
-                actionUrl = actionUrl
+                description = description,
+                thumbnail = thumbnail,
+                url = siteUrl,
+                apiUrl = apiUrl,
+                isPaid = isPaid,
+                isLiveNow = false, // TODO: можно определить по наличию активного эфира
+                subscribersCount = subscribersCount,
+                canSubscribe = canSubscribe
             )
         }
 
@@ -436,7 +583,12 @@ object SmartRutubeParser {
 
     object ResponseAnalyzer {
         fun parse(jsonObj: JSONObject, contextUrl: String? = null): ParsedResponse {
-            // Check if feed with tabs
+            // Специальная обработка для ТВ Онлайн
+            if (contextUrl?.contains("/feeds/live/") == true && jsonObj.has("tabs")) {
+                return parseLiveTvFeed(jsonObj)
+            }
+            
+            // Обычный фид с табами
             if (jsonObj.has("tabs")) {
                 val tabsArray = jsonObj.optJSONArray("tabs")
                 val tabList = mutableListOf<TabInfo>()
@@ -468,7 +620,7 @@ object SmartRutubeParser {
                 )
             }
 
-            // Results pagination response
+            // Results pagination response (search, feeds, etc.)
             if (jsonObj.has("results")) {
                 val resultsArray = jsonObj.optJSONArray("results") ?: JSONArray()
                 val pagInfo = getPagination(jsonObj)
@@ -520,6 +672,55 @@ object SmartRutubeParser {
             return ParsedResponse(
                 type = EntityType.UNKNOWN,
                 error = "Unrecognized response structure"
+            )
+        }
+
+        /**
+         * Специальный парсер для ТВ Онлайн (/api/feeds/live/)
+         */
+        private fun parseLiveTvFeed(jsonObj: JSONObject): ParsedResponse {
+            val allChannels = mutableListOf<NormalizedCard>()
+            val tabsArray = jsonObj.optJSONArray("tabs")
+            val tabInfoList = mutableListOf<TabInfo>()
+            
+            if (tabsArray != null) {
+                for (i in 0 until tabsArray.length()) {
+                    val tabObj = tabsArray.optJSONObject(i) ?: continue
+                    val tabName = tabObj.optString("name", "Таб")
+                    val tabId = tabObj.optInt("id", 0)
+                    val isPaidTab = tabName.equals("Платные каналы", ignoreCase = true)
+                    
+                    val resourcesArray = tabObj.optJSONArray("resources")
+                    val tabResources = mutableListOf<ResourceInfo>()
+                    
+                    if (resourcesArray != null) {
+                        for (j in 0 until resourcesArray.length()) {
+                            val resource = resourcesArray.optJSONObject(j) ?: continue
+                            // Нормализуем каждый канал
+                            val channelCard = DataNormalizer.normalizeLiveTv(resource, isPaidTab)
+                            allChannels.add(channelCard)
+                            
+                            tabResources.add(
+                                ResourceInfo(
+                                    name = resource.optString("name", ""),
+                                    url = resource.optString("url", null),
+                                    detectedType = EntityType.LIVE_TV,
+                                    meta = null
+                                )
+                            )
+                        }
+                    }
+                    
+                    tabInfoList.add(TabInfo(tabId, tabName, tabResources))
+                }
+            }
+            
+            return ParsedResponse(
+                type = EntityType.LIVE_TV,
+                items = allChannels,
+                title = jsonObj.optString("name", "ТВ Онлайн"),
+                tabs = tabInfoList,
+                pagination = PaginationInfo(hasNext = false) // У фида нет пагинации
             )
         }
 
