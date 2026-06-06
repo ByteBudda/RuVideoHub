@@ -1818,32 +1818,57 @@ data class EpisodeInfo(
 fun parseEpisode(title: String): EpisodeInfo {
     val lower = title.lowercase()
     
-    // Find "сезон X" or "X сезон" or "X-й сезон" or "X-ый сезон" or "сезон-X"
     var season = 1
-    val seasonPrefixRegex = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)""")
-    val seasonSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ_]{1,3})?\s*сезон""")
-    
-    seasonPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
-        ?: seasonSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
-        
-    // Find "серия Y" or "Y серия" or "эпизод Y" or "выпуск Y" or "часть Y" with potential dashes and ordinal suffixes
     var episode = 1
     var rawNum = -1
-    val epPrefixRegex = Regex("""(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)""")
-    val epSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ_]{1,3})?\s*(?:серия|эпизод|выпуск|часть)""")
     
-    epPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
-        ?: epSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+    // Standard international patterns: S01E08 or 1x08 or S2 Ep 3
+    val sExeRegex = Regex("""s\s*(\d+)\s*e\s*(\d+)""", RegexOption.IGNORE_CASE)
+    val xRegex = Regex("""(\d+)\s*x\s*(\d+)""", RegexOption.IGNORE_CASE)
+    val sEpRegex = Regex("""s\s*(\d+)\s*ep\s*(\d+)""", RegexOption.IGNORE_CASE)
+    
+    val sexMatch = sExeRegex.find(lower)
+    val xMatch = xRegex.find(lower)
+    val sEpMatch = sEpRegex.find(lower)
+    
+    if (sexMatch != null) {
+        sexMatch.groupValues.getOrNull(1)?.toIntOrNull()?.let { season = it }
+        sexMatch.groupValues.getOrNull(2)?.toIntOrNull()?.let { episode = it; rawNum = it }
+    } else if (sEpMatch != null) {
+        sEpMatch.groupValues.getOrNull(1)?.toIntOrNull()?.let { season = it }
+        sEpMatch.groupValues.getOrNull(2)?.toIntOrNull()?.let { episode = it; rawNum = it }
+    } else if (xMatch != null) {
+        xMatch.groupValues.getOrNull(1)?.toIntOrNull()?.let { season = it }
+        xMatch.groupValues.getOrNull(2)?.toIntOrNull()?.let { episode = it; rawNum = it }
+    } else {
+        // Fallback to Russian word matching
+        val seasonPrefixRegex = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)""")
+        // Use a strict list of allowed Russian ordinal endings to avoid greedy match of 'сезон' starting letters
+        val seasonSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|е)?\s*сезон""")
         
-    if (rawNum == -1) {
-        val digitRegex = Regex("""\d+""")
-        val matches = digitRegex.findAll(lower).toList()
-        if (matches.isNotEmpty()) {
-            matches.last().groupValues.get(0).toIntOrNull()?.let { episode = it; rawNum = it }
+        seasonPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
+            ?: seasonSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
+            
+        val epPrefixRegex = Regex("""(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)""")
+        // Use a strict list of allowed Russian ordinal endings to avoid greedy match of 'серия', etc.
+        val epSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|я|е)?\s*(?:серия|эпизод|выпуск|часть)""")
+        
+        epPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+            ?: epSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
+            
+        if (rawNum == -1) {
+            val digitRegex = Regex("""\d+""")
+            val matches = digitRegex.findAll(lower).toList()
+            if (matches.isNotEmpty()) {
+                matches.last().groupValues.get(0).toIntOrNull()?.let { episode = it; rawNum = it }
+            }
         }
     }
     
     var baseTitle = title
+        .replace(Regex("""(?i)\bs\d+e\d+\b"""), "")
+        .replace(Regex("""(?i)\bs\d+ep\d+\b"""), "")
+        .replace(Regex("""(?i)\b\d+x\d+\b"""), "")
         .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*сезон\w*\b"""), "")
         .replace(Regex("""(?i)\bсезон\w*\s*(?:-|–|—)?\s*\d+\b"""), "")
         .replace(Regex("""(?i)\b\d+\s*(?:-|–|—)?\s*(?:[а-яА-ЯёЁ]{1,3})?\s*сери\w*\b"""), "")
