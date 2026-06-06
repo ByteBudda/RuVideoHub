@@ -124,6 +124,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val activeDownloads = _activeDownloads.asStateFlow()
 
     private val _streamUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private var cachedAllTvChannels: List<Video> = emptyList()
 
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
@@ -215,24 +216,34 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
                 if (_selectedCategory.value == "ТВ Каналы" || tab.resources.any { it.detectedType == com.example.data.rutube.SmartRutubeParser.EntityType.LIVE_TV }) {
-                    val isPaidTab = tabName.contains("платн", ignoreCase = true)
-                    val tvVideos = tab.resources.map { resource ->
-                        val meta = resource.meta ?: org.json.JSONObject()
-                        val channelCard = com.example.data.rutube.SmartRutubeParser.DataNormalizer.normalizeLiveTv(meta, isPaidTab)
-                        Video(
-                            id = "tv_${channelCard.id}__${channelCard.apiUrl ?: ""}",
-                            title = channelCard.name,
-                            channel = "ТВ Эфир • ${if (channelCard.isPaid) "Платный" else "Бесплатный"}",
-                            views = "Прямой эфир",
-                            timeAgo = if (channelCard.isPaid) "Платный канал" else "Смотреть трансляцию",
-                            duration = "ТВ",
-                            isPro = channelCard.isPaid,
-                            category = _selectedCategory.value ?: "ТВ Каналы",
-                            description = channelCard.description ?: "Прямая трансляция телеканала на Rutube.",
-                            thumbnailUrl = channelCard.thumbnail
-                        )
+                    var tvSourceList = cachedAllTvChannels
+                    if (tvSourceList.isEmpty()) {
+                        try {
+                            val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl("https://rutube.ru/api/feeds/live/?format=json")
+                            val bodyStr = response.string()
+                            val jsonObj = org.json.JSONObject(bodyStr)
+                            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, "https://rutube.ru/api/feeds/live/?format=json")
+                            val mappedTvList = parsed.items.map { card ->
+                                repository.mapNormalizedCardToVideo(card, "ТВ Каналы")
+                            }
+                            cachedAllTvChannels = mappedTvList
+                            tvSourceList = mappedTvList
+                        } catch (e: Exception) {
+                            android.util.Log.e("VideoViewModel", "Fallback TV channels fetch failed", e)
+                        }
                     }
-                    _dynamicVideos.value = tvVideos
+                    val filteredTv = when {
+                        tabName.contains("платн", ignoreCase = true) -> {
+                            tvSourceList.filter { it.isPro }
+                        }
+                        tabName.contains("бесплатн", ignoreCase = true) || tabName.contains("общест", ignoreCase = true) || tabName.contains("эфирн", ignoreCase = true) -> {
+                            tvSourceList.filter { !it.isPro }
+                        }
+                        else -> {
+                            tvSourceList
+                        }
+                    }
+                    _dynamicVideos.value = filteredTv
                     currentPage = 1
                     isEndReached = true
                     currentActiveApiEndpoint = null
@@ -337,23 +348,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             _selectedFeedTab.value = firstTab
                             
                             if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.LIVE_TV) {
-                                val isPaidTab = firstTab.name.contains("платн", ignoreCase = true)
-                                val tvVideos = firstTab.resources.map { resource ->
-                                    val meta = resource.meta ?: org.json.JSONObject()
-                                    val channelCard = com.example.data.rutube.SmartRutubeParser.DataNormalizer.normalizeLiveTv(meta, isPaidTab)
-                                    Video(
-                                        id = "tv_${channelCard.id}__${channelCard.apiUrl ?: ""}",
-                                        title = channelCard.name,
-                                        channel = "ТВ Эфир • ${if (channelCard.isPaid) "Платный" else "Бесплатный"}",
-                                        views = "Прямой эфир",
-                                        timeAgo = if (channelCard.isPaid) "Платный канал" else "Смотреть трансляцию",
-                                        duration = "ТВ",
-                                        isPro = channelCard.isPaid,
-                                        category = targetCategory,
-                                        description = channelCard.description ?: "Прямая трансляция телеканала на Rutube.",
-                                        thumbnailUrl = channelCard.thumbnail
-                                    )
+                                val tvVideos = parsed.items.map { card ->
+                                    repository.mapNormalizedCardToVideo(card, targetCategory)
                                 }
+                                cachedAllTvChannels = tvVideos
                                 _dynamicVideos.value = tvVideos
                                 currentPage = 1
                                 isEndReached = true

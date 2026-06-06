@@ -65,7 +65,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         return mapped
     }
 
-    private fun mapNormalizedCardToVideo(card: com.example.data.rutube.SmartRutubeParser.NormalizedCard, defaultCategoryName: String): Video {
+    fun mapNormalizedCardToVideo(card: com.example.data.rutube.SmartRutubeParser.NormalizedCard, defaultCategoryName: String): Video {
         return when (card) {
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
                 Video(
