@@ -34,19 +34,22 @@ object SmartRutubeParser {
          */
         fun normalizeUrl(url: String?, apiBase: String = "https://rutube.ru"): String? {
             if (url.isNullOrBlank()) return null
-            if (url.startsWith("http")) {
-                if (url.contains("rutube.ru")) {
-                    val path = url.replace("https://rutube.ru", "")
+            val cleanUrl = url.trim()
+            if (cleanUrl.startsWith("http")) {
+                if (cleanUrl.contains("rutube.ru")) {
+                    val path = cleanUrl.substringAfter("rutube.ru")
                     if (path.startsWith("/api/")) {
                         return "$apiBase$path"
                     }
-                    return "$apiBase/api$path"
+                    val slash = if (path.startsWith("/")) "" else "/"
+                    return "$apiBase/api$slash$path"
                 }
-                return url
+                return cleanUrl
             }
-            if (url.startsWith("/api/")) return "$apiBase$url"
-            val slash = if (url.startsWith("/")) "" else "/"
-            return "$apiBase$slash$url"
+            if (cleanUrl.startsWith("/api/")) return "$apiBase$cleanUrl"
+            if (cleanUrl.startsWith("api/")) return "$apiBase/$cleanUrl"
+            val slash = if (cleanUrl.startsWith("/")) "" else "/"
+            return "$apiBase/api$slash$cleanUrl"
         }
 
         fun formatDuration(seconds: Double?): String {
@@ -163,7 +166,8 @@ object SmartRutubeParser {
             val avatar: String?,
             val description: String?,
             val subscribers: String,
-            val videosCount: Int
+            val videosCount: Int,
+            val actionUrl: String? = null
         ) : NormalizedCard()
 
         data class PromoCard(
@@ -336,13 +340,23 @@ object SmartRutubeParser {
             val subsCount = data.optLong("subscribers_count", 0L)
             val subText = Utils.formatCount(subsCount)
 
+            val rawActionUrl = data.optString("content").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("view_url").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("absolute_url").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("channel_url").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("url").takeIf { it.isNotBlank() && it != "null" }
+                ?: "/video/person/$id/"
+
+            val actionUrl = Utils.normalizeUrl(rawActionUrl)
+
             return NormalizedCard.ChannelCard(
                 id = id,
                 name = name,
                 avatar = avatar,
                 description = data.optString("description", null),
                 subscribers = subText,
-                videosCount = data.optInt("video_count", 0)
+                videosCount = data.optInt("video_count", 0),
+                actionUrl = actionUrl
             )
         }
 

@@ -593,37 +593,51 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (video != null && video.id.startsWith("channel_")) {
-            val channelId = video.id.substringAfter("channel_")
+            val fullChannelId = video.id.substringAfter("channel_")
+            val idParts = fullChannelId.split("__")
+            val channelId = idParts.getOrNull(0) ?: ""
+            val rawActionUrl = idParts.getOrNull(1) ?: ""
+
             viewModelScope.launch {
                 _isLoading.value = true
                 try {
                     var loadedVideos: List<Video> = emptyList()
-                    
-                    // Attempt 1: person API
-                    loadedVideos = fetchVideosResolvingTabs("https://rutube.ru/api/video/person/$channelId/?format=json", video.category)
-                    
-                    // Attempt 2: feeds person API
-                    if (loadedVideos.isEmpty()) {
-                        loadedVideos = fetchVideosResolvingTabs("https://rutube.ru/api/feeds/person/$channelId/?format=json", video.category)
+                    val fallbackUrls = mutableListOf<String>()
+
+                    if (rawActionUrl.isNotBlank() && rawActionUrl != "null") {
+                        val baseActionUrl = if (rawActionUrl.contains("?")) {
+                            rawActionUrl.substringBefore("?")
+                        } else {
+                            rawActionUrl
+                        }
+                        fallbackUrls.add("$baseActionUrl/?format=json")
+                        
+                        if (!baseActionUrl.endsWith("/video/")) {
+                            fallbackUrls.add("${baseActionUrl.trimEnd('/')}/video/?format=json")
+                        }
                     }
-                    
-                    // Attempt 3: feeds person video API
-                    if (loadedVideos.isEmpty()) {
-                        loadedVideos = fetchVideosResolvingTabs("https://rutube.ru/api/feeds/person/$channelId/video/?format=json", video.category)
+
+                    if (channelId.isNotBlank()) {
+                        fallbackUrls.add("https://rutube.ru/api/video/person/$channelId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/video/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/metainfo/person/$channelId/video/?format=json")
                     }
-                    
-                    // Attempt 4: metainfo person video API
-                    if (loadedVideos.isEmpty()) {
-                        loadedVideos = fetchVideosResolvingTabs("https://rutube.ru/api/metainfo/person/$channelId/video/?format=json", video.category)
+
+                    for (url in fallbackUrls.distinct()) {
+                        loadedVideos = fetchVideosResolvingTabs(url, video.category)
+                        if (loadedVideos.isNotEmpty()) {
+                            currentActiveApiEndpoint = url.substringBefore("?")
+                            break
+                        }
                     }
 
                     if (loadedVideos.isNotEmpty()) {
+                        _selectedSubfolderName.value = video.title
                         _dynamicVideos.value = loadedVideos
                         _searchQuery.value = ""
                         selectTab("home")
                         
-                        // Setup nested paging state for dynamic pagination of channel profile clips
-                        currentActiveApiEndpoint = "https://rutube.ru/api/video/person/$channelId/"
                         currentPage = 1
                         isEndReached = false
                     } else {

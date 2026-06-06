@@ -99,7 +99,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
                 Video(
-                    id = "channel_${card.id}",
+                    id = "channel_${card.id}__${card.actionUrl ?: ""}",
                     title = card.name,
                     channel = "Авторский канал • ${card.subscribers} подписчиков",
                     views = "${card.subscribers} подписчиков",
