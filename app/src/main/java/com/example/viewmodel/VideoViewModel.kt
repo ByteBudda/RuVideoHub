@@ -149,6 +149,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
         fetchRealVideos()
         fetchRealCategories()
+        fetchIptvPlaylist()
     }
 
     private var currentPage = 1
@@ -1618,6 +1619,171 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- IPTV & Federal TV Section ---
+    private val _iptvChannels = MutableStateFlow<List<IptvChannel>>(emptyList())
+    val iptvChannels = _iptvChannels.asStateFlow()
+
+    private val _isIptvLoading = MutableStateFlow(false)
+    val isIptvLoading = _isIptvLoading.asStateFlow()
+
+    private val _iptvLoadError = MutableStateFlow<String?>(null)
+    val iptvLoadError = _iptvLoadError.asStateFlow()
+
+    private val _selectedIptvChannel = MutableStateFlow<IptvChannel?>(null)
+    val selectedIptvChannel = _selectedIptvChannel.asStateFlow()
+
+    private val _selectedFederalChannel = MutableStateFlow<FederalChannel?>(null)
+    val selectedFederalChannel = _selectedFederalChannel.asStateFlow()
+
+    private val _tvMode = MutableStateFlow("iptv") // "iptv" or "federal"
+    val tvMode = _tvMode.asStateFlow()
+
+    private val _iptvGroups = MutableStateFlow<List<String>>(listOf("Все"))
+    val iptvGroups = _iptvGroups.asStateFlow()
+
+    private val _selectedIptvGroup = MutableStateFlow("Все")
+    val selectedIptvGroup = _selectedIptvGroup.asStateFlow()
+
+    private val _tvSearchQuery = MutableStateFlow("")
+    val tvSearchQuery = _tvSearchQuery.asStateFlow()
+
+    val federalChannelsList = listOf(
+        FederalChannel("Первый канал", "https://rutube.ru/play/embed/user/23460655/?autoplay=1", "https://rutube.ru/video/person/23460655/"),
+        FederalChannel("Россия 1", "https://rutube.ru/play/embed/user/24620967/?autoplay=1", "https://rutube.ru/video/person/24620967/"),
+        FederalChannel("НТВ", "https://rutube.ru/play/embed/user/23178409/?autoplay=1", "https://rutube.ru/video/person/23178409/"),
+        FederalChannel("МАТЧ!", "https://rutube.ru/play/embed/user/657766/?autoplay=1", "https://rutube.ru/video/person/657766/"),
+        FederalChannel("ТНТ", "https://rutube.ru/play/embed/user/23463954/?autoplay=1", "https://rutube.ru/video/person/23463954/"),
+        FederalChannel("Пятница", "https://rutube.ru/play/embed/user/599848/?autoplay=1", "https://rutube.ru/video/person/599848/"),
+        FederalChannel("РЕН ТВ", "https://rutube.ru/play/embed/user/23872149/?autoplay=1", "https://rutube.ru/video/person/23872149/"),
+        FederalChannel("ТВ Центр", "https://rutube.ru/play/embed/user/23367587/?autoplay=1", "https://rutube.ru/video/person/23367587/"),
+        FederalChannel("2x2", "https://rutube.ru/play/embed/user/581730/?autoplay=1", "https://rutube.ru/video/person/581730/"),
+        FederalChannel("ТВ-3", "https://rutube.ru/play/embed/user/555940/?autoplay=1", "https://rutube.ru/video/person/555940/"),
+        FederalChannel("СТС", "https://rutube.ru/play/embed/user/23460138/?autoplay=1", "https://rutube.ru/video/person/23460138/"),
+        FederalChannel("МУЗ-ТВ", "https://rutube.ru/play/embed/user/1627210/?autoplay=1", "https://rutube.ru/video/person/1627210/"),
+        FederalChannel("Канал Ю", "https://rutube.ru/play/embed/user/50635567/?autoplay=1", "https://rutube.ru/video/person/50635567/"),
+        FederalChannel("ТНТ4", "https://rutube.ru/play/embed/user/1131656/?autoplay=1", "https://rutube.ru/video/person/1131656/"),
+        FederalChannel("Звезда", "https://rutube.ru/play/embed/user/12050/?autoplay=1", "https://rutube.ru/video/person/12050/"),
+        FederalChannel("МИР", "https://rutube.ru/play/embed/user/6920111/?autoplay=1", "https://rutube.ru/video/person/6920111/"),
+        FederalChannel("СПАС", "https://rutube.ru/play/embed/user/23868813/?autoplay=1", "https://rutube.ru/video/person/23868813/"),
+        FederalChannel("ОТР", "https://rutube.ru/play/embed/user/23460694/?autoplay=1", "https://rutube.ru/video/person/23460694/"),
+        FederalChannel("Культура", "https://rutube.ru/play/embed/user/24620649/?autoplay=1", "https://rutube.ru/video/person/24620649/"),
+        FederalChannel("Россия 24", "https://rutube.ru/play/embed/user/23931703/?autoplay=1", "https://rutube.ru/video/person/23931703/")
+    )
+
+    fun setTvMode(mode: String) {
+        _tvMode.value = mode
+    }
+
+    fun selectIptvChannel(channel: IptvChannel?) {
+        _selectedIptvChannel.value = channel
+        if (channel != null) {
+            _selectedFederalChannel.value = null
+        }
+    }
+
+    fun selectFederalChannel(channel: FederalChannel?) {
+        _selectedFederalChannel.value = channel
+        if (channel != null) {
+            _selectedIptvChannel.value = null
+        }
+    }
+
+    fun selectIptvGroup(group: String) {
+        _selectedIptvGroup.value = group
+    }
+
+    fun setTvSearchQuery(query: String) {
+        _tvSearchQuery.value = query
+    }
+
+    fun fetchIptvPlaylist() {
+        viewModelScope.launch {
+            _isIptvLoading.value = true
+            _iptvLoadError.value = null
+            try {
+                withContext(Dispatchers.IO) {
+                    val client = OkHttpClient.Builder()
+                        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val request = Request.Builder()
+                        .url("https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTVstable.m3u8")
+                        .build()
+                    val response = client.newCall(request).execute()
+                    if (!response.isSuccessful) {
+                        throw Exception("Internal Server Error: ${response.code}")
+                    }
+                    val bodyString = response.body?.string() ?: ""
+                    parseM3u(bodyString)
+                }
+            } catch (e: Exception) {
+                _iptvLoadError.value = e.localizedMessage ?: "Не удалось загрузить плейлист ТВ"
+                android.util.Log.e("VideoViewModel", "IPTV load error", e)
+            } finally {
+                _isIptvLoading.value = false
+            }
+        }
+    }
+
+    private fun parseM3u(m3uContent: String) {
+        val channels = mutableListOf<IptvChannel>()
+        val groups = mutableSetOf<String>()
+        groups.add("Все")
+
+        var currentMetadataLine: String? = null
+        val lines = m3uContent.lineSequence()
+
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) continue
+
+            if (trimmed.startsWith("#EXTINF:")) {
+                currentMetadataLine = trimmed
+            } else if (!trimmed.startsWith("#")) {
+                if (currentMetadataLine != null) {
+                    val metadata = currentMetadataLine
+                    val name = parseAttribute(metadata, ",") ?: parseAttribute(metadata, "tvg-name=\"") ?: "Без названия"
+                    val logoUrl = parseAttribute(metadata, "tvg-logo=\"")
+                    val group = parseAttribute(metadata, "group-title=\"") ?: "Другие"
+
+                    val finalName = if (name.contains(",")) {
+                        name.substringAfterLast(",").trim()
+                    } else name.trim()
+
+                    channels.add(
+                        IptvChannel(
+                            id = trimmed.hashCode().toString(),
+                            name = finalName,
+                            url = trimmed,
+                            logoUrl = logoUrl,
+                            group = group
+                        )
+                    )
+                    groups.add(group)
+                    currentMetadataLine = null
+                }
+            }
+        }
+
+        _iptvChannels.value = channels
+        _iptvGroups.value = groups.toList().sortedWith(Comparator { g1, g2 ->
+            if (g1 == "Все") -1 else if (g2 == "Все") 1 else g1.compareTo(g2, ignoreCase = true)
+        })
+    }
+
+    private fun parseAttribute(line: String, attribute: String): String? {
+        if (!line.contains(attribute)) return null
+        if (attribute == ",") {
+            return line.substringAfterLast(",").trim()
+        }
+        val startIndex = line.indexOf(attribute) + attribute.length
+        val endIndex = line.indexOf("\"", startIndex)
+        if (endIndex != -1 && endIndex > startIndex) {
+            return line.substring(startIndex, endIndex)
+        }
+        return null
+    }
+
     // Factory helper in case we instantiate standard lifecycle
     class Factory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -1648,4 +1814,18 @@ data class RutubeComment(
     val text: String,
     val date: String?,
     val likes: Int
+)
+
+data class IptvChannel(
+    val id: String,
+    val name: String,
+    val url: String,
+    val logoUrl: String? = null,
+    val group: String? = null
+)
+
+data class FederalChannel(
+    val name: String,
+    val embedUrl: String,
+    val profileUrl: String
 )
