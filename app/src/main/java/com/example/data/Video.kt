@@ -12,5 +12,7 @@ data class Video(
     val description: String,
     val thumbnailUrl: String? = null,
     val isDownloaded: Boolean = false,
-    val isBookmarked: Boolean = false
+    val isBookmarked: Boolean = false,
+    val authorId: String? = null,
+    val authorActionUrl: String? = null
 )

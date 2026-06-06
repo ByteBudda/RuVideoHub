@@ -78,7 +78,9 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     isPro = (0..10).random() > 8,
                     category = defaultCategoryName,
                     description = card.description,
-                    thumbnailUrl = card.thumbnail
+                    thumbnailUrl = card.thumbnail,
+                    authorId = card.channelId,
+                    authorActionUrl = card.channelId?.let { "https://rutube.ru/api/video/person/$it/" }
                 )
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvShowCard -> {
@@ -156,12 +158,34 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val selectedCategoryName = category ?: "Фильмы"
             
             if (q.isNotEmpty()) {
-                val responseBody = apiService.searchVideos(q, page = page)
-                val bodyString = responseBody.string()
-                val results = parseVideoListJson(bodyString, "Поиск: $q")
-                if (results.isNotEmpty()) {
+                val resultsList = mutableListOf<Video>()
+                
+                // Try fetching videos search results
+                try {
+                    val responseBody = apiService.searchVideos(q, page = page)
+                    val bodyString = responseBody.string()
+                    val parsed = parseVideoListJson(bodyString, "Поиск: $q")
+                    resultsList.addAll(parsed)
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoRepository", "Error searching videos", e)
+                }
+
+                // Try fetching channels search results
+                try {
+                    val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
+                    val personResponse = apiService.getDynamicUrl("https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json")
+                    val bodyString = personResponse.string()
+                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q")
+                    
+                    val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") }
+                    resultsList.addAll(0, channelsOnly)
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoRepository", "Error searching channels via person endpoint", e)
+                }
+
+                if (resultsList.isNotEmpty()) {
                     lastFetchSource = "Rutube LIVE"
-                    return results
+                    return resultsList.distinctBy { it.id }
                 }
             } else {
                 var categorySlug = categorySlugs[selectedCategoryName]

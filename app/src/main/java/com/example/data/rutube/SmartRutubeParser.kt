@@ -190,15 +190,16 @@ object SmartRutubeParser {
 
     object DataNormalizer {
         fun normalizeItem(item: JSONObject): NormalizedCard {
-            val isNested = item.has("content_type") && item.has("object")
+            val hasContentType = item.has("content_type")
+            val isNested = hasContentType && item.has("object")
             val data = if (isNested) item.optJSONObject("object") ?: item else item
-            val model = if (isNested) {
+            val model = if (hasContentType) {
                 item.optJSONObject("content_type")?.optString("model") ?: "video"
             } else {
-                data.optString("type", "video")
+                data.optString("type", "").takeIf { it.isNotBlank() } ?: data.optString("model", "video")
             }
 
-            if (model == "userchannel" || data.has("subscribers_count")) {
+            if (model == "userchannel" || model == "person" || model == "channel" || data.has("subscribers_count")) {
                 return normalizeChannel(data)
             }
 

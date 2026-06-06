@@ -335,7 +335,22 @@ fun HomeTabScreen(
                     HeroVideoCard(
                         video = heroVideo,
                         onVideoClick = { viewModel.selectVideo(heroVideo) },
-                        onDownloadToggle = { viewModel.toggleDownload(heroVideo) }
+                        onDownloadToggle = { viewModel.toggleDownload(heroVideo) },
+                        onChannelClick = if (!heroVideo.authorId.isNullOrBlank()) {
+                            {
+                                val channelDummy = Video(
+                                    id = "channel_${heroVideo.authorId}__${heroVideo.authorActionUrl ?: ""}",
+                                    title = heroVideo.channel,
+                                    channel = heroVideo.channel,
+                                    views = "",
+                                    timeAgo = "",
+                                    duration = "КАНАЛ",
+                                    category = heroVideo.category,
+                                    description = ""
+                                )
+                                viewModel.selectVideo(channelDummy)
+                            }
+                        } else null
                     )
                 }
 
@@ -346,7 +361,22 @@ fun HomeTabScreen(
                             video = video,
                             onVideoClick = { viewModel.selectVideo(video) },
                             onDownloadToggle = { viewModel.toggleDownload(video) },
-                            onBookmarkToggle = { viewModel.toggleBookmark(video) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                            onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                {
+                                    val channelDummy = Video(
+                                        id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                        title = video.channel,
+                                        channel = video.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = "КАНАЛ",
+                                        category = video.category,
+                                        description = ""
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                            } else null
                         )
                     }
                 }
@@ -616,6 +646,7 @@ fun HeroVideoCard(
     video: Video,
     onVideoClick: () -> Unit,
     onDownloadToggle: () -> Unit,
+    onChannelClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -681,12 +712,30 @@ fun HeroVideoCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${video.channel} • ${video.views} • ${video.timeAgo}",
-                        color = GreyText,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal
-                    )
+                    if (onChannelClick != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = video.channel,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable(onClick = onChannelClick)
+                            )
+                            Text(
+                                text = " • ${video.views} • ${video.timeAgo}",
+                                color = GreyText,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "${video.channel} • ${video.views} • ${video.timeAgo}",
+                            color = GreyText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
                 }
 
                 // Action buttons right
@@ -716,6 +765,7 @@ fun SecondaryVideoItemRow(
     onVideoClick: () -> Unit,
     onDownloadToggle: () -> Unit,
     onBookmarkToggle: () -> Unit,
+    onChannelClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -755,11 +805,21 @@ fun SecondaryVideoItemRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = video.channel,
-                    fontSize = 10.sp,
-                    color = GreyText
-                )
+                if (onChannelClick != null) {
+                    Text(
+                        text = video.channel,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable(onClick = onChannelClick)
+                    )
+                } else {
+                    Text(
+                        text = video.channel,
+                        fontSize = 10.sp,
+                        color = GreyText
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .size(3.dp)
@@ -2220,12 +2280,44 @@ fun SleekPlayerDetailOverlay(
                 )
 
                 // Stats info
-                Text(
-                    text = "${video.channel} • ${video.views} • ${video.timeAgo}",
-                    fontSize = 11.sp,
-                    color = GreyText,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-                )
+                ) {
+                    if (!video.authorId.isNullOrBlank()) {
+                        Text(
+                            text = video.channel,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                onDismiss()
+                                val channelDummy = Video(
+                                    id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                    title = video.channel,
+                                    channel = video.channel,
+                                    views = "",
+                                    timeAgo = "",
+                                    duration = "КАНАЛ",
+                                    category = video.category,
+                                    description = ""
+                                )
+                                viewModel.selectVideo(channelDummy)
+                            }
+                        )
+                        Text(
+                            text = " • ${video.views} • ${video.timeAgo}",
+                            fontSize = 11.sp,
+                            color = GreyText
+                        )
+                    } else {
+                        Text(
+                            text = "${video.channel} • ${video.views} • ${video.timeAgo}",
+                            fontSize = 11.sp,
+                            color = GreyText
+                        )
+                    }
+                }
 
                 // Direct active action layout pills
                 val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
