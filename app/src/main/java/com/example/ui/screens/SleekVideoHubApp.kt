@@ -768,6 +768,7 @@ fun SecondaryVideoItemRow(
     onChannelClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val isChannel = video.id.startsWith("channel_") || video.duration?.uppercase() == "КАНАЛ"
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -779,11 +780,13 @@ fun SecondaryVideoItemRow(
         // Thumbnail Left
         VideoThumbnail(
             id = video.id,
-            duration = video.duration,
+            duration = video.duration ?: "",
             thumbnailUrl = video.thumbnailUrl,
-            modifier = Modifier
-                .width(128.dp)
-                .height(78.dp)
+            modifier = if (isChannel) {
+                Modifier.size(68.dp).align(Alignment.CenterVertically)
+            } else {
+                Modifier.width(128.dp).height(78.dp)
+            }
         )
 
         // Text Right
@@ -793,73 +796,88 @@ fun SecondaryVideoItemRow(
         ) {
             Text(
                 text = video.title,
-                fontSize = 12.sp,
+                fontSize = if (isChannel) 14.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
-                lineHeight = 15.sp,
+                lineHeight = if (isChannel) 18.sp else 15.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (onChannelClick != null) {
+            if (isChannel) {
+                Text(
+                    text = if (video.views.isNotBlank()) video.views else "Авторский канал",
+                    fontSize = 11.sp,
+                    color = GreyText
+                )
+                if (!video.timeAgo.isNullOrBlank()) {
                     Text(
-                        text = video.channel,
+                        text = video.timeAgo,
+                        fontSize = 10.sp,
+                        color = GreyText.copy(alpha = 0.8f)
+                    )
+                }
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (onChannelClick != null) {
+                        Text(
+                            text = video.channel,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable(onClick = onChannelClick)
+                        )
+                    } else {
+                        Text(
+                            text = video.channel,
+                            fontSize = 10.sp,
+                            color = GreyText
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFCAC4D0))
+                    )
+                    Text(
+                        text = "HD",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onChannelClick)
-                    )
-                } else {
-                    Text(
-                        text = video.channel,
-                        fontSize = 10.sp,
                         color = GreyText
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .size(3.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFCAC4D0))
-                )
-                Text(
-                    text = "HD",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GreyText
-                )
-            }
 
-            // Quick mini controls
-            Row(
-                modifier = Modifier.padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                IconButton(
-                    onClick = onDownloadToggle,
-                    modifier = Modifier.size(24.dp).testTag("quick_download_${video.id}")
+                // Quick mini controls
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Icon(
-                        imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                        contentDescription = "Скачать",
-                        tint = Primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onBookmarkToggle,
-                    modifier = Modifier.size(24.dp).testTag("quick_bookmark_${video.id}")
-                ) {
-                    Icon(
-                        imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = "Закладка",
-                        tint = Primary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    IconButton(
+                        onClick = onDownloadToggle,
+                        modifier = Modifier.size(24.dp).testTag("quick_download_${video.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                            contentDescription = "Скачать",
+                            tint = Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onBookmarkToggle,
+                        modifier = Modifier.size(24.dp).testTag("quick_bookmark_${video.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = "Закладка",
+                            tint = Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -877,6 +895,9 @@ fun VideoThumbnail(
     onPlayClick: (() -> Unit)? = null
 ) {
     val isFolder = duration == "ПАПКА"
+    val isChannel = id.startsWith("channel_") || duration == "КАНАЛ"
+    val thumbnailShape = if (isChannel) CircleShape else RoundedCornerShape(16.dp)
+
     val gradientColors = when {
         isFolder -> listOf(Color(0xFFFFB300), Color(0xFFE65100))
         id == "api_review" -> listOf(Color(0xFF6750A4), Color(0xFF21005D))
@@ -890,7 +911,7 @@ fun VideoThumbnail(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(thumbnailShape)
             .background(Brush.linearGradient(colors = gradientColors))
     ) {
         if (isFolder) {

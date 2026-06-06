@@ -705,7 +705,7 @@ object SmartRutubeParser {
                                     name = resource.optString("name", ""),
                                     url = resource.optString("url", null),
                                     detectedType = EntityType.LIVE_TV,
-                                    meta = null
+                                    meta = resource
                                 )
                             )
                         }

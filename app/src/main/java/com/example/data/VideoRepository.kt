@@ -408,7 +408,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
             RutubeCategory(1015, "Обучение", "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500", "/api/feeds/education/"),
             RutubeCategory(1016, "Путешествия", "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500", "/api/feeds/travel/"),
             RutubeCategory(1017, "Кулинария", "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500", "/api/feeds/food/"),
-            RutubeCategory(1018, "Аниме", "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500", "/api/feeds/anime/")
+            RutubeCategory(1018, "Аниме", "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500", "/api/feeds/anime/"),
+            RutubeCategory(1019, "ТВ Каналы", "https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=500", "/api/feeds/live/")
         )
 
         val categoriesList = mutableListOf<RutubeCategory>()
