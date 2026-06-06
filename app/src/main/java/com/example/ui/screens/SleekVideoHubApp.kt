@@ -2474,7 +2474,7 @@ fun SleekPlayerDetailOverlay(
 
             // Related videos segment
             Text(
-                text = if (currentEpList.size > 1) "Список серий по порядку" else "Рекомендуем далее",
+                text = if (currentEpList.size > 1) "Смотреть далее" else "Рекомендуем далее",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
