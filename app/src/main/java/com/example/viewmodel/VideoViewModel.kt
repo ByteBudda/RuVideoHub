@@ -557,34 +557,61 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectVideo(video: Video?) {
         if (video != null && video.id.startsWith("tv_")) {
-            val tvId = video.id.substringAfter("tv_")
+            val fullTvId = video.id.substringAfter("tv_")
+            val idParts = fullTvId.split("__")
+            val tvId = idParts.getOrNull(0) ?: ""
+            val rawActionUrl = idParts.getOrNull(1) ?: ""
+
             viewModelScope.launch {
                 _isLoading.value = true
                 try {
-                    val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
-                    val response = apiService.getDynamicUrl("https://rutube.ru/api/metainfo/tv/$tvId/video/?format=json")
-                    val bodyStr = response.string()
-                    val episodes = repository.parseVideoListJson(bodyStr, video.category)
-                    if (episodes.isNotEmpty()) {
-                        val firstEpisode = episodes.first()
+                    var loadedVideos: List<Video> = emptyList()
+                    val fallbackUrls = mutableListOf<String>()
+
+                    if (rawActionUrl.isNotBlank() && rawActionUrl != "null") {
+                        val baseActionUrl = if (rawActionUrl.contains("?")) {
+                            rawActionUrl.substringBefore("?")
+                        } else {
+                            rawActionUrl
+                        }
+                        fallbackUrls.add("$baseActionUrl/?format=json")
+                        
+                        if (!baseActionUrl.endsWith("/video/")) {
+                            fallbackUrls.add("${baseActionUrl.trimEnd('/')}/video/?format=json")
+                        }
+                    }
+
+                    if (tvId.isNotBlank()) {
+                        fallbackUrls.add("https://rutube.ru/api/metainfo/tv/$tvId/video/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/feeds/tv/$tvId/video/?format=json")
+                    }
+
+                    for (url in fallbackUrls.distinct()) {
+                        loadedVideos = fetchVideosResolvingTabs(url, video.category)
+                        if (loadedVideos.isNotEmpty()) {
+                            currentActiveApiEndpoint = url.substringBefore("?")
+                            break
+                        }
+                    }
+
+                    if (loadedVideos.isNotEmpty()) {
+                        val firstEpisode = loadedVideos.first()
                         _currentSelectedVideo.value = firstEpisode
                         _isPlaying.value = true
                         _playProgress.value = 0f
                         startPlaybackTicker()
-                        _dynamicVideos.value = episodes
-                        
-                        // Setup nested paging state for dynamic pagination of episodes
-                        currentActiveApiEndpoint = "https://rutube.ru/api/metainfo/tv/$tvId/video/"
+                        _selectedSubfolderName.value = video.title
+                        _dynamicVideos.value = loadedVideos
+                        _searchQuery.value = ""
+                        selectTab("home")
                         currentPage = 1
                         isEndReached = false
                     } else {
-                        setSearchQuery(video.title)
-                        selectTab("home")
+                        currentPage = 1
+                        isEndReached = true
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("VideoViewModel", "Error fetching TV episodes", e)
-                    setSearchQuery(video.title)
-                    selectTab("home")
                 } finally {
                     _isLoading.value = false
                 }
@@ -641,13 +668,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         currentPage = 1
                         isEndReached = false
                     } else {
-                        setSearchQuery(video.title)
-                        selectTab("home")
+                        currentPage = 1
+                        isEndReached = true
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("VideoViewModel", "Error resolving channel", e)
-                    setSearchQuery(video.title)
-                    selectTab("home")
                 } finally {
                     _isLoading.value = false
                 }
@@ -657,39 +682,64 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
         if (video != null && video.id.startsWith("unknown_")) {
             val parts = video.id.substringAfter("unknown_").split("__")
+            val rawId = parts.getOrNull(0) ?: ""
             val actionUrl = parts.getOrNull(1) ?: ""
-            if (actionUrl.isNotBlank() && actionUrl != "null") {
-                viewModelScope.launch {
-                    _isLoading.value = true
-                    try {
-                        val normalizedUrl = if (actionUrl.startsWith("http")) actionUrl else "https://rutube.ru${if (actionUrl.startsWith("/")) "" else "/"}$actionUrl"
-                        val finalUrl = if (normalizedUrl.contains("?")) "$normalizedUrl&format=json" else "$normalizedUrl?format=json"
-                        
-                        val loadedVideos = fetchVideosResolvingTabs(finalUrl, video.category)
-                        if (loadedVideos.isNotEmpty()) {
-                            _selectedSubfolderName.value = video.title
-                            _dynamicVideos.value = loadedVideos
-                            _searchQuery.value = ""
-                            selectTab("home")
-                            
-                            val cleanEndpoint = if (normalizedUrl.contains("?")) normalizedUrl.substringBefore("?") else normalizedUrl
-                            currentActiveApiEndpoint = cleanEndpoint
-                            currentPage = 1
-                            isEndReached = false
+            
+            viewModelScope.launch {
+                _isLoading.value = true
+                try {
+                    var loadedVideos: List<Video> = emptyList()
+                    val fallbackUrls = mutableListOf<String>()
+
+                    if (actionUrl.isNotBlank() && actionUrl != "null") {
+                        val baseActionUrl = if (actionUrl.contains("?")) {
+                            actionUrl.substringBefore("?")
                         } else {
-                            setSearchQuery(video.title)
-                            selectTab("home")
+                            actionUrl
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.e("VideoViewModel", "Error resolving unknown/container Matryoshka card", e)
-                        setSearchQuery(video.title)
-                        selectTab("home")
-                    } finally {
-                        _isLoading.value = false
+                        fallbackUrls.add("$baseActionUrl/?format=json")
+                        
+                        // Add /video/ suffix fallback if not already there
+                        if (!baseActionUrl.endsWith("/video/")) {
+                            fallbackUrls.add("${baseActionUrl.trimEnd('/')}/video/?format=json")
+                        }
                     }
+
+                    if (rawId.isNotBlank() && rawId.all { it.isDigit() }) {
+                        fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/video/playlist/$rawId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/?format=json")
+                    }
+
+                    for (url in fallbackUrls.distinct()) {
+                        loadedVideos = fetchVideosResolvingTabs(url, video.category)
+                        if (loadedVideos.isNotEmpty()) {
+                            currentActiveApiEndpoint = url.substringBefore("?")
+                            break
+                        }
+                    }
+
+                    if (loadedVideos.isNotEmpty()) {
+                        _selectedSubfolderName.value = video.title
+                        _dynamicVideos.value = loadedVideos
+                        _searchQuery.value = ""
+                        selectTab("home")
+                        
+                        currentPage = 1
+                        isEndReached = false
+                    } else {
+                        currentPage = 1
+                        isEndReached = true
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoViewModel", "Error resolving unknown/container Matryoshka card", e)
+                } finally {
+                    _isLoading.value = false
                 }
-                return
             }
+            return
         }
 
         _currentSelectedVideo.value = video

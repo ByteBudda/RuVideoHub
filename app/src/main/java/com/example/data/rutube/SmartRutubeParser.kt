@@ -157,7 +157,8 @@ object SmartRutubeParser {
             val year: String?,
             val rating: Double?,
             val seasonsCount: Int,
-            val description: String?
+            val description: String?,
+            val actionUrl: String? = null
         ) : NormalizedCard()
 
         data class ChannelCard(
@@ -209,7 +210,11 @@ object SmartRutubeParser {
                 return normalizeVideo(data)
             }
 
-            val actionUrl = data.optString("target").takeIf { it.isNotBlank() } ?: data.optString("url", "").takeIf { it.isNotBlank() }
+            val rawActionUrl = data.optString("target").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("url").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("absolute_url").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("content").takeIf { it.isNotBlank() && it != "null" }
+            val actionUrl = Utils.normalizeUrl(rawActionUrl)
             val rawId = data.optString("id", "").takeIf { it.isNotBlank() } ?: data.optString("code", "").takeIf { it.isNotBlank() } ?: (100000..999999).random().toString()
 
             return NormalizedCard.UnknownCard(
@@ -290,6 +295,12 @@ object SmartRutubeParser {
                 data.optDouble("imdb_rating")
             } else null
 
+            val rawActionUrl = data.optString("absolute_url").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("content").takeIf { it.isNotBlank() && it != "null" }
+                ?: data.optString("url").takeIf { it.isNotBlank() && it != "null" }
+                ?: "/metainfo/tv/$id/video/"
+            val actionUrl = Utils.normalizeUrl(rawActionUrl)
+
             return NormalizedCard.TvShowCard(
                 id = id,
                 title = title,
@@ -297,7 +308,8 @@ object SmartRutubeParser {
                 year = year,
                 rating = kpRating,
                 seasonsCount = data.optInt("seasons_count", 1),
-                description = data.optString("description", "Смотрите оригинальные сезоны бесплатно")
+                description = data.optString("description", "Смотрите оригинальные сезоны бесплатно"),
+                actionUrl = actionUrl
             )
         }
 

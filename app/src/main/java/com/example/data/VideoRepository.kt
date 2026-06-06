@@ -85,7 +85,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 val ratingStr = if (card.rating != null && card.rating > 0.05) " • Кинопоиск: ${card.rating}" else ""
                 val yearVal = card.year ?: "Передача"
                 Video(
-                    id = "tv_${card.id}",
+                    id = "tv_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
                     channel = "Шоу • $yearVal$ratingStr",
                     views = "${card.seasonsCount} сезонов",
