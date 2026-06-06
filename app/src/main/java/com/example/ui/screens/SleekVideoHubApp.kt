@@ -250,6 +250,7 @@ fun HomeTabScreen(
 
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
         val selectedFeedTab by viewModel.selectedFeedTab.collectAsStateWithLifecycle()
+        val selectedSubfolderName by viewModel.selectedSubfolderName.collectAsStateWithLifecycle()
 
         if (feedTabs.isNotEmpty()) {
             FeedTabRow(
@@ -257,6 +258,32 @@ fun HomeTabScreen(
                 selectedTab = selectedFeedTab,
                 onTabSelected = { viewModel.selectFeedTab(it) }
             )
+        }
+
+        if (selectedSubfolderName != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), shape = RoundedCornerShape(12.dp))
+                    .clickable { viewModel.resetSubfolder() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "${selectedFeedTab?.name ?: "Назад"} › $selectedSubfolderName",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -789,13 +816,15 @@ fun VideoThumbnail(
     isPlaying: Boolean = false,
     onPlayClick: (() -> Unit)? = null
 ) {
-    val gradientColors = when (id) {
-        "api_review" -> listOf(Color(0xFF6750A4), Color(0xFF21005D))
-        "top_10" -> listOf(Color(0xFF4B3978), Color(0xFF1B033A))
-        "history_rutube" -> listOf(Color(0xFF8B5CF6), Color(0xFF3B0764))
-        "android_2026" -> listOf(Color(0xFF0284C7), Color(0xFF0369A1))
-        "sleek_compose" -> listOf(Color(0xFFEC4899), Color(0xFFBE185D))
-        "recommender_secrets" -> listOf(Color(0xFF10B981), Color(0xFF047857))
+    val isFolder = duration == "ПАПКА"
+    val gradientColors = when {
+        isFolder -> listOf(Color(0xFFFFB300), Color(0xFFE65100))
+        id == "api_review" -> listOf(Color(0xFF6750A4), Color(0xFF21005D))
+        id == "top_10" -> listOf(Color(0xFF4B3978), Color(0xFF1B033A))
+        id == "history_rutube" -> listOf(Color(0xFF8B5CF6), Color(0xFF3B0764))
+        id == "android_2026" -> listOf(Color(0xFF0284C7), Color(0xFF0369A1))
+        id == "sleek_compose" -> listOf(Color(0xFFEC4899), Color(0xFFBE185D))
+        id == "recommender_secrets" -> listOf(Color(0xFF10B981), Color(0xFF047857))
         else -> listOf(Color(0xFF333333), Color(0xFF111111))
     }
 
@@ -804,7 +833,16 @@ fun VideoThumbnail(
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(colors = gradientColors))
     ) {
-        if (!thumbnailUrl.isNullOrBlank()) {
+        if (isFolder) {
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = "Папка раздела",
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp)
+            )
+        } else if (!thumbnailUrl.isNullOrBlank()) {
             AsyncImage(
                 model = thumbnailUrl,
                 contentDescription = null,
