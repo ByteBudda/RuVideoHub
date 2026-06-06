@@ -1821,46 +1821,112 @@ fun parseEpisode(title: String): EpisodeInfo {
     var season = 1
     var episode = 1
     var rawNum = -1
+    var matched = false
     
-    // Standard international patterns: S01E08 or 1x08 or S2 Ep 3
+    // 1. Unified S01E08, S1 Ep 8, 1x08 patterns
     val sExeRegex = Regex("""s\s*(\d+)\s*e\s*(\d+)""", RegexOption.IGNORE_CASE)
-    val xRegex = Regex("""(\d+)\s*x\s*(\d+)""", RegexOption.IGNORE_CASE)
     val sEpRegex = Regex("""s\s*(\d+)\s*ep\s*(\d+)""", RegexOption.IGNORE_CASE)
+    val xRegex = Regex("""(\d+)\s*x\s*(\d+)""", RegexOption.IGNORE_CASE)
     
     val sexMatch = sExeRegex.find(lower)
-    val xMatch = xRegex.find(lower)
     val sEpMatch = sEpRegex.find(lower)
+    val xMatch = xRegex.find(lower)
     
     if (sexMatch != null) {
-        sexMatch.groupValues.getOrNull(1)?.toIntOrNull()?.let { season = it }
-        sexMatch.groupValues.getOrNull(2)?.toIntOrNull()?.let { episode = it; rawNum = it }
+        season = sexMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+        episode = sexMatch.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+        rawNum = episode
+        matched = true
     } else if (sEpMatch != null) {
-        sEpMatch.groupValues.getOrNull(1)?.toIntOrNull()?.let { season = it }
-        sEpMatch.groupValues.getOrNull(2)?.toIntOrNull()?.let { episode = it; rawNum = it }
+        season = sEpMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+        episode = sEpMatch.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+        rawNum = episode
+        matched = true
     } else if (xMatch != null) {
-        xMatch.groupValues.getOrNull(1)?.toIntOrNull()?.let { season = it }
-        xMatch.groupValues.getOrNull(2)?.toIntOrNull()?.let { episode = it; rawNum = it }
-    } else {
-        // Fallback to Russian word matching
-        val seasonPrefixRegex = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)""")
-        // Use a strict list of allowed Russian ordinal endings to avoid greedy match of 'сезон' starting letters
-        val seasonSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|е)?\s*сезон""")
+        season = xMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+        episode = xMatch.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+        rawNum = episode
+        matched = true
+    }
+    
+    if (!matched) {
+        // 2. Russian Combined patterns:
+        // A. "1 сезон 8 серия" or "1-й сезон 8-я серия"
+        val ruComb1 = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|е|ое)?\s*сезон\w*\s*[,.\s-]*\s*(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|я|е)?\s*(?:серия|эпизод|выпуск|часть)""")
+        // B. "сезон 1 серия 8" or "сезон 1, выпуск 8"
+        val ruComb2 = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)\s*[,.\s-]*\s*(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)""")
+        // C. "1 сезон, серия 8" or "1 сезон, эпизод 8"
+        val ruComb3 = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|е|ое)?\s*сезон\w*\s*[,.\s-]*\s*(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)""")
+        // D. "сезон 1, 8 серия"
+        val ruComb4 = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)\s*[,.\s-]*\s*(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|я|е)?\s*(?:серия|эпизод|выпуск|часть)""")
+
+        val c1 = ruComb1.find(lower)
+        val c2 = ruComb2.find(lower)
+        val c3 = ruComb3.find(lower)
+        val c4 = ruComb4.find(lower)
         
-        seasonPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
-            ?: seasonSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { season = it }
-            
-        val epPrefixRegex = Regex("""(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)""")
-        // Use a strict list of allowed Russian ordinal endings to avoid greedy match of 'серия', etc.
+        if (c1 != null) {
+            season = c1.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            episode = c1.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+            rawNum = episode
+            matched = true
+        } else if (c2 != null) {
+            season = c2.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            episode = c2.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+            rawNum = episode
+            matched = true
+        } else if (c3 != null) {
+            season = c3.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            episode = c3.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+            rawNum = episode
+            matched = true
+        } else if (c4 != null) {
+            season = c4.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            episode = c4.groupValues.getOrNull(2)?.toIntOrNull() ?: 1
+            rawNum = episode
+            matched = true
+        }
+    }
+    
+    if (!matched) {
+        // Fallback to standalone matches, but carefully.
+        val seasonSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|е|ое)?\s*сезон""")
+        val seasonPrefixRegex = Regex("""сезон\w*\s*(?:-|–|—)?\s*(\d+)\b""")
+        
+        val sSfxMatch = seasonSuffixRegex.find(lower)
+        val sPfxMatch = seasonPrefixRegex.find(lower)
+        
+        if (sSfxMatch != null) {
+            season = sSfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+        } else if (sPfxMatch != null) {
+            season = sPfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+        }
+        
         val epSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|я|е)?\s*(?:серия|эпизод|выпуск|часть)""")
+        val epPrefixRegex = Regex("""(?:серия|эпизод|выпуск|часть)\w*\s*(?:-|–|—)?\s*(\d+)\b""")
         
-        epPrefixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
-            ?: epSuffixRegex.find(lower)?.groupValues?.get(1)?.toIntOrNull()?.let { episode = it; rawNum = it }
-            
+        val epSfxMatch = epSuffixRegex.find(lower)
+        val epPfxMatch = epPrefixRegex.find(lower)
+        
+        if (epSfxMatch != null) {
+            episode = epSfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            rawNum = episode
+        } else if (epPfxMatch != null) {
+            episode = epPfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            rawNum = episode
+        }
+        
         if (rawNum == -1) {
             val digitRegex = Regex("""\d+""")
             val matches = digitRegex.findAll(lower).toList()
             if (matches.isNotEmpty()) {
-                matches.last().groupValues.get(0).toIntOrNull()?.let { episode = it; rawNum = it }
+                val lastNum = matches.last().groupValues.getOrNull(0)?.toIntOrNull() ?: 1
+                if (matches.size == 1 && (sSfxMatch != null || sPfxMatch != null)) {
+                    episode = 1
+                } else {
+                    episode = lastNum
+                    rawNum = lastNum
+                }
             }
         }
     }
@@ -2236,100 +2302,6 @@ fun SleekPlayerDetailOverlay(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-                }
-
-                // Navigation buttons for series: Prev Episode / Next Episode
-                if (currentEpList.size > 1) {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(SecondaryBackground, shape = RoundedCornerShape(16.dp))
-                            .padding(horizontal = 4.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val hasPrev = currentIndex > 0
-                        androidx.compose.material3.TextButton(
-                            onClick = {
-                                if (hasPrev) {
-                                    viewModel.selectVideo(currentEpList[currentIndex - 1])
-                                }
-                            },
-                            enabled = hasPrev,
-                            modifier = Modifier.weight(1.2f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowBack,
-                                    contentDescription = "Предыдущая серия",
-                                    tint = if (hasPrev) MaterialTheme.colorScheme.onBackground else GreyText,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "Пред. серия",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (hasPrev) MaterialTheme.colorScheme.onBackground else GreyText
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.width(1.dp).height(24.dp).background(SurfaceVariant))
-                        
-                        val currentInfo = parseEpisode(video.title)
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1.3f)
-                        ) {
-                            Text(
-                                text = "Серия ${currentInfo.episode}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Primary
-                            )
-                            Text(
-                                text = "Сезон ${currentInfo.season}",
-                                fontSize = 9.sp,
-                                color = GreyText
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.width(1.dp).height(24.dp).background(SurfaceVariant))
-                        
-                        val hasNext = currentIndex < currentEpList.size - 1
-                        androidx.compose.material3.TextButton(
-                            onClick = {
-                                if (hasNext) {
-                                    viewModel.selectVideo(currentEpList[currentIndex + 1])
-                                }
-                            },
-                            enabled = hasNext,
-                            modifier = Modifier.weight(1.2f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "След. серия",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (hasNext) MaterialTheme.colorScheme.onBackground else GreyText
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForward,
-                                    contentDescription = "Следующая серия",
-                                    tint = if (hasNext) MaterialTheme.colorScheme.onBackground else GreyText,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
                     }
                 }
 
