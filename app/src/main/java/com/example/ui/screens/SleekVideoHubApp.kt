@@ -948,14 +948,80 @@ fun VideoThumbnail(
             .background(Brush.linearGradient(colors = gradientColors))
     ) {
         if (isFolder) {
-            Icon(
-                imageVector = Icons.Default.Folder,
-                contentDescription = "Папка раздела",
-                tint = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(40.dp)
-            )
+            if (!thumbnailUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.2f),
+                                    Color.Black.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .background(
+                            Color.Black.copy(alpha = 0.5f),
+                            shape = CircleShape
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = "Папка раздела",
+                        tint = Color(0xFFFFB300),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                        .background(Color(0xFFFFB300).copy(alpha = 0.95f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "РАЗДЕЛ",
+                        color = Color.Black,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = "Папка раздела",
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(40.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "ПАПКА",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         } else if (!thumbnailUrl.isNullOrBlank()) {
             AsyncImage(
                 model = thumbnailUrl,

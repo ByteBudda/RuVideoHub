@@ -310,7 +310,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             isPro = false,
                             category = _selectedCategory.value,
                             description = "Коллекция контента из раздела: ${resource.name}",
-                            thumbnailUrl = null
+                            thumbnailUrl = resource.thumbnailUrl
                         )
                     }
                     _dynamicVideos.value = folderVideos
@@ -411,7 +411,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                         isPro = false,
                                         category = targetCategory,
                                         description = "Коллекция контента из раздела: ${resource.name}",
-                                        thumbnailUrl = null
+                                        thumbnailUrl = resource.thumbnailUrl
                                     )
                                 }
                                 _dynamicVideos.value = folderVideos
