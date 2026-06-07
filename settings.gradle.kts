@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "My Application"
 
 include(":app")
+// include(":desktop") // Раскомментируйте эту строку на локальном компьютере для сборки Desktop-версии!

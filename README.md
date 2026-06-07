@@ -1,21 +1,120 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Sleek Video Hub 🎬
 
-# Run and deploy your AI Studio app
+**Sleek Video Hub** — динамический клиент для платформы Rutube, обеспечивающий быструю и стильную навигацию по медиаконтенту, категориям, каналам и плейлистам. Приложение обладает продуманной архитектурой MVVM на базе **Jetpack Compose**, адаптивной версткой для мобильных/планшетов, а также подготовленной конфигурацией для настольных ПК (**Desktop**) на основе Compose Multiplatform.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/62f51503-e401-4a4b-8e6b-1a0353ef0181
+## ✨ Ключевые возможности
 
-## Run Locally
+### 📱 Android-версия
+*   **Умный парсинг Rutube Content (SmartRutubeParser)**: Автоматический разбор сложных динамических структур данных Rutube API. Приложение автоматически распределяет разделы на плоские плейлисты или многоуровневые папки/подразделы.
+*   **Стильный UI в стиле Material 3**: Изящное сочетание глубокого черного фона и главного кораллово-красного акцентного цвета `#FFFF253E`.
+*   **Удобная навигация без случайных закрытий**:
+    *   Реализована умная история навигации (Navigation History Stack): при кликах во вложенные подкаталоги, каналы или видео, кнопка «Назад» последовательно возвращает пользователя назад внутри контекста.
+    *   При попытке закрыть приложение с главного экрана всплывает предупреждение: *«Нажмите назад ещё раз для выхода»* (двойной клик назад в течение 2 секунд для подтверждения).
+*   **Адаптивная верстка (Anti-Warp Layout)**:
+    *   Исключены наложения и вертикальные растягивания текстов в карточках при длинных названиях каналов или видео.
+    *   Тексты снабжены автоматическим усечением длины (`maxLines` + `Ellipsis`) и адаптивным весом в строках (`Modifier.weight(fill = false)`).
+*   **Встроенный плеер**: Воспроизведение видео в полноэкранном и стандартном форматах с поддержкой изменения соотношения сторон.
+*   **Полнотекстовый поиск**: Мгновенный поиск видеороликов, каналов и плейлистов с возможностью сохранения истории.
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+### 💻 Десктоп-версия (Desktop Module)
+*   Подготовлен независимый модуль `:desktop` на базе **Compose Multiplatform (JetBrains)**.
+*   Реализован оптимизированный интерфейс для больших экранов:
+    *   Боковая панель навигации (Vertical Navigation Rail) для быстрого переключения разделов.
+    *   Сетка карточек с высокой информационной плотностью, соответствующая дизайну исходной мобильной версии.
+    *   Поддерживает сборку нативных дистрибутивов для macOS (`.dmg`), Windows (`.msi`) и Linux (`.deb`).
 
+---
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+## 🛠️ Стек технологий
+
+*   **Язык**: Kotlin
+*   **Основной UI (Android)**: Jetpack Compose, Material 3, Vector Assets
+*   **Desktop UI**: Jetbrains Compose Multiplatform
+*   **Архитектура**: MVVM (Model-View-ViewModel) + Clean Architecture
+*   **Менеджмент состояния**: Kotlin Coroutines, StateFlow, `collectAsStateWithLifecycle()`
+*   **Сетевое взаимодействие**: Retrofit, OkHttp 4, Moshi, JSON-Parsing (org.json)
+*   **Сборщик проектов**: Gradle (.gradle.kts Kotlin DSL) + Version Catalog (`libs.versions.toml`)
+
+---
+
+## 📁 Структура проекта
+
+```
+├── app/                           # Модуль Android-приложения
+│   ├── src/main/java/com/example/
+│   │   ├── data/                  # Слой данных
+│   │   │   ├── rutube/            # Умный разборщик API Rutube (SmartRutubeParser.kt)
+│   │   │   └── VideoRepository.kt # Репозиторий для кеширования и динамических запросов
+│   │   ├── viewmodel/             # Вью-модель, управление состоянием навигации и кешем
+│   │   │   └── VideoViewModel.kt  # Хранит стек навигации и управляет возвратами
+│   │   └── ui/screens/            # Слой отрисовки UI
+│   │       └── SleekVideoHubApp.kt # Главный экран, плеер, списки, адаптивные карточки
+│   └── build.gradle.kts           # Конфигурация сборки Android
+│
+├── desktop/                       # Подготовленный модуль Desktop-клиента
+│   ├── src/main/kotlin/com/example/desktop/
+│   │   └── Main.kt                # Точка входа для ПК-версии (Multiplatform UI)
+│   └── build.gradle.kts           # Сборщик Gradle для Desktop-приложения
+│
+├── gradle/libs.versions.toml      # Единая таблица версий зависимостей (Version Catalog)
+└── settings.gradle.kts            # Конфигурация мультимодульной сборки Gradle
+```
+
+---
+
+## 🚀 Как запустить и собрать проект
+
+### 1. Локальная сборка Android-версии
+Для сборки стандартного APK-файла в среде Android Studio выполните:
+```bash
+gradle :app:assembleDebug
+```
+Готовый артефакт будет доступен по пути: `app/build/outputs/apk/debug/app-debug.apk`.
+
+### 2. Запуск Десктоп-клиента
+Чтобы запустить или собрать десктопную версию на своем локальном компьютере, выполните следующие простые шаги:
+
+1.  Откройте файл `settings.gradle.kts` в корне проекта.
+2.  Раскомментируйте подключение модуля десктопа:
+    ```kotlin
+    include(":desktop")
+    ```
+3.  Выполните команду Gradle в терминале для сборки и запуска приложения:
+    ```bash
+    gradle :desktop:run
+    ```
+
+Чтобы упаковать Desktop-приложение в дистрибутив (`DMG`/`MSI`/`DEB`) под вашу текущую ОС:
+```bash
+gradle :desktop:packageDistributionForCurrentOS
+```
+
+---
+
+## ⚙️ Управлением поведением кнопки «Назад» (Back Navigation)
+
+В файле `SleekVideoHubApp.kt` реализован перехват системного события `BackHandler`:
+```kotlin
+androidx.activity.compose.BackHandler(enabled = currentSelectedVideo == null) {
+    if (viewModel.canNavigateBack()) {
+        viewModel.navigateBack()
+    } else {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime < 2000L) {
+            (context as? android.app.Activity)?.finish()
+        } else {
+            lastBackPressTime = currentTime
+            android.widget.Toast.makeText(context, "Нажмите назад ещё раз для выхода", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+```
+При открытом плеере (`currentSelectedVideo != null`) системная кнопка закрывает оверлей-видеоплеер, либо сворачивает полноэкранный режим. В обычном состоянии при нажатии кнопки «Назад»:
+1.  Если открыт подраздел/папка каталога — мы возвращаемся на уровень выше в ленту вкладок.
+2.  Если активна строка поиска — очищается поисковый запрос.
+3.  Если мы находимся на других вкладках — приложение плавно переключается на вкладку "home" (Главная).
+4.  Если мы уже на главном экране («Фильмы» / «Главная» домашнего таба) — при первом клике всплывает тост. Повторный клик завершает активити. 
+
+Это делает мобильный опыт максимально органичным, предотвращая потерю прогресса просмотра из-за случайных жестов назад.
