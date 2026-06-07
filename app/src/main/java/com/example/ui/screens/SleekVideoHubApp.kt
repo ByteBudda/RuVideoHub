@@ -749,19 +749,28 @@ fun HeroVideoCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     if (onChannelClick != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
                                 text = video.channel,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.clickable(onClick = onChannelClick)
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clickable(onClick = onChannelClick)
+                                    .weight(1f, fill = false)
                             )
                             Text(
                                 text = " • ${video.views} • ${video.timeAgo}",
                                 color = GreyText,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal
+                                fontWeight = FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     } else {
@@ -769,7 +778,9 @@ fun HeroVideoCard(
                             text = "${video.channel} • ${video.views} • ${video.timeAgo}",
                             color = GreyText,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -2318,7 +2329,7 @@ fun SleekPlayerDetailOverlay(
                 // Stats info
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp)
                 ) {
                     if (!video.authorId.isNullOrBlank()) {
                         Text(
@@ -2326,31 +2337,39 @@ fun SleekPlayerDetailOverlay(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.clickable {
-                                onDismiss()
-                                val channelDummy = Video(
-                                    id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                    title = video.channel,
-                                    channel = video.channel,
-                                    views = "",
-                                    timeAgo = "",
-                                    duration = "КАНАЛ",
-                                    category = video.category,
-                                    description = ""
-                                )
-                                viewModel.selectVideo(channelDummy)
-                            }
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable {
+                                    onDismiss()
+                                    val channelDummy = Video(
+                                        id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                        title = video.channel,
+                                        channel = video.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = "КАНАЛ",
+                                        category = video.category,
+                                        description = ""
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
                         )
                         Text(
                             text = " • ${video.views} • ${video.timeAgo}",
                             fontSize = 11.sp,
-                            color = GreyText
+                            color = GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     } else {
                         Text(
                             text = "${video.channel} • ${video.views} • ${video.timeAgo}",
                             fontSize = 11.sp,
-                            color = GreyText
+                            color = GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
