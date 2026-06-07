@@ -879,48 +879,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun playNextVideo() {
-        val current = _currentSelectedVideo.value ?: return
-        val list = filteredVideos.value
-        if (list.isEmpty()) return
-        val index = list.indexOfFirst { it.id == current.id }
-        if (index != -1 && index < list.size - 1) {
-            val nextVideo = list[index + 1]
-            if (nextVideo.duration != "КАНАЛ" && nextVideo.duration != "ПАПКА" && nextVideo.duration != "КАТАЛОГ") {
-                selectVideo(nextVideo)
-            } else {
-                for (i in (index + 2) until list.size) {
-                    val candidate = list[i]
-                    if (candidate.duration != "КАНАЛ" && candidate.duration != "ПАПКА" && candidate.duration != "КАТАЛОГ") {
-                        selectVideo(candidate)
-                        break
-                    }
-                }
-            }
-        }
-    }
-
-    fun playPreviousVideo() {
-        val current = _currentSelectedVideo.value ?: return
-        val list = filteredVideos.value
-        if (list.isEmpty()) return
-        val index = list.indexOfFirst { it.id == current.id }
-        if (index > 0) {
-            val prevVideo = list[index - 1]
-            if (prevVideo.duration != "КАНАЛ" && prevVideo.duration != "ПАПКА" && prevVideo.duration != "КАТАЛОГ") {
-                selectVideo(prevVideo)
-            } else {
-                for (i in (index - 2) downTo 0) {
-                    val candidate = list[i]
-                    if (candidate.duration != "КАНАЛ" && candidate.duration != "ПАПКА" && candidate.duration != "КАТАЛОГ") {
-                        selectVideo(candidate)
-                        break
-                    }
-                }
-            }
-        }
-    }
-
     fun seekProgress(progress: Float) {
         _playProgress.value = progress.coerceIn(0f, 1f)
     }

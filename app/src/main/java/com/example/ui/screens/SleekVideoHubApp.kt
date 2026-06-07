@@ -2939,26 +2939,6 @@ fun RutubeVideoPlayer(
     // HUD message for aspect ratio cycle
     var hudMessage by remember { mutableStateOf<String?>(null) }
 
-    var showOverlayExplanationDialog by remember { mutableStateOf(false) }
-
-    val postNotificationsLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            val intent = android.content.Intent(context, com.example.service.BackgroundPlayerService::class.java).apply {
-                action = com.example.service.BackgroundPlayerService.ACTION_PLAY
-            }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-            android.widget.Toast.makeText(context, "Фоновое воспроизведение (аудио) запущенно!", android.widget.Toast.LENGTH_SHORT).show()
-        } else {
-            android.widget.Toast.makeText(context, "Разрешение на уведомления отклонено", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
-
     LaunchedEffect(videoId) {
         if (offlineFile.exists()) {
             hlsUrl = offlineFile.absolutePath
@@ -3342,73 +3322,6 @@ fun RutubeVideoPlayer(
                                 Text(aspectMode.displayName, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
 
-                            // Background music (notification control) option
-                            IconButton(
-                                onClick = {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                        if (androidx.core.content.ContextCompat.checkSelfPermission(
-                                                context,
-                                                android.Manifest.permission.POST_NOTIFICATIONS
-                                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                        ) {
-                                            val sIntent = android.content.Intent(context, com.example.service.BackgroundPlayerService::class.java).apply {
-                                                action = com.example.service.BackgroundPlayerService.ACTION_PLAY
-                                            }
-                                            context.startForegroundService(sIntent)
-                                            android.widget.Toast.makeText(context, "Фоновое воспроизведение (аудио) запущенно!", android.widget.Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            postNotificationsLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                                        }
-                                    } else {
-                                        val sIntent = android.content.Intent(context, com.example.service.BackgroundPlayerService::class.java).apply {
-                                            action = com.example.service.BackgroundPlayerService.ACTION_PLAY
-                                        }
-                                        context.startService(sIntent)
-                                        android.widget.Toast.makeText(context, "Фоновое воспроизведение (аудио) запущенно!", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier.size(32.dp).testTag("bg_audio_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = "Фоновое аудио",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            // PiP Floating overlay window option
-                            IconButton(
-                                onClick = {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                                        if (android.provider.Settings.canDrawOverlays(context)) {
-                                            val sIntent = android.content.Intent(context, com.example.service.BackgroundPlayerService::class.java).apply {
-                                                action = com.example.service.BackgroundPlayerService.ACTION_SHOW_OVERLAY
-                                            }
-                                            context.startService(sIntent)
-                                            android.widget.Toast.makeText(context, "Плавающий плеер поверх окон активен!", android.widget.Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            showOverlayExplanationDialog = true
-                                        }
-                                    } else {
-                                        val sIntent = android.content.Intent(context, com.example.service.BackgroundPlayerService::class.java).apply {
-                                            action = com.example.service.BackgroundPlayerService.ACTION_SHOW_OVERLAY
-                                        }
-                                        context.startService(sIntent)
-                                    }
-                                },
-                                modifier = Modifier.size(32.dp).testTag("floating_overlap_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PictureInPicture,
-                                    contentDescription = "Оверлей-окно",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
                             // Share video link
                             IconButton(
                                 onClick = {
@@ -3597,44 +3510,6 @@ fun RutubeVideoPlayer(
                 ) {
                     Text(text = msg, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-            }
-
-            if (showOverlayExplanationDialog) {
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { showOverlayExplanationDialog = false },
-                    title = { Text("Оверлей плеер", fontWeight = FontWeight.Bold) },
-                    text = { Text("Чтобы включить компактное плавающее окно поверх всех приложений, пожалуйста, предоставьте разрешение в настройках системы.") },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(
-                            onClick = {
-                                showOverlayExplanationDialog = false
-                                try {
-                                    val intent = android.content.Intent(
-                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        android.net.Uri.parse("package:${context.packageName}")
-                                    ).apply {
-                                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                                    intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                    context.startActivity(intent)
-                                }
-                            }
-                        ) {
-                            Text("Разрешить", color = Primary)
-                        }
-                    },
-                    dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { showOverlayExplanationDialog = false }) {
-                            Text("Отмена", color = Color.Gray)
-                        }
-                    },
-                    containerColor = Color(0xFF1E1E1E),
-                    titleContentColor = Color.White,
-                    textContentColor = Color.LightGray
-                )
             }
         }
     }
