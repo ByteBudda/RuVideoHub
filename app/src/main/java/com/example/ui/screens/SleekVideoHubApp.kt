@@ -865,8 +865,9 @@ fun SleekFolderGridItem(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                maxLines = 1,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
+                lineHeight = 16.sp,
                 modifier = Modifier.weight(1f)
             )
 
