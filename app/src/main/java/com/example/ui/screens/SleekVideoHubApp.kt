@@ -332,26 +332,31 @@ fun HomeTabScreen(
                 // Section recommended (hero card)
                 val heroVideo = filteredVideos.first()
                 item {
-                    HeroVideoCard(
-                        video = heroVideo,
-                        onVideoClick = { viewModel.selectVideo(heroVideo) },
-                        onDownloadToggle = { viewModel.toggleDownload(heroVideo) },
-                        onChannelClick = if (!heroVideo.authorId.isNullOrBlank()) {
-                            {
-                                val channelDummy = Video(
-                                    id = "channel_${heroVideo.authorId}__${heroVideo.authorActionUrl ?: ""}",
-                                    title = heroVideo.channel,
-                                    channel = heroVideo.channel,
-                                    views = "",
-                                    timeAgo = "",
-                                    duration = "КАНАЛ",
-                                    category = heroVideo.category,
-                                    description = ""
-                                )
-                                viewModel.selectVideo(channelDummy)
-                            }
-                        } else null
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HeroVideoCard(
+                            video = heroVideo,
+                            onVideoClick = { viewModel.selectVideo(heroVideo) },
+                            onDownloadToggle = { viewModel.toggleDownload(heroVideo) },
+                            onChannelClick = if (!heroVideo.authorId.isNullOrBlank()) {
+                                {
+                                    val channelDummy = Video(
+                                        id = "channel_${heroVideo.authorId}__${heroVideo.authorActionUrl ?: ""}",
+                                        title = heroVideo.channel,
+                                        channel = heroVideo.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = "КАНАЛ",
+                                        category = heroVideo.category,
+                                        description = ""
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                            } else null
+                        )
+                    }
                 }
 
                 // Section listed items
@@ -655,6 +660,7 @@ fun HeroVideoCard(
         border = BorderStroke(1.dp, SurfaceVariant),
         modifier = modifier
             .fillMaxWidth()
+            .widthIn(max = 560.dp)
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .shadow(
                 elevation = 6.dp,
@@ -673,6 +679,7 @@ fun HeroVideoCard(
                 thumbnailUrl = video.thumbnailUrl,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 220.dp)
                     .aspectRatio(16f / 9f)
             )
 
@@ -2936,6 +2943,7 @@ fun RutubeVideoPlayer(
                             }
                             webViewClient = WebViewClient()
                             webChromeClient = WebChromeClient()
+                            keepScreenOn = true
                             val embedUrl = "https://rutube.ru/play/embed/$videoId/?autoplay=1"
                             loadUrl(embedUrl)
                         }
@@ -3046,6 +3054,7 @@ fun RutubeVideoPlayer(
                         )
                         useController = false
                         player = exoPlayer
+                        keepScreenOn = true
                         resizeMode = when (aspectMode) {
                             VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                             VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -3056,6 +3065,7 @@ fun RutubeVideoPlayer(
                 },
                 update = { playerView ->
                     playerView.player = exoPlayer
+                    playerView.keepScreenOn = true
                     playerView.resizeMode = when (aspectMode) {
                         VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                         VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT

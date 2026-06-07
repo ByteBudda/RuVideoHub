@@ -178,12 +178,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         "Фильмы" to "movies",
         "Сериалы" to "serials",
         "Телепередачи" to "tv",
-        "Музыка" to "music",
         "Мультфильмы" to "cartoons",
+        "Музыка" to "music",
         "Спорт" to "sport",
         "Юмор" to "umor",
         "Видеоигры" to "games",
-        "Технологии" to "technologies"
+        "Технологии" to "technologies",
+        "Блоги" to "blogs",
+        "Новости" to "news",
+        "Лайфхаки" to "lifehacks",
+        "Детям" to "kids",
+        "Авто-мото" to "auto",
+        "Обучение" to "education",
+        "Путешествия" to "travel",
+        "Кулинария" to "food",
+        "Аниме" to "anime"
     )
 
     fun selectCategory(category: String, targetUrl: String? = null) {
