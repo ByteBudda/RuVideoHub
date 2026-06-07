@@ -329,39 +329,68 @@ fun HomeTabScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                // Section recommended (hero card)
-                val heroVideo = filteredVideos.first()
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        HeroVideoCard(
-                            video = heroVideo,
-                            onVideoClick = { viewModel.selectVideo(heroVideo) },
-                            onDownloadToggle = { viewModel.toggleDownload(heroVideo) },
-                            onChannelClick = if (!heroVideo.authorId.isNullOrBlank()) {
-                                {
-                                    val channelDummy = Video(
-                                        id = "channel_${heroVideo.authorId}__${heroVideo.authorActionUrl ?: ""}",
-                                        title = heroVideo.channel,
-                                        channel = heroVideo.channel,
-                                        views = "",
-                                        timeAgo = "",
-                                        duration = "КАНАЛ",
-                                        category = heroVideo.category,
-                                        description = ""
-                                    )
-                                    viewModel.selectVideo(channelDummy)
-                                }
-                            } else null
-                        )
-                    }
-                }
+                // Section recommended (hero card for videos, uniform list for folders)
+                val firstItem = filteredVideos.first()
+                val isFolderList = firstItem.duration == "ПАПКА" || firstItem.duration == "КАТАЛОГ"
 
-                // Section listed items
-                if (filteredVideos.size > 1) {
-                    items(filteredVideos.subList(1, filteredVideos.size), key = { it.id }) { video ->
+                if (!isFolderList) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            HeroVideoCard(
+                                video = firstItem,
+                                onVideoClick = { viewModel.selectVideo(firstItem) },
+                                onDownloadToggle = { viewModel.toggleDownload(firstItem) },
+                                onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
+                                    {
+                                        val channelDummy = Video(
+                                            id = "channel_${firstItem.authorId}__${firstItem.authorActionUrl ?: ""}",
+                                            title = firstItem.channel,
+                                            channel = firstItem.channel,
+                                            views = "",
+                                            timeAgo = "",
+                                            duration = "КАНАЛ",
+                                            category = firstItem.category,
+                                            description = ""
+                                        )
+                                        viewModel.selectVideo(channelDummy)
+                                    }
+                                } else null
+                            )
+                        }
+                    }
+
+                    // Section listed items
+                    if (filteredVideos.size > 1) {
+                        items(filteredVideos.subList(1, filteredVideos.size), key = { it.id }) { video ->
+                            SecondaryVideoItemRow(
+                                video = video,
+                                onVideoClick = { viewModel.selectVideo(video) },
+                                onDownloadToggle = { viewModel.toggleDownload(video) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                    {
+                                        val channelDummy = Video(
+                                            id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                            title = video.channel,
+                                            channel = video.channel,
+                                            views = "",
+                                            timeAgo = "",
+                                            duration = "КАНАЛ",
+                                            category = video.category,
+                                            description = ""
+                                        )
+                                        viewModel.selectVideo(channelDummy)
+                                    }
+                                } else null
+                            )
+                        }
+                    }
+                } else {
+                    // For folder-lists (subcategories/directories), keep visual layout clean and uniform (no giant hero card)
+                    items(filteredVideos, key = { it.id }) { video ->
                         SecondaryVideoItemRow(
                             video = video,
                             onVideoClick = { viewModel.selectVideo(video) },

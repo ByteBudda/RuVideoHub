@@ -33,6 +33,27 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val categorySlugs = mapOf(
+        "Фильмы" to "movies",
+        "Сериалы" to "serials",
+        "Телепередачи" to "tv",
+        "Мультфильмы" to "cartoons",
+        "Музыка" to "music",
+        "Спорт" to "sport",
+        "Юмор" to "umor",
+        "Видеоигры" to "games",
+        "Технологии" to "technologies",
+        "Блоги" to "blogs",
+        "Новости" to "news",
+        "Лайфхаки" to "lifehacks",
+        "Детям" to "kids",
+        "Авто-мото" to "auto",
+        "Обучение" to "education",
+        "Путешествия" to "travel",
+        "Кулинария" to "food",
+        "Аниме" to "anime"
+    )
+
     // Authorization State
     private val _isAuthorized = MutableStateFlow(false)
     val isAuthorized = _isAuthorized.asStateFlow()
@@ -133,6 +154,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Инициализация...")
 
+    private var currentPage = 1
+    private var isEndReached = false
+    private var currentQuery: String? = null
+    private var currentCategory: String? = "Фильмы"
+    private var currentActiveApiEndpoint: String? = null
+
+    private val _isMoreLoading = MutableStateFlow(false)
+    val isMoreLoading = _isMoreLoading.asStateFlow()
+
     init {
         val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
         val savedSessionId = sharedPrefs.getString("sessionid", null)
@@ -151,15 +181,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         fetchRealCategories()
     }
 
-    private var currentPage = 1
-    private var isEndReached = false
-    private var currentQuery: String? = null
-    private var currentCategory: String? = "Фильмы"
-    private var currentActiveApiEndpoint: String? = null
-
-    private val _isMoreLoading = MutableStateFlow(false)
-    val isMoreLoading = _isMoreLoading.asStateFlow()
-
     fun fetchRealCategories() {
         viewModelScope.launch {
             _isCategoriesLoading.value = true
@@ -174,26 +195,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val categorySlugs = mapOf(
-        "Фильмы" to "movies",
-        "Сериалы" to "serials",
-        "Телепередачи" to "tv",
-        "Мультфильмы" to "cartoons",
-        "Музыка" to "music",
-        "Спорт" to "sport",
-        "Юмор" to "umor",
-        "Видеоигры" to "games",
-        "Технологии" to "technologies",
-        "Блоги" to "blogs",
-        "Новости" to "news",
-        "Лайфхаки" to "lifehacks",
-        "Детям" to "kids",
-        "Авто-мото" to "auto",
-        "Обучение" to "education",
-        "Путешествия" to "travel",
-        "Кулинария" to "food",
-        "Аниме" to "anime"
-    )
 
     fun selectCategory(category: String, targetUrl: String? = null) {
         _selectedCategory.value = category
@@ -208,20 +209,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                val tabName = tab.name ?: ""
-                val isFolderTab = tab.resources.size > 1 && (
-                    tabName.contains("жанр", ignoreCase = true) ||
-                    tabName.contains("год", ignoreCase = true) ||
-                    tabName.contains("стран", ignoreCase = true) ||
-                    tabName.contains("катег", ignoreCase = true) ||
-                    tabName.contains("раздел", ignoreCase = true) ||
-                    tabName.contains("тема", ignoreCase = true) ||
-                    (!tabName.equals("Главная", ignoreCase = true) && 
-                     !tabName.equals("Рекомендации", ignoreCase = true) && 
-                     !tabName.equals("Рекомендуем", ignoreCase = true) && 
-                     !tabName.equals("Тренды", ignoreCase = true) && 
-                     !tabName.equals("Новинки", ignoreCase = true))
-                )
+                // Any tab with more than 1 resource contains subcategories/folders to display
+                val isFolderTab = tab.resources.size > 1
 
                 if (isFolderTab) {
                     val folderVideos = tab.resources.map { resource ->
@@ -323,24 +312,48 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             val firstTab = parsed.tabs.first()
                             _selectedFeedTab.value = firstTab
                             
-                            val combined = mutableListOf<Video>()
-                            for (resource in firstTab.resources.take(3)) {
-                                val rawUrl = resource.url ?: continue
-                                val subUrl = if (rawUrl.startsWith("http")) rawUrl else "https://rutube.ru${if (rawUrl.startsWith("/")) "" else "/"}$rawUrl"
-                                val subFinalUrl = if (subUrl.contains("?")) "$subUrl&format=json" else "$subUrl?format=json"
-                                try {
-                                    val subResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(subFinalUrl)
-                                    val subVideos = repository.parseVideoListJson(subResponse.string(), targetCategory)
-                                    combined.addAll(subVideos)
-                                    currentActiveApiEndpoint = subUrl
-                                } catch (resEx: Exception) {
-                                    android.util.Log.e("VideoViewModel", "First tab resource load failed", resEx)
+                            val isFolderTab = firstTab.resources.size > 1
+                            if (isFolderTab) {
+                                val folderVideos = firstTab.resources.map { resource ->
+                                    Video(
+                                        id = "unknown_res_${firstTab.id}_${resource.name.hashCode()}__${resource.url ?: ""}",
+                                        title = resource.name,
+                                        channel = "Папка каталога",
+                                        views = "Подраздел",
+                                        timeAgo = "Открыть",
+                                        duration = "ПАПКА",
+                                        isPro = false,
+                                        category = targetCategory,
+                                        description = "Коллекция контента из раздела: ${resource.name}",
+                                        thumbnailUrl = null
+                                    )
                                 }
-                            }
-                            if (combined.isNotEmpty()) {
-                                _dynamicVideos.value = combined.distinctBy { it.id }
+                                _dynamicVideos.value = folderVideos
+                                currentPage = 1
+                                isEndReached = true
+                                currentActiveApiEndpoint = null
                             } else {
-                                _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                                val combined = mutableListOf<Video>()
+                                for (resource in firstTab.resources.take(3)) {
+                                    val rawUrl = resource.url ?: continue
+                                    val subUrl = if (rawUrl.startsWith("http")) rawUrl else "https://rutube.ru${if (rawUrl.startsWith("/")) "" else "/"}$rawUrl"
+                                    val subFinalUrl = if (subUrl.contains("?")) "$subUrl&format=json" else "$subUrl?format=json"
+                                    try {
+                                        val subResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(subFinalUrl)
+                                        val subVideos = repository.parseVideoListJson(subResponse.string(), targetCategory)
+                                        combined.addAll(subVideos)
+                                        currentActiveApiEndpoint = subUrl
+                                    } catch (resEx: Exception) {
+                                        android.util.Log.e("VideoViewModel", "First tab resource load failed: $rawUrl", resEx)
+                                    }
+                                }
+                                if (combined.isNotEmpty()) {
+                                    _dynamicVideos.value = combined.distinctBy { it.id }
+                                    currentPage = 1
+                                    isEndReached = false
+                                } else {
+                                    _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                                }
                             }
                         } else {
                             _feedTabs.value = emptyList()
