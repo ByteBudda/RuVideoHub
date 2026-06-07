@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import com.example.ui.screens.SleekVideoHubApp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.VideoViewModel
+import com.example.service.BackgroundPlayerService
 
 class MainActivity : ComponentActivity() {
 
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    BackgroundPlayerService.serviceViewModel = viewModel
     window.setFlags(
         android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
         android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
