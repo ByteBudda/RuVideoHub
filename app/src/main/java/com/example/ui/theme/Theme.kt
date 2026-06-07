@@ -11,31 +11,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-  primary = Primary,
-  onPrimary = OnPrimary,
-  primaryContainer = PrimaryContainer,
-  onPrimaryContainer = OnPrimaryContainer,
-  background = Background,
-  onBackground = OnBackground,
-  surface = Surface,
-  onSurface = OnSurface,
-  surfaceVariant = SurfaceVariant,
-  onSurfaceVariant = OnSurfaceVariant,
-  outline = Outline
+  primary = DarkPrimary,
+  onPrimary = DarkOnPrimary,
+  primaryContainer = DarkPrimaryContainer,
+  onPrimaryContainer = DarkOnPrimaryContainer,
+  background = DarkBackground,
+  onBackground = DarkOnBackground,
+  surface = DarkSurface,
+  onSurface = DarkOnSurface,
+  surfaceVariant = DarkSurfaceVariant,
+  onSurfaceVariant = DarkOnSurfaceVariant,
+  outline = DarkOutline,
+  secondaryContainer = DarkSecondaryBackground,
+  tertiaryContainer = DarkProBadgeBg,
+  onTertiaryContainer = DarkProBadgeText
 )
 
 private val LightColorScheme = lightColorScheme(
-  primary = Primary,
-  onPrimary = OnPrimary,
-  primaryContainer = PrimaryContainer,
-  onPrimaryContainer = OnPrimaryContainer,
-  background = Background,
-  onBackground = OnBackground,
-  surface = Surface,
-  onSurface = OnSurface,
-  surfaceVariant = SurfaceVariant,
-  onSurfaceVariant = OnSurfaceVariant,
-  outline = Outline
+  primary = LightPrimary,
+  onPrimary = LightOnPrimary,
+  primaryContainer = LightPrimaryContainer,
+  onPrimaryContainer = LightOnPrimaryContainer,
+  background = LightBackground,
+  onBackground = LightOnBackground,
+  surface = LightSurface,
+  onSurface = LightOnSurface,
+  surfaceVariant = LightSurfaceVariant,
+  onSurfaceVariant = LightOnSurfaceVariant,
+  outline = LightOutline,
+  secondaryContainer = LightSecondaryBackground,
+  tertiaryContainer = LightProBadgeBg,
+  onTertiaryContainer = LightProBadgeText
 )
 
 @Composable
