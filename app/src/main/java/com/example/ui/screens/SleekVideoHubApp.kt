@@ -396,12 +396,26 @@ fun HomeTabScreen(
                         }
                     }
                 } else {
-                    // For folder-lists (subcategories/directories), keep visual layout clean and uniform (no giant hero card)
-                    items(filteredVideos, key = { it.id }) { video ->
-                        SleekFolderItemRow(
-                            video = video,
-                            onFolderClick = { viewModel.selectVideo(video) }
-                        )
+                    // Render folder subdirectories in a gorgeous, compact, content-dense 2-column grid!
+                    val chunkedVideos = filteredVideos.chunked(2)
+                    items(chunkedVideos) { pair ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            pair.forEach { video ->
+                                SleekFolderGridItem(
+                                    video = video,
+                                    onFolderClick = { viewModel.selectVideo(video) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (pair.size < 2) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
 
@@ -797,93 +811,70 @@ fun HeroVideoCard(
 }
 
 @Composable
-fun SleekFolderItemRow(
+fun SleekFolderGridItem(
     video: Video,
     onFolderClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val hashColor = remember(video.title) {
+        val hues = listOf(
+            Color(0xFFFF253E), // Coral Red
+            Color(0xFF00C853), // Emerald Green
+            Color(0xFF00B0FF), // Neon Blue
+            Color(0xFFAA00FF), // Deep Violet
+            Color(0xFFFFD600)  // Gold Amber
+        )
+        val index = kotlin.math.abs(video.title.hashCode()) % hues.size
+        hues[index]
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable(onClick = onFolderClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF161616)
+            containerColor = Color(0xFF161616).copy(alpha = 0.65f)
         ),
         border = BorderStroke(1.dp, Color(0xFF262626))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFFFF253E),
-                                Color(0xFFFF5E70)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Folder,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+                    .width(3.dp)
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(hashColor)
+            )
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = video.title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "Папка каталога",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFF253E).copy(alpha = 0.85f)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(3.dp)
-                            .clip(CircleShape)
-                            .background(Color.Gray.copy(alpha = 0.5f))
-                    )
-                    Text(
-                        text = "Открыть",
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = null,
+                tint = hashColor,
+                modifier = Modifier.size(16.dp)
+            )
+
+            Text(
+                text = video.title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Перейти",
-                tint = Color.Gray.copy(alpha = 0.8f),
-                modifier = Modifier.size(20.dp)
+                contentDescription = "Open",
+                tint = Color.Gray.copy(alpha = 0.6f),
+                modifier = Modifier.size(14.dp)
             )
         }
     }
