@@ -245,14 +245,12 @@ fun HomeTabScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
-    val apiSource by viewModel.apiSource.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxSize()) {
         // App search header
         SleekHeader(
             searchQuery = searchQuery,
-            onSearchQueryChanged = { viewModel.setSearchQuery(it) },
-            apiSource = apiSource
+            onSearchQueryChanged = { viewModel.setSearchQuery(it) }
         )
 
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
@@ -444,7 +442,6 @@ fun HomeTabScreen(
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
-    apiSource: String,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -490,7 +487,7 @@ fun SleekHeader(
                 decorationBox = { innerTextField ->
                     if (searchQuery.isEmpty()) {
                         Text(
-                            text = "Поиск видео на Rutube",
+                            text = "Поиск видео...",
                             color = GreyText,
                             fontSize = 14.sp
                         )
@@ -512,50 +509,6 @@ fun SleekHeader(
                     )
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            val badgeColor = when (apiSource) {
-                "Rutube LIVE" -> Color(0xFF4CAF50)
-                "Встроенные хиты" -> Color(0xFF9C27B0)
-                else -> Color(0xFFFF9800)
-            }
-
-            val statusLabel = when (apiSource) {
-                "Rutube LIVE" -> "Подключено к Rutube LIVE"
-                "Встроенные хиты" -> "Встроенная медиатека (Офлайн)"
-                else -> "Локальный архив (Офлайн)"
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(badgeColor)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = statusLabel,
-                    fontSize = 11.sp,
-                    color = GreyText,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Text(
-                text = "v2.1.0-LIVE",
-                fontSize = 10.sp,
-                color = GreyText.copy(alpha = 0.5f),
-                fontWeight = FontWeight.Light
-            )
         }
     }
 }
@@ -1152,13 +1105,13 @@ fun ExploreTabScreen(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Проводник Rutube",
+            text = "Проводник",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Исследуйте полный каталог категорий, трансляций и шоу в реальном времени с Rutube",
+            text = "Исследуйте полный каталог категорий, трансляций и шоу в реальном времени",
             fontSize = 12.sp,
             color = GreyText,
             modifier = Modifier.padding(top = 4.dp, bottom = 18.dp),
@@ -1986,7 +1939,7 @@ fun VoiceListeningOverlay(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Слушаю Rutube... Произнесите ключевой запрос",
+                text = "Слушаю... Произнесите ключевой запрос",
                 fontSize = 11.sp,
                 color = GreyText,
                 textAlign = TextAlign.Center,
@@ -3284,7 +3237,7 @@ fun RutubeVideoPlayer(
                                 }
                             }
                             Text(
-                                text = if (offlineFile.exists()) "$videoTitle • Offline" else videoTitle.ifBlank { "Rutube Онлайн-превью" },
+                                text = if (offlineFile.exists()) "$videoTitle • Offline" else videoTitle.ifBlank { "Онлайн-превью" },
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -3533,7 +3486,7 @@ enum class VlcAspectRatio(val displayName: String) {
 fun shareVideo(context: android.content.Context, video: Video) {
     val sendIntent = android.content.Intent().apply {
         action = android.content.Intent.ACTION_SEND
-        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Rutube Hub: \"${video.title}\"\n\nПосмотреть на Rutube: https://rutube.ru/video/${video.id}/")
+        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Sleek Video Hub: \"${video.title}\"\n\nПосмотреть: https://rutube.ru/video/${video.id}/")
         type = "text/plain"
     }
     val shareIntent = android.content.Intent.createChooser(sendIntent, "Поделиться видео")
