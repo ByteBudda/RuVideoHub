@@ -135,7 +135,91 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedSubfolderName = MutableStateFlow<String?>(null)
     val selectedSubfolderName = _selectedSubfolderName.asStateFlow()
 
+    data class NavigationSnapshot(
+        val tab: String,
+        val category: String,
+        val feedTab: com.example.data.rutube.SmartRutubeParser.TabInfo?,
+        val subfolderName: String?,
+        val searchQuery: String,
+        val selectedVideo: Video?
+    )
+
+    private val navHistory = java.util.Stack<NavigationSnapshot>()
+
+    fun pushToHistory() {
+        val currentSnapshot = NavigationSnapshot(
+            tab = _currentTab.value,
+            category = _selectedCategory.value,
+            feedTab = _selectedFeedTab.value,
+            subfolderName = _selectedSubfolderName.value,
+            searchQuery = _searchQuery.value,
+            selectedVideo = _currentSelectedVideo.value
+        )
+        if (navHistory.isEmpty() || navHistory.peek() != currentSnapshot) {
+            navHistory.push(currentSnapshot)
+        }
+    }
+
+    fun canNavigateBack(): Boolean {
+        if (_currentSelectedVideo.value != null) return true
+        if (_selectedSubfolderName.value != null) return true
+        if (_searchQuery.value.isNotEmpty()) return true
+        if (_currentTab.value != "home") return true
+        if (_selectedCategory.value != "Фильмы") return true
+        return !navHistory.isEmpty()
+    }
+
+    fun navigateBack(): Boolean {
+        if (_currentSelectedVideo.value != null) {
+            _currentSelectedVideo.value = null
+            return true
+        }
+
+        if (_selectedSubfolderName.value != null) {
+            resetSubfolder()
+            return true
+        }
+
+        if (_searchQuery.value.isNotEmpty()) {
+            setSearchQuery("")
+            return true
+        }
+
+        if (_currentTab.value != "home") {
+            _currentTab.value = "home"
+            return true
+        }
+
+        if (_selectedCategory.value != "Фильмы") {
+            _selectedCategory.value = "Фильмы"
+            fetchRealVideos(query = null, category = "Фильмы")
+            return true
+        }
+
+        if (!navHistory.isEmpty()) {
+            val last = navHistory.pop()
+            _currentTab.value = last.tab
+            _selectedCategory.value = last.category
+            _selectedFeedTab.value = last.feedTab
+            _selectedSubfolderName.value = last.subfolderName
+            _searchQuery.value = last.searchQuery
+            _currentSelectedVideo.value = last.selectedVideo
+
+            if (last.subfolderName == null) {
+                if (last.feedTab != null) {
+                    selectFeedTab(last.feedTab)
+                } else {
+                    fetchRealVideos(query = if (last.searchQuery.isEmpty()) null else last.searchQuery, category = last.category)
+                }
+            }
+            return true
+        }
+
+        return false
+    }
+
     fun resetSubfolder() {
+        pushToHistory()
         _selectedSubfolderName.value = null
         _selectedFeedTab.value?.let { selectFeedTab(it) }
     }
@@ -197,12 +281,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
 
     fun selectCategory(category: String, targetUrl: String? = null) {
+        pushToHistory()
         _selectedCategory.value = category
         _searchQuery.value = ""
         fetchRealVideos(query = null, category = category, targetUrl = targetUrl)
     }
 
     fun selectFeedTab(tab: com.example.data.rutube.SmartRutubeParser.TabInfo) {
+        pushToHistory()
         _selectedFeedTab.value = tab
         _selectedSubfolderName.value = null
         fetchJob?.cancel()
@@ -514,10 +600,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectTab(tab: String) {
-        _currentTab.value = tab
+        if (_currentTab.value != tab) {
+            pushToHistory()
+            _currentTab.value = tab
+        }
     }
 
     fun selectCategory(category: String) {
+        pushToHistory()
         _selectedCategory.value = category
         fetchRealVideos(query = _searchQuery.value, category = category)
     }
@@ -578,6 +668,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectVideo(video: Video?) {
+        pushToHistory()
         if (video != null && video.id.startsWith("tv_")) {
             val fullTvId = video.id.substringAfter("tv_")
             val idParts = fullTvId.split("__")

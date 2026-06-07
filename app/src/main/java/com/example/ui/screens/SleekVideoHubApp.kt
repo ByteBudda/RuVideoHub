@@ -61,12 +61,19 @@ fun SleekVideoHubApp(
     val currentSelectedVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
-    if (currentSelectedVideo == null && (currentTab != "home" || searchQuery.isNotEmpty())) {
-        androidx.activity.compose.BackHandler {
-            if (currentTab != "home") {
-                viewModel.selectTab("home")
-            } else if (searchQuery.isNotEmpty()) {
-                viewModel.setSearchQuery("")
+    val context = LocalContext.current
+    var lastBackPressTime by remember { mutableStateOf(0L) }
+
+    androidx.activity.compose.BackHandler(enabled = currentSelectedVideo == null) {
+        if (viewModel.canNavigateBack()) {
+            viewModel.navigateBack()
+        } else {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastBackPressTime < 2000L) {
+                (context as? android.app.Activity)?.finish()
+            } else {
+                lastBackPressTime = currentTime
+                android.widget.Toast.makeText(context, "Нажмите назад ещё раз для выхода", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }
