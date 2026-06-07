@@ -2230,6 +2230,7 @@ fun SleekPlayerDetailOverlay(
     var isFullscreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var selectedAspectRatio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(VlcAspectRatio.FIT) }
     var showDownloadOptionsDialog by remember { mutableStateOf(false) }
+    var isDescriptionExpanded by remember(video.id) { mutableStateOf(false) }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -2707,26 +2708,55 @@ fun SleekPlayerDetailOverlay(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Expandable Description Box card
+                // Expandable Description Box card (spoiler style)
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground.copy(alpha = 0.6f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize()
+                        .clickable { isDescriptionExpanded = !isDescriptionExpanded }
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "Описание медиафайла",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = video.description,
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp,
-                            color = GreyText
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (isDescriptionExpanded) "Описание медиафайла" else "Показать описание видео...",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            Icon(
+                                imageVector = if (isDescriptionExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isDescriptionExpanded) "Скрыть" else "Развернуть",
+                                tint = GreyText,
+                                modifier = Modifier.size(18.dp)
+                             )
+                        }
+                        if (isDescriptionExpanded) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = video.description.ifBlank { "Описание отсутствует." },
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp,
+                                color = GreyText
+                            )
+                        }
                     }
                 }
 
