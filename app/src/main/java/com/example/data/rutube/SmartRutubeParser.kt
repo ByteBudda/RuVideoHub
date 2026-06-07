@@ -423,8 +423,7 @@ object SmartRutubeParser {
         val name: String,
         val url: String?,
         val detectedType: EntityType,
-        val meta: JSONObject?,
-        val thumbnailUrl: String? = null
+        val meta: JSONObject?
     )
 
     data class PaginationInfo(
@@ -456,16 +455,7 @@ object SmartRutubeParser {
                                 val normalizedResUrl = Utils.normalizeUrl(rawResUrl)
                                 val detectedType = ResourceClassifier.classify(resObj)
                                 val extraParams = resObj.optJSONObject("extra_params")
-                                val picUrl = resObj.optString("picture", 
-                                    resObj.optString("image", 
-                                    resObj.optString("icon", 
-                                    resObj.optString("thumbnail_url", 
-                                    resObj.optString("thumbnail", "")))))
-                                val finalPicUrl = if (picUrl.isNotEmpty()) picUrl else {
-                                    extraParams?.optString("picture", extraParams.optString("image", "")) ?: ""
-                                }
-                                val realPicUrl = if (finalPicUrl.isNotEmpty()) Utils.normalizeUrl(finalPicUrl) else null
-                                resourceList.add(ResourceInfo(resName, normalizedResUrl, detectedType, extraParams, realPicUrl))
+                                resourceList.add(ResourceInfo(resName, normalizedResUrl, detectedType, extraParams))
                             }
                         }
                         tabList.add(TabInfo(tabId, tabName, resourceList))

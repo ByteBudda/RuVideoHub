@@ -398,26 +398,9 @@ fun HomeTabScreen(
                 } else {
                     // For folder-lists (subcategories/directories), keep visual layout clean and uniform (no giant hero card)
                     items(filteredVideos, key = { it.id }) { video ->
-                        SecondaryVideoItemRow(
+                        SleekFolderItemRow(
                             video = video,
-                            onVideoClick = { viewModel.selectVideo(video) },
-                            onDownloadToggle = { viewModel.toggleDownload(video) },
-                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                            onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                {
-                                    val channelDummy = Video(
-                                        id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                        title = video.channel,
-                                        channel = video.channel,
-                                        views = "",
-                                        timeAgo = "",
-                                        duration = "КАНАЛ",
-                                        category = video.category,
-                                        description = ""
-                                    )
-                                    viewModel.selectVideo(channelDummy)
-                                }
-                            } else null
+                            onFolderClick = { viewModel.selectVideo(video) }
                         )
                     }
                 }
@@ -814,6 +797,99 @@ fun HeroVideoCard(
 }
 
 @Composable
+fun SleekFolderItemRow(
+    video: Video,
+    onFolderClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clickable(onClick = onFolderClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF161616)
+        ),
+        border = BorderStroke(1.dp, Color(0xFF262626))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFFF253E),
+                                Color(0xFFFF5E70)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = video.title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Папка каталога",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFF253E).copy(alpha = 0.85f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.5f))
+                    )
+                    Text(
+                        text = "Открыть",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Перейти",
+                tint = Color.Gray.copy(alpha = 0.8f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
 fun SecondaryVideoItemRow(
     video: Video,
     onVideoClick: () -> Unit,
@@ -948,80 +1024,14 @@ fun VideoThumbnail(
             .background(Brush.linearGradient(colors = gradientColors))
     ) {
         if (isFolder) {
-            if (!thumbnailUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = thumbnailUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.2f),
-                                    Color.Black.copy(alpha = 0.7f)
-                                )
-                            )
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(
-                            Color.Black.copy(alpha = 0.5f),
-                            shape = CircleShape
-                        )
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                        .padding(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = "Папка раздела",
-                        tint = Color(0xFFFFB300),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(8.dp)
-                        .background(Color(0xFFFFB300).copy(alpha = 0.95f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "РАЗДЕЛ",
-                        color = Color.Black,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Folder,
-                    contentDescription = "Папка раздела",
-                    tint = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(40.dp)
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(8.dp)
-                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "ПАПКА",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = "Папка раздела",
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp)
+            )
         } else if (!thumbnailUrl.isNullOrBlank()) {
             AsyncImage(
                 model = thumbnailUrl,
