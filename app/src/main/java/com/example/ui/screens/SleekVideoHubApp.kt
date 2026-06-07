@@ -834,48 +834,48 @@ fun SleekFolderGridItem(
             .clickable(onClick = onFolderClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF161616).copy(alpha = 0.65f)
+            containerColor = Color(0xFF1E1E1E).copy(alpha = 0.35f)
         ),
-        border = BorderStroke(1.dp, Color(0xFF262626))
+        border = BorderStroke(1.dp, Color(0xFFFFFFFF).copy(alpha = 0.07f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .width(3.dp)
-                    .height(20.dp)
-                    .clip(RoundedCornerShape(1.5.dp))
-                    .background(hashColor)
-            )
-
-            Icon(
-                imageVector = Icons.Default.Folder,
-                contentDescription = null,
-                tint = hashColor,
-                modifier = Modifier.size(16.dp)
+                    .width(4.dp)
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                hashColor,
+                                hashColor.copy(alpha = 0.3f)
+                            )
+                        )
+                    )
             )
 
             Text(
                 text = video.title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = Color.White.copy(alpha = 0.95f),
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = 16.sp,
+                lineHeight = 17.sp,
                 modifier = Modifier.weight(1f)
             )
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Open",
-                tint = Color.Gray.copy(alpha = 0.6f),
-                modifier = Modifier.size(14.dp)
+                tint = Color.White.copy(alpha = 0.4f),
+                modifier = Modifier.size(16.dp)
             )
         }
     }
