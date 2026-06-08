@@ -47,10 +47,42 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.focus.*
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.composed
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 
+
+@Composable
+fun Modifier.sleekTvFocus(
+    shape: Shape = RoundedCornerShape(12.dp),
+    focusColor: Color = MaterialTheme.colorScheme.primary,
+    onEnter: (() -> Unit)? = null
+): Modifier = this.composed {
+    var isFocused by remember { mutableStateOf(false) }
+    this
+        .onFocusChanged { isFocused = it.isFocused }
+        .onKeyEvent {
+            if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.DirectionCenter || it.key == Key.NumPadEnter)) {
+                onEnter?.invoke()
+                true
+            } else {
+                false
+            }
+        }
+        .focusable()
+        .then(
+            if (isFocused) {
+                Modifier.border(2.dp, focusColor.copy(alpha = 0.8f), shape)
+            } else {
+                Modifier
+            }
+        )
+}
 
 @Composable
 fun SleekVideoHubApp(
@@ -210,6 +242,7 @@ fun RowScope.BottomTabItem(
         verticalArrangement = Arrangement.Center,
         modifier = modifier
             .weight(1f)
+            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = onClick)
             .clickable(onClick = onClick)
             .padding(vertical = 4.dp)
             .testTag(testTag)
@@ -271,6 +304,7 @@ fun HomeTabScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), shape = RoundedCornerShape(12.dp))
+                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.resetSubfolder() })
                     .clickable { viewModel.resetSubfolder() }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -482,6 +516,7 @@ fun SleekHeader(
                 ),
                 modifier = Modifier
                     .weight(1f)
+                    .sleekTvFocus(shape = RoundedCornerShape(8.dp))
                     .testTag("search_input"),
                 singleLine = true,
                 decorationBox = { innerTextField ->
@@ -499,7 +534,7 @@ fun SleekHeader(
             if (searchQuery.isNotEmpty()) {
                 IconButton(
                     onClick = { onSearchQueryChanged("") },
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(28.dp).sleekTvFocus(CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -534,6 +569,7 @@ fun CategoryRow(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isSelected) Primary else SurfaceVariant)
+                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { onCategorySelected(cat) })
                     .clickable { onCategorySelected(cat) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .testTag("category_chip_$cat")
@@ -572,6 +608,7 @@ fun FeedTabRow(
                 modifier = Modifier
                     .clip(RoundedCornerShape(100.dp))
                     .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    .sleekTvFocus(shape = RoundedCornerShape(100.dp), onEnter = { onTabSelected(tab) })
                     .border(
                         width = 1.dp,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -648,6 +685,7 @@ fun HeroVideoCard(
             .fillMaxWidth()
             .widthIn(max = 560.dp)
             .padding(horizontal = 16.dp, vertical = 4.dp)
+            .sleekTvFocus(shape = RoundedCornerShape(28.dp), onEnter = onVideoClick)
             .shadow(
                 elevation = 6.dp,
                 shape = RoundedCornerShape(28.dp),
@@ -718,7 +756,8 @@ fun HeroVideoCard(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
-                                    .clickable(onClick = onChannelClick)
+                                    .sleekTvFocus(shape = RoundedCornerShape(4.dp), onEnter = onChannelClick)
+                                    .clickable(onClick = onChannelClick ?: {})
                                     .weight(1f, fill = false)
                             )
                             Text(
@@ -749,6 +788,7 @@ fun HeroVideoCard(
                         .size(36.dp)
                         .clip(CircleShape)
                         .background(PrimaryContainer)
+                        .sleekTvFocus(CircleShape)
                         .testTag("download_button_${video.id}")
                 ) {
                     Icon(
@@ -784,6 +824,7 @@ fun SleekFolderGridItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = onFolderClick)
             .clickable(onClick = onFolderClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
@@ -846,6 +887,7 @@ fun SecondaryVideoItemRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .sleekTvFocus(shape = RoundedCornerShape(0.dp), onEnter = onVideoClick)
             .clickable(onClick = onVideoClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -886,7 +928,9 @@ fun SecondaryVideoItemRow(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onChannelClick)
+                        modifier = Modifier
+                            .sleekTvFocus(shape = RoundedCornerShape(4.dp), onEnter = onChannelClick)
+                            .clickable(onClick = onChannelClick ?: {})
                     )
                 } else {
                     Text(
@@ -916,7 +960,9 @@ fun SecondaryVideoItemRow(
             ) {
                 IconButton(
                     onClick = onDownloadToggle,
-                    modifier = Modifier.size(24.dp).testTag("quick_download_${video.id}")
+                    modifier = Modifier.size(24.dp)
+                        .sleekTvFocus(CircleShape)
+                        .testTag("quick_download_${video.id}")
                 ) {
                     Icon(
                         imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
@@ -927,7 +973,9 @@ fun SecondaryVideoItemRow(
                 }
                 IconButton(
                     onClick = onBookmarkToggle,
-                    modifier = Modifier.size(24.dp).testTag("quick_bookmark_${video.id}")
+                    modifier = Modifier.size(24.dp)
+                        .sleekTvFocus(CircleShape)
+                        .testTag("quick_bookmark_${video.id}")
                 ) {
                     Icon(
                         imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
@@ -1142,6 +1190,11 @@ fun ExploreTabScreen(
                                 .weight(1f)
                                 .height(115.dp)
                                 .clip(RoundedCornerShape(16.dp))
+                                .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
+                                    viewModel.selectCategory(firstItem.title, firstItem.target)
+                                    viewModel.setSearchQuery("")
+                                    viewModel.selectTab("home")
+                                })
                                 .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                                 .clickable {
                                     viewModel.selectCategory(firstItem.title, firstItem.target)
@@ -1183,6 +1236,11 @@ fun ExploreTabScreen(
                                     .weight(1f)
                                     .height(115.dp)
                                     .clip(RoundedCornerShape(16.dp))
+                                    .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
+                                        viewModel.selectCategory(secondItem.title, secondItem.target)
+                                        viewModel.setSearchQuery("")
+                                        viewModel.selectTab("home")
+                                    })
                                     .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                                     .clickable {
                                         viewModel.selectCategory(secondItem.title, secondItem.target)
@@ -1269,7 +1327,8 @@ fun RecentsTabScreen(
                                 isDownloaded = it.isDownloaded, isBookmarked = it.isBookmarked
                             ))
                         }
-                    }
+                    },
+                    modifier = Modifier.sleekTvFocus(RoundedCornerShape(8.dp))
                 ) {
                     Text("Очистить всё", color = Primary, fontSize = 12.sp)
                 }
@@ -1338,6 +1397,7 @@ fun RecentsTabScreen(
                         border = BorderStroke(1.dp, SurfaceVariant),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -1376,7 +1436,9 @@ fun RecentsTabScreen(
                                 onClick = { 
                                     viewModel.deleteRecentItem(videoRuntime)
                                 },
-                                modifier = Modifier.size(32.dp).testTag("delete_recent_${saved.id}")
+                                modifier = Modifier.size(32.dp)
+                                    .sleekTvFocus(CircleShape)
+                                    .testTag("delete_recent_${saved.id}")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
@@ -1565,6 +1627,7 @@ fun DownloadsTabScreen(
                         border = BorderStroke(1.dp, SurfaceVariant),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -1603,7 +1666,9 @@ fun DownloadsTabScreen(
                                 onClick = { 
                                     viewModel.toggleDownload(videoRuntime)
                                 },
-                                modifier = Modifier.size(32.dp).testTag("delete_download_${saved.id}")
+                                modifier = Modifier.size(32.dp)
+                                    .sleekTvFocus(CircleShape)
+                                    .testTag("delete_download_${saved.id}")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
@@ -1768,6 +1833,7 @@ fun LibraryTabScreen(
                         border = BorderStroke(1.dp, SurfaceVariant),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -1803,7 +1869,9 @@ fun LibraryTabScreen(
 
                             IconButton(
                                 onClick = { viewModel.toggleBookmark(videoRuntime) },
-                                modifier = Modifier.size(32.dp).testTag("delete_bookmark_${saved.id}")
+                                modifier = Modifier.size(32.dp)
+                                    .sleekTvFocus(CircleShape)
+                                    .testTag("delete_bookmark_${saved.id}")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Bookmark,
@@ -3003,6 +3071,14 @@ fun RutubeVideoPlayer(
     Box(
         modifier = modifier
             .background(Color.Black)
+            .onKeyEvent {
+                if (it.type == KeyEventType.KeyDown) {
+                    lastInteractionTime = System.currentTimeMillis()
+                    controlsVisible = true
+                }
+                false
+            }
+            .focusable()
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null
@@ -3070,6 +3146,7 @@ fun RutubeVideoPlayer(
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                             .size(36.dp)
+                            .sleekTvFocus(CircleShape)
                     ) {
                         Icon(
                             imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
@@ -3088,6 +3165,7 @@ fun RutubeVideoPlayer(
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                             .size(36.dp)
+                            .sleekTvFocus(CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -3227,7 +3305,8 @@ fun RutubeVideoPlayer(
                                             viewModel.saveVideoPosition(videoId, currentPos)
                                         }
                                         onToggleFullscreen()
-                                    }
+                                    },
+                                    modifier = Modifier.sleekTvFocus(CircleShape)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ArrowBack,
@@ -3263,7 +3342,7 @@ fun RutubeVideoPlayer(
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(28.dp)
+                                modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp))
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
@@ -3281,7 +3360,7 @@ fun RutubeVideoPlayer(
                                     lastInteractionTime = System.currentTimeMillis()
                                     onShare()
                                 },
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(32.dp).sleekTvFocus(CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
@@ -3316,6 +3395,7 @@ fun RutubeVideoPlayer(
                             modifier = Modifier
                                 .size(44.dp)
                                 .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                .sleekTvFocus(CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FastRewind,
@@ -3341,6 +3421,7 @@ fun RutubeVideoPlayer(
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(Primary.copy(alpha = 0.9f), CircleShape)
+                                .sleekTvFocus(CircleShape)
                         ) {
                             Icon(
                                 imageVector = if (isPlayingState) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -3362,6 +3443,7 @@ fun RutubeVideoPlayer(
                             modifier = Modifier
                                 .size(44.dp)
                                 .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                .sleekTvFocus(CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FastForward,
@@ -3419,6 +3501,7 @@ fun RutubeVideoPlayer(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(28.dp)
+                                    .sleekTvFocus(RoundedCornerShape(14.dp))
                             )
 
                             Text(
@@ -3437,7 +3520,7 @@ fun RutubeVideoPlayer(
                                     }
                                     onToggleFullscreen()
                                 },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp).sleekTvFocus(CircleShape)
                             ) {
                                 Icon(
                                     imageVector = if (isFullscreen) Icons.Default.Close else Icons.Default.AspectRatio,
