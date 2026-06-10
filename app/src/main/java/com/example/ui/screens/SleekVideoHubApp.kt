@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.composed
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -3079,12 +3081,70 @@ fun RutubeVideoPlayer(
                 false
             }
             .focusable()
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null
-            ) {
-                lastInteractionTime = System.currentTimeMillis()
-                controlsVisible = !controlsVisible
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = {
+                        lastInteractionTime = System.currentTimeMillis()
+                        controlsVisible = !controlsVisible
+                    },
+                    onDoubleTap = { offset ->
+                        lastInteractionTime = System.currentTimeMillis()
+                        val width = size.width
+                        if (offset.x < width / 3) {
+                            exoPlayer?.let { player ->
+                                val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
+                                player.seekTo(newPos)
+                                currentPos = newPos
+                                hudMessage = "-10 сек"
+                            }
+                        } else if (offset.x > width * 2 / 3) {
+                            exoPlayer?.let { player ->
+                                val newPos = (player.currentPosition + 10000).coerceAtMost(player.duration ?: 0)
+                                player.seekTo(newPos)
+                                currentPos = newPos
+                                hudMessage = "+10 сек"
+                            }
+                        }
+                    }
+                )
+            }
+            .pointerInput(isFullscreen) {
+                if (isFullscreen) {
+                    detectVerticalDragGestures(
+                        onDragStart = { _ ->
+                            lastInteractionTime = System.currentTimeMillis()
+                        },
+                        onDragEnd = { },
+                        onVerticalDrag = { change, dragAmount ->
+                            lastInteractionTime = System.currentTimeMillis()
+                            val width = size.width.toFloat()
+                            val height = size.height.toFloat()
+                            val isRightSide = change.position.x > width / 2f
+                            
+                            val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                            val activity = context as? android.app.Activity
+                            
+                            if (isRightSide) {
+                                val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
+                                val currentVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
+                                val diff = -(dragAmount / height) * maxVol * 1.5f
+                                val newVol = (currentVol + diff).coerceIn(0f, maxVol)
+                                audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, newVol.toInt(), 0)
+                                hudMessage = "Громкость: ${((newVol / maxVol) * 100).toInt()}%"
+                            } else {
+                                activity?.window?.let { window ->
+                                    val attrs = window.attributes
+                                    val currentBrightness = if (attrs.screenBrightness < 0) 0.5f else attrs.screenBrightness
+                                    val diff = -(dragAmount / height) * 1.5f
+                                    val newBrightness = (currentBrightness + diff).coerceIn(0f, 1f)
+                                    attrs.screenBrightness = newBrightness
+                                    window.attributes = attrs
+                                    hudMessage = "Яркость: ${(newBrightness * 100).toInt()}%"
+                                }
+                            }
+                        }
+                    )
+                }
             },
         contentAlignment = Alignment.Center
     ) {
@@ -3534,17 +3594,22 @@ fun RutubeVideoPlayer(
                 }
             }
 
-            // HUD notification for Aspect Ratio cycles
-            hudMessage?.let { msg ->
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 64.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Text(text = msg, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            // HUD notification for Aspect Ratio cycles, Volume, Brightness
+            androidx.compose.animation.AnimatedVisibility(
+                visible = hudMessage != null,
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                hudMessage?.let { msg ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 24.dp, vertical = 14.dp)
+                    ) {
+                        Text(text = msg, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
