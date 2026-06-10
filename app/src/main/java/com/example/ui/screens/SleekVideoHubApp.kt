@@ -2958,11 +2958,21 @@ fun RutubeVideoPlayer(
     var totalDuration by remember { mutableLongStateOf(0L) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var controlsVisible by remember { mutableStateOf(true) }
+    
+    DisposableEffect(Unit) {
+        val window = (context as? android.app.Activity)?.window
+        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     // HUD message for aspect ratio cycle
     var hudMessage by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(videoId) {
+    var retryTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(videoId, retryTrigger) {
         if (offlineFile.exists()) {
             hlsUrl = offlineFile.absolutePath
             isLoading = false
@@ -2970,6 +2980,10 @@ fun RutubeVideoPlayer(
             isLoading = true
             loadError = null
             useEmbedPlayer = false
+            // Evict cache on retry
+            if (retryTrigger > 0) {
+                viewModel.clearHlsCache(videoId)
+            }
             val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId)
             if (resolvedUrl != null) {
                 hlsUrl = resolvedUrl
@@ -2983,7 +2997,20 @@ fun RutubeVideoPlayer(
 
     val exoPlayer = remember(videoId, hlsUrl) {
         if (hlsUrl == null) null else {
-            androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                .setBufferDurationsMs(32000, 120000, 2500, 5000)
+                .build()
+                
+            val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
+                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build()
+
+            androidx.media3.exoplayer.ExoPlayer.Builder(context)
+                .setAudioAttributes(audioAttributes, true)
+                .setHandleAudioBecomingNoisy(true)
+                .setLoadControl(loadControl)
+                .build().apply {
                 playWhenReady = isPlayingState
                 val uri = if (offlineFile.exists()) {
                     android.net.Uri.fromFile(offlineFile)
@@ -2998,6 +3025,9 @@ fun RutubeVideoPlayer(
                             "Accept" to "*/*",
                             "Referer" to "https://rutube.ru/"
                         ))
+                        .setConnectTimeoutMs(15000)
+                        .setReadTimeoutMs(15000)
+                        .setAllowCrossProtocolRedirects(true)
                     val mediaSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
                         .createMediaSource(androidx.media3.common.MediaItem.fromUri(uri))
                     setMediaSource(mediaSource)
@@ -3029,7 +3059,11 @@ fun RutubeVideoPlayer(
     LaunchedEffect(exoPlayer) {
         exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                useEmbedPlayer = true
+                if (retryTrigger < 3) {
+                    retryTrigger++
+                } else {
+                    useEmbedPlayer = true
+                }
             }
         })
     }

@@ -1603,6 +1603,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clearHlsCache(videoId: String) {
+        _streamUrlCache.remove(videoId)
+    }
+
     suspend fun fetchHlsStreamUrl(videoId: String): String? {
         val cachedUrl = _streamUrlCache[videoId]
         if (cachedUrl != null) {
