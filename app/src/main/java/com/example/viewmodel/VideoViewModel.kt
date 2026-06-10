@@ -884,20 +884,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startPlaybackTicker() {
-        playbackJob?.cancel()
-        playbackJob = viewModelScope.launch {
-            while (_isPlaying.value) {
-                delay(1000)
-                val current = _playProgress.value
-                if (current < 1f) {
-                    _playProgress.value = (current + 0.008f).coerceAtMost(1f)
-                } else {
-                    _isPlaying.value = false
-                    _playProgress.value = 0f
-                    stopPlaybackTicker()
-                }
-            }
-        }
+        // Disabled fake playback ticker because real ExoPlayer handles its own state
     }
 
     private fun stopPlaybackTicker() {
