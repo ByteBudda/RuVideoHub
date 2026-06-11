@@ -2070,7 +2070,8 @@ data class EpisodeInfo(
     val baseTitle: String,
     val season: Int,
     val episode: Int,
-    val rawNum: Int
+    val rawNum: Int,
+    val hasEpisodeInfo: Boolean = false
 )
 
 fun parseEpisode(title: String): EpisodeInfo {
@@ -2154,10 +2155,13 @@ fun parseEpisode(title: String): EpisodeInfo {
         val sSfxMatch = seasonSuffixRegex.find(lower)
         val sPfxMatch = seasonPrefixRegex.find(lower)
         
+        var seasonFound = false
         if (sSfxMatch != null) {
             season = sSfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            seasonFound = true
         } else if (sPfxMatch != null) {
             season = sPfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
+            seasonFound = true
         }
         
         val epSuffixRegex = Regex("""(\d+)\s*(?:-|–|—)?\s*(?:й|ый|ой|го|ий|ая|я|е)?\s*(?:серия|эпизод|выпуск|часть)""")
@@ -2166,12 +2170,19 @@ fun parseEpisode(title: String): EpisodeInfo {
         val epSfxMatch = epSuffixRegex.find(lower)
         val epPfxMatch = epPrefixRegex.find(lower)
         
+        var episodeFound = false
         if (epSfxMatch != null) {
             episode = epSfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
             rawNum = episode
+            episodeFound = true
         } else if (epPfxMatch != null) {
             episode = epPfxMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 1
             rawNum = episode
+            episodeFound = true
+        }
+        
+        if (seasonFound || episodeFound) {
+            matched = true
         }
         
         if (rawNum == -1) {
@@ -2210,7 +2221,7 @@ fun parseEpisode(title: String): EpisodeInfo {
         baseTitle = title.take(15)
     }
     
-    return EpisodeInfo(baseTitle, season, episode, if (rawNum != -1) rawNum else 1)
+    return EpisodeInfo(baseTitle, season, episode, if (rawNum != -1) rawNum else 1, matched)
 }
 
 fun getSortedEpisodes(currentVideo: Video, allVideos: List<Video>): List<Video> {
@@ -2873,7 +2884,11 @@ fun SleekPlayerDetailOverlay(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = "Сезон ${epInfo.season} • Серия ${epInfo.episode}",
+                                    text = if (epInfo.hasEpisodeInfo) {
+                                        "Сезон ${epInfo.season} • Серия ${epInfo.episode}"
+                                    } else {
+                                        "${ep.views} • ${ep.timeAgo}"
+                                    },
                                     fontSize = 9.sp,
                                     color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else GreyText
                                 )
