@@ -92,7 +92,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorActionUrl = card.channelId?.let { "https://rutube.ru/api/video/person/$it/" }
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvShowCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
                 val ratingStr = if (card.rating != null && card.rating > 0.05) " • Кинопоиск: ${card.rating}" else ""
                 val yearVal = card.year ?: "Передача"
                 Video(
@@ -106,6 +106,20 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     category = defaultCategoryName,
                     description = card.description ?: "Смотрите оригинальные сезоны и выпуски бесплатно.",
                     thumbnailUrl = card.poster
+                )
+            }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
+                Video(
+                    id = "playlist_${card.id}__${card.actionUrl ?: ""}",
+                    title = card.title,
+                    channel = "Плейлист • Подборка",
+                    views = "${card.videosCount} видео",
+                    timeAgo = "Смотреть плейлист",
+                    duration = "ПЛЕЙЛИСТ",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = "Смотрите полную подборку видео из этого плейлиста.",
+                    thumbnailUrl = card.thumbnail
                 )
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
@@ -440,10 +454,15 @@ class VideoRepository(private val dao: SavedVideoDao) {
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvShowCard -> {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
                         title = card.title
                         thumbnail = card.poster ?: ""
                         actionUrl = "/feeds/tv/"
+                    }
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
+                        title = card.title
+                        thumbnail = card.thumbnail ?: ""
+                        actionUrl = "/feeds/playlist/"
                     }
                     is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
                         title = card.title

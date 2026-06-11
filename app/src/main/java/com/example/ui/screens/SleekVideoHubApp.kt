@@ -609,7 +609,7 @@ fun FeedTabRow(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(100.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                     .sleekTvFocus(shape = RoundedCornerShape(100.dp), onEnter = { onTabSelected(tab) })
                     .border(
                         width = 1.dp,
@@ -621,9 +621,9 @@ fun FeedTabRow(
             ) {
                 Text(
                     text = tab.name ?: "Раздел",
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -830,9 +830,9 @@ fun SleekFolderGridItem(
             .clickable(onClick = onFolderClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1E1E1E).copy(alpha = 0.35f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
-        border = BorderStroke(1.dp, Color(0xFFFFFFFF).copy(alpha = 0.07f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Row(
             modifier = Modifier
@@ -860,7 +860,7 @@ fun SleekFolderGridItem(
                 text = video.title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.95f),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 17.sp,
@@ -870,7 +870,7 @@ fun SleekFolderGridItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Open",
-                tint = Color.White.copy(alpha = 0.4f),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -1148,6 +1148,19 @@ fun ExploreTabScreen(
     val realCategories by viewModel.realCategories.collectAsStateWithLifecycle()
     val isCategoriesLoading by viewModel.isCategoriesLoading.collectAsStateWithLifecycle()
 
+    val getCategoryGradient = { title: String ->
+        val colors = listOf(
+            listOf(Color(0xFF8B5CF6), Color(0xFF3B0764)), // Purple
+            listOf(Color(0xFF0EA5E9), Color(0xFF0369A1)), // Blue
+            listOf(Color(0xFFEC4899), Color(0xFF9D174D)), // Pink
+            listOf(Color(0xFF10B981), Color(0xFF047857)), // Emerald
+            listOf(Color(0xFFF59E0B), Color(0xFFB45309)), // Amber
+            listOf(Color(0xFFEF4444), Color(0xFF991B1B))  // Red
+        )
+        val index = kotlin.math.abs(title.hashCode()) % colors.size
+        Brush.linearGradient(colors = colors[index])
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -1192,6 +1205,7 @@ fun ExploreTabScreen(
                                 .weight(1f)
                                 .height(115.dp)
                                 .clip(RoundedCornerShape(16.dp))
+                                .background(getCategoryGradient(firstItem.title))
                                 .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
                                     viewModel.selectCategory(firstItem.title, firstItem.target)
                                     viewModel.setSearchQuery("")
@@ -1238,6 +1252,7 @@ fun ExploreTabScreen(
                                     .weight(1f)
                                     .height(115.dp)
                                     .clip(RoundedCornerShape(16.dp))
+                                    .background(getCategoryGradient(secondItem.title))
                                     .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
                                         viewModel.selectCategory(secondItem.title, secondItem.target)
                                         viewModel.setSearchQuery("")

@@ -67,7 +67,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _username = MutableStateFlow<String>("Сергей Петров")
     val username = _username.asStateFlow()
 
-    private val _userAvatar = MutableStateFlow<String>("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=60")
+    private val _userAvatar = MutableStateFlow<String>("")
     val userAvatar = _userAvatar.asStateFlow()
 
     private val db = AppDatabase.getDatabase(application)
@@ -393,7 +393,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         val jsonObj = org.json.JSONObject(bodyStr)
                         val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, finalUrl)
                         
-                        if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.FEED && parsed.tabs.isNotEmpty()) {
+                        if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.FEED_CATALOG && parsed.tabs.isNotEmpty()) {
                             _feedTabs.value = parsed.tabs
                             val firstTab = parsed.tabs.first()
                             _selectedFeedTab.value = firstTab
