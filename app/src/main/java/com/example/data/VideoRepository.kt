@@ -418,7 +418,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
         try {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
-            val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json")
+            val response = apiService.getDynamicUrl("https://rutube.ru/api/v1/feeds/promogroup/382/?format=json&limit=100")
             val bodyStr = response.string()
             val jsonObj = JSONObject(bodyStr)
             val parsedResult = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, "https://rutube.ru/api/v1/feeds/promogroup/382/")
