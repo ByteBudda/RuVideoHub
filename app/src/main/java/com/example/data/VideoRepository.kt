@@ -386,25 +386,25 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
     suspend fun fetchRealCategories(): List<RutubeCategory> {
         val defaultCategories = listOf(
-            RutubeCategory(1001, "Фильмы", "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500", "/api/feeds/movies/"),
-            RutubeCategory(1002, "Сериалы", "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=500", "/api/feeds/serials/"),
-            RutubeCategory(1003, "Телепередачи", "https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=500", "/api/feeds/tv/"),
-            RutubeCategory(1004, "Мультфильмы", "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500", "/api/feeds/cartoons/"),
-            RutubeCategory(1005, "Музыка", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500", "/api/feeds/music/"),
-            RutubeCategory(1006, "Спорт", "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=500", "/api/feeds/sport/"),
-            RutubeCategory(1007, "Юмор", "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500", "/api/feeds/umor/"),
-            RutubeCategory(1008, "Видеоигры", "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=500", "/api/feeds/games/"),
-            RutubeCategory(1009, "Технологии", "https://images.unsplash.com/photo-1518770660439-4636190af475?w=500", "/api/feeds/technologies/"),
-            RutubeCategory(1010, "Блоги", "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=500", "/api/feeds/blogs/"),
-            RutubeCategory(1011, "Новости", "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500", "/api/feeds/news/"),
-            RutubeCategory(1012, "Лайфхаки", "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=500", "/api/feeds/lifehacks/"),
-            RutubeCategory(1013, "Детям", "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=500", "/api/feeds/kids/"),
-            RutubeCategory(1014, "Авто-мото", "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=500", "/api/feeds/auto/"),
-            RutubeCategory(1015, "Обучение", "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500", "/api/feeds/education/"),
-            RutubeCategory(1016, "Путешествия", "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500", "/api/feeds/travel/"),
-            RutubeCategory(1017, "Кулинария", "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500", "/api/feeds/food/"),
-            RutubeCategory(1018, "Аниме", "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500", "/api/feeds/anime/")
-        )
+    RutubeCategory(1001, "Фильмы", "https://pic.rtbcdn.ru/promoitem/55/c1/55c106e53da7e36f144347990cb39885.png", "/api/feeds/movies/"),
+    RutubeCategory(1002, "Сериалы", "https://pic.rtbcdn.ru/promoitem/55/c1/55c106e53da7e36f144347990cb39885.png", "/api/feeds/serials/"),
+    RutubeCategory(1003, "Телепередачи", "https://pic.rtbcdn.ru/promoitem/11/4b/114b0e5e339a889c31ee106e9b986c53.png", "/api/feeds/tv/"),
+    RutubeCategory(1004, "Мультфильмы", "https://pic.rtbcdn.ru/promoitem/2025-06-06/64/73/64734dadd906cefa63183b96cd260e1b.png", "/api/feeds/cartoons/"),
+    RutubeCategory(1005, "Музыка", "https://pic.rtbcdn.ru/promoitem/8c/49/8c49dbbe473765f4c881090860ddee01.png", "/api/feeds/music/"),
+    RutubeCategory(1006, "Спорт", "https://pic.rtbcdn.ru/promoitem/dc/04/dc049d8eb246cec4eeb63c615d302bd4.png", "/api/feeds/sport/"),
+    RutubeCategory(1007, "Юмор", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/umor/"),
+    RutubeCategory(1008, "Видеоигры", "https://pic.rtbcdn.ru/promoitem/8b/57/8b57e8c2550b1a269b028f6567bbffe6.png", "/api/feeds/games/"),
+    RutubeCategory(1009, "Технологии", "https://pic.rtbcdn.ru/promoitem/2025-03-19/a3/c6/a3c653afccb951f5a62bb80c65319a2d.png", "/api/feeds/technologies/"),
+    RutubeCategory(1010, "Блоги", "https://pic.rtbcdn.ru/promoitem/ae/62/ae62f83e8cb442661a825819fdf61d8c.png", "/api/feeds/blogs/"),
+    RutubeCategory(1011, "Новости", "https://pic.rtbcdn.ru/promoitem/3f/e6/3fe614a9cfa0e1c2f25d71102558109d.png", "/api/feeds/news/"),
+    RutubeCategory(1012, "Лайфхаки", "https://pic.rtbcdn.ru/promoitem/2025-03-19/a3/c6/a3c653afccb951f5a62bb80c65319a2d.png", "/api/feeds/lifehacks/"),
+    RutubeCategory(1013, "Детям", "https://pic.rtbcdn.ru/promoitem/eb/a3/eba3273e49348d87f585dea09b68327e.png", "/api/feeds/kids/"),
+    RutubeCategory(1014, "Авто-мото", "https://pic.rtbcdn.ru/promoitem/d5/e9/d5e9d7e180130a06705106f5f12cbf0f.png", "/api/feeds/auto/"),
+    RutubeCategory(1015, "Обучение", "https://pic.rtbcdn.ru/promoitem/15/8d/158d95d4cb03f4187226734c611cfbbe.png", "/api/feeds/education/"),
+    RutubeCategory(1016, "Путешествия", "https://pic.rtbcdn.ru/promoitem/24/95/2495ff72ab1d9a70411f2ee8ef6c3b5f.png", "/api/feeds/travel/"),
+    RutubeCategory(1017, "Кулинария", "https://pic.rtbcdn.ru/promoitem/02/50/0250d5124179a913e26eb8965f48228e.png", "/api/feeds/food/"),
+    RutubeCategory(1018, "Аниме", "https://pic.rtbcdn.ru/promoitem/1d/59/1d59b21c708d89744b20d9f220a47b1a.png", "/api/feeds/anime/")
+)
 
         val categoriesList = mutableListOf<RutubeCategory>()
         categoriesList.addAll(defaultCategories)
