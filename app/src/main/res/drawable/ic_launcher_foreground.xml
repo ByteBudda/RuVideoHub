@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/rutube_ios_icon"
+        android:drawable="@drawable/icon.png"
         android:gravity="center" />
 </layer-list>
