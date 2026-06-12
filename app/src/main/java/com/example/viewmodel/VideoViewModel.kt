@@ -890,6 +890,118 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadVideoByUrlOrId(urlOrId: String) {
+        val trimmedUrl = urlOrId.trim()
+        if (trimmedUrl.isBlank()) return
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                android.util.Log.d("VideoViewModel", "Handling deep link URL: $trimmedUrl")
+                
+                // 1. Is it a Channel? E.g., .../video/person/([0-9a-zA-Z_-]+)... or .../channel/([0-9a-zA-Z_-]+)...
+                val channelPattern = java.util.regex.Pattern.compile("/(?:video/person|channel)/([0-9a-zA-Z_-]+)")
+                val channelMatcher = channelPattern.matcher(trimmedUrl)
+                if (channelMatcher.find()) {
+                    val channelId = channelMatcher.group(1) ?: ""
+                    if (channelId.isNotBlank()) {
+                        val dummyChannelVideo = Video(
+                            id = "channel_${channelId}__https://rutube.ru/api/video/person/$channelId/",
+                            title = "Канал Rutube ($channelId)",
+                            channel = "Канал • Загрузка...",
+                            views = "",
+                            timeAgo = "",
+                            duration = "КАНАЛ",
+                            category = "Каналы",
+                            description = "Загрузка канала из внешнего источника...",
+                            thumbnailUrl = ""
+                        )
+                        selectVideo(dummyChannelVideo)
+                        return@launch
+                    }
+                }
+
+                // 2. Is it a TV series? E.g., .../metainfo/tv/([0-9a-zA-Z_-]+)...
+                val tvPattern = java.util.regex.Pattern.compile("/metainfo/tv/([0-9a-zA-Z_-]+)")
+                val tvMatcher = tvPattern.matcher(trimmedUrl)
+                if (tvMatcher.find()) {
+                    val tvId = tvMatcher.group(1) ?: ""
+                    if (tvId.isNotBlank()) {
+                        val dummyTvVideo = Video(
+                            id = "tv_${tvId}__https://rutube.ru/api/metainfo/tv/$tvId/",
+                            title = "Передача Rutube ($tvId)",
+                            channel = "Шоу • Загрузка...",
+                            views = "",
+                            timeAgo = "",
+                            duration = "СЕРИАЛ",
+                            category = "Телепередачи",
+                            description = "Загрузка передач из внешнего источника...",
+                            thumbnailUrl = ""
+                        )
+                        selectVideo(dummyTvVideo)
+                        return@launch
+                    }
+                }
+
+                // 3. Extract standard video ID
+                val videoId = parseVideoIdFromRutubeUrl(trimmedUrl)
+                if (videoId.isNotBlank()) {
+                    // Try fetching video metadata from api
+                    val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                    val apiUrl = "https://rutube.ru/api/video/$videoId/?format=json"
+                    val response = apiService.getDynamicUrl(apiUrl)
+                    val bodyStr = response.string()
+                    val parsedVideoList = repository.parseVideoListJson(bodyStr, "Разное")
+                    
+                    if (parsedVideoList.isNotEmpty()) {
+                        selectVideo(parsedVideoList.first())
+                    } else {
+                        // Fallback: Create placeholder video if request failed
+                        val fallbackVideo = Video(
+                            id = videoId,
+                            title = "Видео Rutube ($videoId)",
+                            channel = "Rutube",
+                            views = "",
+                            timeAgo = "Только что",
+                            duration = "00:00",
+                            category = "Разное",
+                            description = "Импортировано из внешнего приложения. Приятного просмотра!",
+                            thumbnailUrl = ""
+                        )
+                        selectVideo(fallbackVideo)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Error resolving deep link URL: $trimmedUrl", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private fun parseVideoIdFromRutubeUrl(url: String): String {
+        if (!url.contains("/")) {
+            return url.trim()
+        }
+        
+        // Find 32-character hexadecimal hashes or numeric IDs
+        // Handles: /video/79bda66479f64bfcc233d45f3ba1e899/ or /play/embed/12345/
+        val generalPattern = java.util.regex.Pattern.compile("/(?:video|play/embed)/([a-zA-Z0-9]+)")
+        val matcher = generalPattern.matcher(url)
+        if (matcher.find()) {
+            return matcher.group(1) ?: ""
+        }
+        
+        // General fallback: last segment that looks like a token
+        val cleanUrl = url.substringBefore("?").trimEnd('/')
+        val lastSegment = cleanUrl.substringAfterLast("/")
+        if (lastSegment.length >= 8 && lastSegment.all { it.isLetterOrDigit() }) {
+            return lastSegment
+        }
+        
+        return ""
+    }
+
     fun togglePlayPause() {
         _isPlaying.value = !_isPlaying.value
         if (_isPlaying.value) {
