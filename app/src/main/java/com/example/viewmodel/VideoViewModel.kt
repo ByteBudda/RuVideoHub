@@ -117,13 +117,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _dynamicVideos = MutableStateFlow<List<Video>>(emptyList())
     val dynamicVideos = _dynamicVideos.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading = _isLoading.asStateFlow()
 
     private val _realCategories = MutableStateFlow<List<RutubeCategory>>(emptyList())
     val realCategories = _realCategories.asStateFlow()
 
-    private val _isCategoriesLoading = MutableStateFlow(false)
+    private val _isCategoriesLoading = MutableStateFlow(true)
     val isCategoriesLoading = _isCategoriesLoading.asStateFlow()
 
     private val _feedTabs = MutableStateFlow<List<com.example.data.rutube.SmartRutubeParser.TabInfo>>(emptyList())
