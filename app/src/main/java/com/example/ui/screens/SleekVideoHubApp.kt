@@ -2334,7 +2334,7 @@ fun SleekPlayerDetailOverlay(
             }
         } else {
             if (!isTv) {
-                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             window?.let {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -2352,7 +2352,7 @@ fun SleekPlayerDetailOverlay(
     DisposableEffect(Unit, isTv) {
         onDispose {
             if (!isTv) {
-                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             val window = activity?.window
             window?.let {
