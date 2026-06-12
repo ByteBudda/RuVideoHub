@@ -27,6 +27,19 @@ class MainActivity : ComponentActivity() {
         SleekVideoHubApp(viewModel = viewModel)
       }
     }
+
+    // Handle deep link intent on fresh startup
+    intent?.data?.toString()?.let { url ->
+        viewModel.loadVideoByUrlOrId(url)
+    }
+  }
+
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    intent.data?.toString()?.let { url ->
+        viewModel.loadVideoByUrlOrId(url)
+    }
   }
 }
 
