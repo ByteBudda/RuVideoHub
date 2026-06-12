@@ -457,12 +457,12 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
                         title = card.title
                         thumbnail = card.poster ?: ""
-                        actionUrl = "/feeds/tv/"
+                        actionUrl = card.actionUrl ?: ""
                     }
                     is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
-                        actionUrl = "/feeds/playlist/"
+                        actionUrl = card.actionUrl ?: ""
                     }
                     is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
                         title = card.title
