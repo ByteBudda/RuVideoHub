@@ -2287,6 +2287,17 @@ fun SleekPlayerDetailOverlay(
     var showDownloadOptionsDialog by remember { mutableStateOf(false) }
     var isDescriptionExpanded by remember(video.id) { mutableStateOf(false) }
 
+    val closeButtonFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    LaunchedEffect(video.id) {
+        kotlinx.coroutines.delay(400)
+        try {
+            closeButtonFocusRequester.requestFocus()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions: Map<String, Boolean> ->
@@ -2395,7 +2406,13 @@ fun SleekPlayerDetailOverlay(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player").sleekTvFocus(CircleShape)) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .testTag("dismiss_player")
+                            .focusRequester(closeButtonFocusRequester)
+                            .sleekTvFocus(CircleShape)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Закрыть плеер",
@@ -2476,6 +2493,7 @@ fun SleekPlayerDetailOverlay(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .weight(1f, fill = false)
+                                .sleekTvFocus(RoundedCornerShape(4.dp))
                                 .clickable {
                                     onDismiss()
                                     val channelDummy = Video(
@@ -2732,7 +2750,13 @@ fun SleekPlayerDetailOverlay(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player")) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .testTag("dismiss_player")
+                            .focusRequester(closeButtonFocusRequester)
+                            .sleekTvFocus(CircleShape)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Закрыть плеер",
@@ -2823,6 +2847,7 @@ fun SleekPlayerDetailOverlay(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .weight(1f, fill = false)
+                                .sleekTvFocus(RoundedCornerShape(4.dp))
                                 .clickable {
                                     onDismiss()
                                     val channelDummy = Video(
@@ -2892,6 +2917,7 @@ fun SleekPlayerDetailOverlay(
                             .weight(1f)
                             .height(40.dp)
                             .testTag("player_action_download")
+                            .sleekTvFocus(RoundedCornerShape(20.dp))
                     ) {
                         if (activeDownload != null) {
                             CircularProgressIndicator(
@@ -2931,6 +2957,7 @@ fun SleekPlayerDetailOverlay(
                             .weight(1f)
                             .height(40.dp)
                             .testTag("player_action_bookmark")
+                            .sleekTvFocus(RoundedCornerShape(20.dp))
                     ) {
                         Icon(
                             imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
@@ -2957,6 +2984,7 @@ fun SleekPlayerDetailOverlay(
                             .weight(1f)
                             .height(40.dp)
                             .testTag("player_action_share")
+                            .sleekTvFocus(RoundedCornerShape(20.dp))
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
@@ -3122,6 +3150,7 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .animateContentSize()
+                        .sleekTvFocus(RoundedCornerShape(16.dp), onEnter = { isDescriptionExpanded = !isDescriptionExpanded })
                         .clickable { isDescriptionExpanded = !isDescriptionExpanded }
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
@@ -3183,6 +3212,7 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
+                        .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
                         .clickable { viewModel.selectVideo(ep) },
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
@@ -3346,6 +3376,22 @@ fun RutubeVideoPlayer(
     var totalDuration by remember { mutableLongStateOf(0L) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var controlsVisible by remember { mutableStateOf(true) }
+
+    val playPauseFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val playerBoxFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    LaunchedEffect(controlsVisible) {
+        kotlinx.coroutines.delay(100)
+        try {
+            if (controlsVisible) {
+                playPauseFocusRequester.requestFocus()
+            } else {
+                playerBoxFocusRequester.requestFocus()
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
     
     DisposableEffect(Unit) {
         val window = (context as? android.app.Activity)?.window
@@ -3495,6 +3541,7 @@ fun RutubeVideoPlayer(
     Box(
         modifier = modifier
             .background(Color.Black)
+            .focusRequester(playerBoxFocusRequester)
             .onKeyEvent {
                 if (it.type == KeyEventType.KeyDown) {
                     lastInteractionTime = System.currentTimeMillis()
@@ -3903,6 +3950,7 @@ fun RutubeVideoPlayer(
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(Primary.copy(alpha = 0.9f), CircleShape)
+                                .focusRequester(playPauseFocusRequester)
                                 .sleekTvFocus(CircleShape)
                         ) {
                             Icon(
@@ -4056,7 +4104,7 @@ enum class VlcAspectRatio(val displayName: String) {
 fun shareVideo(context: android.content.Context, video: Video) {
     val sendIntent = android.content.Intent().apply {
         action = android.content.Intent.ACTION_SEND
-        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Sleek Video Hub: \"${video.title}\"\n\nПосмотреть: https://rutube.ru/video/${video.id}/")
+        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Ru Video Hub: \"${video.title}\"\n\nПосмотреть: https://rutube.ru/video/${video.id}/")
         type = "text/plain"
     }
     val shareIntent = android.content.Intent.createChooser(sendIntent, "Поделиться видео")
