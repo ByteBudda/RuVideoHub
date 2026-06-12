@@ -70,8 +70,12 @@ fun Modifier.sleekTvFocus(
         .onFocusChanged { isFocused = it.isFocused }
         .onKeyEvent {
             if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.DirectionCenter || it.key == Key.NumPadEnter)) {
-                onEnter?.invoke()
-                true
+                if (onEnter != null) {
+                    onEnter.invoke()
+                    true
+                } else {
+                    false
+                }
             } else {
                 false
             }
@@ -2297,12 +2301,23 @@ fun SleekPlayerDetailOverlay(
         }
     }
 
+    val isTv = remember(context) {
+        val uiModeManager = context.getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
+        context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+    }
+
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
     // Immersive mode orientation and system bar control
     val activity = context as? android.app.Activity
-    LaunchedEffect(isFullscreen) {
+    LaunchedEffect(isFullscreen, isTv) {
         val window = activity?.window
         if (isFullscreen) {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            if (!isTv) {
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
             window?.let {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                     it.insetsController?.hide(
@@ -2318,7 +2333,9 @@ fun SleekPlayerDetailOverlay(
                 }
             }
         } else {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            if (!isTv) {
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
             window?.let {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                     it.insetsController?.show(
@@ -2332,9 +2349,11 @@ fun SleekPlayerDetailOverlay(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(Unit, isTv) {
         onDispose {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            if (!isTv) {
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
             val window = activity?.window
             window?.let {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -2357,11 +2376,347 @@ fun SleekPlayerDetailOverlay(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    if (isLandscape && !isFullscreen) {
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1.5f)
+                    .fillMaxHeight()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_player").sleekTvFocus(CircleShape)) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Закрыть плеер",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    Text(
+                        text = "${video.category} • Воспроизведение",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Primary,
+                        letterSpacing = 0.5.sp
+                    )
+
+                    Box(modifier = Modifier.size(24.dp))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isPlaying) {
+                        RutubeVideoPlayer(
+                            videoId = video.id,
+                            viewModel = viewModel,
+                            videoTitle = video.title,
+                            aspectMode = selectedAspectRatio,
+                            isFullscreen = false,
+                            onToggleFullscreen = { isFullscreen = true },
+                            onChangeAspectRatio = { selectedAspectRatio = it },
+                            onShare = { shareVideo(context, video) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        VideoThumbnail(
+                            id = video.id,
+                            duration = video.duration,
+                            thumbnailUrl = video.thumbnailUrl,
+                            hasPlayOverlay = true,
+                            isPlaying = false,
+                            onPlayClick = { viewModel.togglePlayPause() },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = video.title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp)
+                ) {
+                    if (!video.authorId.isNullOrBlank()) {
+                        Text(
+                            text = video.channel,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable {
+                                    onDismiss()
+                                    val channelDummy = Video(
+                                        id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                        title = video.channel,
+                                        channel = video.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = "КАНАЛ",
+                                        category = video.category,
+                                        description = ""
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                        )
+                        Text(
+                            text = " • ${video.views} • ${video.timeAgo}",
+                            fontSize = 11.sp,
+                            color = GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else {
+                        Text(
+                            text = "${video.channel} • ${video.views} • ${video.timeAgo}",
+                            fontSize = 11.sp,
+                            color = GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+                val activeDownload = activeDownloads[video.id]
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (video.isDownloaded) {
+                                showDownloadOptionsDialog = true
+                            } else {
+                                if (activeDownload == null) {
+                                    viewModel.toggleDownload(video)
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when {
+                                video.isDownloaded -> Color(0xFF10B981)
+                                activeDownload != null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                else -> PrimaryContainer
+                            },
+                            contentColor = when {
+                                video.isDownloaded -> Color.White
+                                activeDownload != null -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onPrimaryContainer
+                            }
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("player_action_download_land")
+                            .sleekTvFocus(RoundedCornerShape(20.dp))
+                    ) {
+                        if (activeDownload != null) {
+                            CircularProgressIndicator(
+                                progress = { activeDownload.progress },
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = when {
+                                video.isDownloaded -> "Скачано"
+                                activeDownload != null -> "${(activeDownload.progress * 100).toInt()}%"
+                                else -> "Скачать"
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Button(
+                        onClick = { viewModel.toggleBookmark(video) },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (video.isBookmarked) Primary else SurfaceVariant,
+                            contentColor = if (video.isBookmarked) Color.White else GreyText
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("player_action_bookmark_land")
+                            .sleekTvFocus(RoundedCornerShape(20.dp))
+                    ) {
+                        Icon(
+                            imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (video.isBookmarked) "Сохранено" else "В закладки",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SecondaryBackground.copy(alpha = 0.6f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize()
+                        .sleekTvFocus(RoundedCornerShape(16.dp), onEnter = { isDescriptionExpanded = !isDescriptionExpanded })
+                        .clickable { isDescriptionExpanded = !isDescriptionExpanded }
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (isDescriptionExpanded) "Описание медиафайла" else "Показать описание...",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            Icon(
+                                imageVector = if (isDescriptionExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isDescriptionExpanded) "Скрыть" else "Развернуть",
+                                tint = GreyText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        if (isDescriptionExpanded) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = video.description.ifBlank { "Описание отсутствует." },
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp,
+                                color = GreyText
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = if (currentEpList.size > 1) "Смотреть далее" else "Рекомендуем далее",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+
+                currentEpList.forEach { ep ->
+                    val isActive = ep.id == video.id
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
+                            .clickable { viewModel.selectVideo(ep) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                VideoThumbnail(
+                                    id = ep.id,
+                                    duration = ep.duration,
+                                    thumbnailUrl = ep.thumbnailUrl,
+                                    modifier = Modifier
+                                        .width(72.dp)
+                                        .height(44.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = ep.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
+                                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
         // Player header bar - collapses during fullscreen to avoid layout structure alterations
         Box(
             modifier = Modifier
@@ -2913,6 +3268,7 @@ fun SleekPlayerDetailOverlay(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
     }
     }
 }
