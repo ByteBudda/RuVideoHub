@@ -821,8 +821,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        if (video != null && video.id.startsWith("unknown_")) {
-            val parts = video.id.substringAfter("unknown_").split("__")
+        if (video != null && (video.id.startsWith("unknown_") || video.id.startsWith("playlist_") || video.id.startsWith("promo_"))) {
+            val prefix = when {
+                video.id.startsWith("unknown_") -> "unknown_"
+                video.id.startsWith("playlist_") -> "playlist_"
+                video.id.startsWith("promo_") -> "promo_"
+                else -> ""
+            }
+            val parts = video.id.substringAfter(prefix).split("__")
             val rawId = parts.getOrNull(0) ?: ""
             val actionUrl = parts.getOrNull(1) ?: ""
             
@@ -839,6 +845,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     if (rawId.isNotBlank() && rawId.all { it.isDigit() }) {
+                        fallbackUrls.add("https://rutube.ru/api/feeds/promogroup/$rawId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/video/playlist/$rawId/?format=json")
