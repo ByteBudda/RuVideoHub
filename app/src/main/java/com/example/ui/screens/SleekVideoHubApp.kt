@@ -57,8 +57,13 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
-
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.sleekTvFocus(
     shape: Shape = RoundedCornerShape(12.dp),
@@ -66,16 +71,23 @@ fun Modifier.sleekTvFocus(
     onEnter: (() -> Unit)? = null
 ): Modifier = this.composed {
     var isFocused by remember { mutableStateOf(false) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+
     this
-        .onFocusChanged { isFocused = it.isFocused }
-        .onKeyEvent {
-            if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.DirectionCenter || it.key == Key.NumPadEnter)) {
-                if (onEnter != null) {
-                    onEnter.invoke()
-                    true
-                } else {
-                    false
-                }
+        .bringIntoViewRequester(bringIntoViewRequester)
+        .onFocusChanged { state ->
+            isFocused = state.isFocused
+            if (state.isFocused) {
+                scope.launch { bringIntoViewRequester.bringIntoView() }
+            }
+        }
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyUp && 
+                (event.key == Key.Enter || event.key == Key.DirectionCenter || event.key == Key.NumPadEnter)
+            ) {
+                onEnter?.invoke()
+                true
             } else {
                 false
             }
@@ -108,7 +120,7 @@ fun SleekVideoHubApp(
         } else {
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastBackPressTime < 2000L) {
-                (context as? android.app.Activity)?.finish()
+                context.findActivity()?.finish()
             } else {
                 lastBackPressTime = currentTime
                 android.widget.Toast.makeText(context, "Нажмите назад ещё раз для выхода", android.widget.Toast.LENGTH_SHORT).show()
@@ -377,7 +389,8 @@ fun HomeTabScreen(
                 if (filteredVideos.isNotEmpty()) {
                     // Section recommended (hero card for videos, uniform list for folders)
                     val firstItem = filteredVideos.first()
-                    val isFolderList = firstItem.duration == "ПАПКА" || firstItem.duration == "КАТАЛОГ"
+                    val isFolderList = firstItem.duration == "ПАПКА" || 
+                                       firstItem.duration == "КАТАЛОГ"
 
                     if (!isFolderList) {
                         item {
@@ -847,20 +860,38 @@ fun SleekFolderGridItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(24.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                hashColor,
-                                hashColor.copy(alpha = 0.3f)
+            val isChannelType = video.duration == "КАНАЛ"
+            if (!video.thumbnailUrl.isNullOrBlank()) {
+                val imageShape = if (isChannelType) CircleShape else RoundedCornerShape(8.dp)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(imageShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    AsyncImage(
+                        model = video.thumbnailUrl,
+                        contentDescription = video.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    hashColor,
+                                    hashColor.copy(alpha = 0.3f)
+                                )
                             )
                         )
-                    )
-            )
+                )
+            }
 
             Text(
                 text = video.title,
@@ -2275,28 +2306,26 @@ fun SleekPlayerDetailOverlay(
     val progress by viewModel.playProgress.collectAsStateWithLifecycle()
     val allVideos by viewModel.allVideos.collectAsStateWithLifecycle()
 
-    val currentEpList = remember(video, allVideos) {
-        getSortedEpisodes(video, allVideos)
+    val currentEpList by androidx.compose.runtime.produceState<List<Video>>(initialValue = emptyList(), video, allVideos) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            getSortedEpisodes(video, allVideos)
+        }
     }
-    val currentIndex = currentEpList.indexOfFirst { it.id == video.id }
+    val currentIndex = remember(currentEpList, video.id) { currentEpList.indexOfFirst { it.id == video.id } }
 
     val formattedElapsed = viewModel.getFormattedElapsedTime(video.duration, progress)
 
     var isFullscreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var isPlayerActive by remember(video.id) { mutableStateOf(false) }
+    LaunchedEffect(video.id) {
+        kotlinx.coroutines.delay(450)
+        isPlayerActive = true
+    }
     var selectedAspectRatio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(VlcAspectRatio.FIT) }
     var showDownloadOptionsDialog by remember { mutableStateOf(false) }
     var isDescriptionExpanded by remember(video.id) { mutableStateOf(false) }
 
     val closeButtonFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-
-    LaunchedEffect(video.id) {
-        kotlinx.coroutines.delay(400)
-        try {
-            closeButtonFocusRequester.requestFocus()
-        } catch (e: Exception) {
-            // ignore
-        }
-    }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -2322,7 +2351,7 @@ fun SleekPlayerDetailOverlay(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     // Immersive mode orientation and system bar control
-    val activity = context as? android.app.Activity
+    val activity = context.findActivity()
     LaunchedEffect(isFullscreen, isTv) {
         val window = activity?.window
         if (isFullscreen) {
@@ -2392,11 +2421,13 @@ fun SleekPlayerDetailOverlay(
             modifier = modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .focusGroup()
         ) {
             Column(
                 modifier = Modifier
                     .weight(1.5f)
                     .fillMaxHeight()
+                    .focusGroup()
             ) {
                 Row(
                     modifier = Modifier
@@ -2438,7 +2469,7 @@ fun SleekPlayerDetailOverlay(
                         .background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isPlaying) {
+                    if (isPlaying && isPlayerActive) {
                         RutubeVideoPlayer(
                             videoId = video.id,
                             viewModel = viewModel,
@@ -2451,15 +2482,40 @@ fun SleekPlayerDetailOverlay(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        VideoThumbnail(
-                            id = video.id,
-                            duration = video.duration,
-                            thumbnailUrl = video.thumbnailUrl,
-                            hasPlayOverlay = true,
-                            isPlaying = false,
-                            onPlayClick = { viewModel.togglePlayPause() },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            VideoThumbnail(
+                                id = video.id,
+                                duration = video.duration,
+                                thumbnailUrl = video.thumbnailUrl,
+                                hasPlayOverlay = !isPlaying,
+                                isPlaying = false,
+                                onPlayClick = { viewModel.togglePlayPause() },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            if (isPlaying && !isPlayerActive) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(
+                                            color = Primary,
+                                            strokeWidth = 3.dp,
+                                            modifier = Modifier.size(44.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text(
+                                            text = "Подготовка проигрывателя...",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2469,6 +2525,7 @@ fun SleekPlayerDetailOverlay(
                     .weight(1f)
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState())
+                    .focusGroup()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(
@@ -2557,6 +2614,7 @@ fun SleekPlayerDetailOverlay(
                                 else -> MaterialTheme.colorScheme.onPrimaryContainer
                             }
                         ),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
@@ -2577,7 +2635,7 @@ fun SleekPlayerDetailOverlay(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = when {
                                 video.isDownloaded -> "Скачано"
@@ -2585,7 +2643,9 @@ fun SleekPlayerDetailOverlay(
                                 else -> "Скачать"
                             },
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -2596,6 +2656,7 @@ fun SleekPlayerDetailOverlay(
                             containerColor = if (video.isBookmarked) Primary else SurfaceVariant,
                             contentColor = if (video.isBookmarked) Color.White else GreyText
                         ),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
@@ -2607,11 +2668,13 @@ fun SleekPlayerDetailOverlay(
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (video.isBookmarked) "Сохранено" else "В закладки",
+                            text = if (video.isBookmarked) "Сохранено" else "Избранное",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -2680,49 +2743,55 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
 
-                currentEpList.forEach { ep ->
-                    val isActive = ep.id == video.id
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
-                            .clickable { viewModel.selectVideo(ep) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
-                        )
-                    ) {
-                        Row(
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusGroup(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    currentEpList.forEach { ep ->
+                        val isActive = ep.id == video.id
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
+                                .clickable { viewModel.selectVideo(ep) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
+                            )
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                VideoThumbnail(
-                                    id = ep.id,
-                                    duration = ep.duration,
-                                    thumbnailUrl = ep.thumbnailUrl,
-                                    modifier = Modifier
-                                        .width(72.dp)
-                                        .height(44.dp)
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = ep.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
-                                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    VideoThumbnail(
+                                        id = ep.id,
+                                        duration = ep.duration,
+                                        thumbnailUrl = ep.thumbnailUrl,
+                                        modifier = Modifier
+                                            .width(72.dp)
+                                            .height(44.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = ep.title,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
+                                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
@@ -2787,7 +2856,7 @@ fun SleekPlayerDetailOverlay(
                     .aspectRatio(16f / 9f)
             }.background(Color.Black)
         ) {
-            if (isPlaying) {
+            if (isPlaying && isPlayerActive) {
                 RutubeVideoPlayer(
                     videoId = video.id,
                     viewModel = viewModel,
@@ -2800,15 +2869,40 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                VideoThumbnail(
-                    id = video.id,
-                    duration = video.duration,
-                    thumbnailUrl = video.thumbnailUrl,
-                    hasPlayOverlay = true,
-                    isPlaying = false,
-                    onPlayClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.fillMaxSize()
-                )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    VideoThumbnail(
+                        id = video.id,
+                        duration = video.duration,
+                        thumbnailUrl = video.thumbnailUrl,
+                        hasPlayOverlay = !isPlaying,
+                        isPlaying = false,
+                        onPlayClick = { viewModel.togglePlayPause() },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    if (isPlaying && !isPlayerActive) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(
+                                    color = Primary,
+                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(44.dp)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Подготовка проигрывателя...",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -2821,6 +2915,7 @@ fun SleekPlayerDetailOverlay(
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
+                    .focusGroup()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 // Title descriptor
@@ -2886,7 +2981,9 @@ fun SleekPlayerDetailOverlay(
                 val activeDownload = activeDownloads[video.id]
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusGroup(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Download action state button
@@ -2913,6 +3010,7 @@ fun SleekPlayerDetailOverlay(
                                 else -> MaterialTheme.colorScheme.onPrimaryContainer
                             }
                         ),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
@@ -2933,7 +3031,7 @@ fun SleekPlayerDetailOverlay(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = when {
                                 video.isDownloaded -> "Скачано"
@@ -2941,7 +3039,9 @@ fun SleekPlayerDetailOverlay(
                                 else -> "Скачать"
                             },
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -2953,6 +3053,7 @@ fun SleekPlayerDetailOverlay(
                             containerColor = if (video.isBookmarked) Primary else SurfaceVariant,
                             contentColor = if (video.isBookmarked) Color.White else GreyText
                         ),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
@@ -2964,11 +3065,13 @@ fun SleekPlayerDetailOverlay(
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (video.isBookmarked) "Сохранено" else "В закладки",
+                            text = if (video.isBookmarked) "Сохранено" else "Избранное",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -2980,6 +3083,7 @@ fun SleekPlayerDetailOverlay(
                             containerColor = SurfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
@@ -2995,7 +3099,9 @@ fun SleekPlayerDetailOverlay(
                         Text(
                             text = "Поделиться",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -3206,89 +3312,95 @@ fun SleekPlayerDetailOverlay(
                 modifier = Modifier.padding(bottom = 10.dp)
             )
 
-            currentEpList.forEach { ep ->
-                val isActive = ep.id == video.id
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
-                        .clickable { viewModel.selectVideo(ep) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                    ),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
-                    )
-                ) {
-                    Row(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusGroup(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                currentEpList.forEach { ep ->
+                    val isActive = ep.id == video.id
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
+                            .clickable { viewModel.selectVideo(ep) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
+                        )
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            VideoThumbnail(
-                                id = ep.id,
-                                duration = ep.duration,
-                                thumbnailUrl = ep.thumbnailUrl,
-                                modifier = Modifier
-                                    .width(80.dp)
-                                    .height(48.dp)
-                            )
-                            if (isActive) {
-                                Box(
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                VideoThumbnail(
+                                    id = ep.id,
+                                    duration = ep.duration,
+                                    thumbnailUrl = ep.thumbnailUrl,
                                     modifier = Modifier
                                         .width(80.dp)
                                         .height(48.dp)
-                                        .background(Color.Black.copy(alpha = 0.5f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = "Играет сейчас",
-                                        tint = Primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            val epInfo = parseEpisode(ep.title)
-                            Text(
-                                text = ep.title,
-                                fontSize = 11.sp,
-                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
-                                color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = if (epInfo.hasEpisodeInfo) {
-                                        "Сезон ${epInfo.season} • Серия ${epInfo.episode}"
-                                    } else {
-                                        "${ep.views} • ${ep.timeAgo}"
-                                    },
-                                    fontSize = 9.sp,
-                                    color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else GreyText
                                 )
                                 if (isActive) {
-                                    Text(
-                                        text = "Воспроизведение",
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Primary,
+                                    Box(
                                         modifier = Modifier
-                                            .background(Primary.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            .width(80.dp)
+                                            .height(48.dp)
+                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Играет сейчас",
+                                            tint = Primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                val epInfo = parseEpisode(ep.title)
+                                Text(
+                                    text = ep.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
+                                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (epInfo.hasEpisodeInfo) {
+                                            "Сезон ${epInfo.season} • Серия ${epInfo.episode}"
+                                        } else {
+                                            "${ep.views} • ${ep.timeAgo}"
+                                        },
+                                        fontSize = 9.sp,
+                                        color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else GreyText
                                     )
+                                    if (isActive) {
+                                        Text(
+                                            text = "Воспроизведение",
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Primary,
+                                            modifier = Modifier
+                                                .background(Primary.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -3378,23 +3490,20 @@ fun RutubeVideoPlayer(
     var controlsVisible by remember { mutableStateOf(true) }
 
     val playPauseFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-    val playerBoxFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
     LaunchedEffect(controlsVisible) {
-        kotlinx.coroutines.delay(100)
-        try {
-            if (controlsVisible) {
+        if (controlsVisible) {
+            kotlinx.coroutines.delay(100)
+            try {
                 playPauseFocusRequester.requestFocus()
-            } else {
-                playerBoxFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // ignore
             }
-        } catch (e: Exception) {
-            // ignore
         }
     }
     
     DisposableEffect(Unit) {
-        val window = (context as? android.app.Activity)?.window
+        val window = context.findActivity()?.window
         window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose {
             window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -3440,7 +3549,12 @@ fun RutubeVideoPlayer(
                 .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
                 .build()
 
-            androidx.media3.exoplayer.ExoPlayer.Builder(context)
+            val playContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                context.createAttributionContext("mediaPlayer")
+            } else {
+                context
+            }
+            androidx.media3.exoplayer.ExoPlayer.Builder(playContext)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
                 .setLoadControl(loadControl)
@@ -3541,15 +3655,6 @@ fun RutubeVideoPlayer(
     Box(
         modifier = modifier
             .background(Color.Black)
-            .focusRequester(playerBoxFocusRequester)
-            .onKeyEvent {
-                if (it.type == KeyEventType.KeyDown) {
-                    lastInteractionTime = System.currentTimeMillis()
-                    controlsVisible = true
-                }
-                false
-            }
-            .focusable()
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {
@@ -3591,7 +3696,7 @@ fun RutubeVideoPlayer(
                             val isRightSide = change.position.x > width / 2f
                             
                             val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-                            val activity = context as? android.app.Activity
+                            val activity = context.findActivity()
                             
                             if (isRightSide) {
                                 val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
@@ -3800,6 +3905,7 @@ fun RutubeVideoPlayer(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.5f))
+                        .focusGroup()
                         .clickable(
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication = null
@@ -4104,7 +4210,7 @@ enum class VlcAspectRatio(val displayName: String) {
 fun shareVideo(context: android.content.Context, video: Video) {
     val sendIntent = android.content.Intent().apply {
         action = android.content.Intent.ACTION_SEND
-        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Ru Video Hub: \"${video.title}\"\n\nПосмотреть: https://rutube.ru/video/${video.id}/")
+        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в Sleek Video Hub: \"${video.title}\"\n\nПосмотреть: https://rutube.ru/video/${video.id}/")
         type = "text/plain"
     }
     val shareIntent = android.content.Intent.createChooser(sendIntent, "Поделиться видео")
@@ -4117,5 +4223,15 @@ fun formatMillis(ms: Long): String {
     val min = totalSec / 60
     val sec = totalSec % 60
     return String.format("%02d:%02d", min, sec)
+}
+
+// Helper extension function to unwrap Activity from any wrapped Context
+fun android.content.Context.findActivity(): android.app.Activity? {
+    var ctx = this
+    while (ctx is android.content.ContextWrapper) {
+        if (ctx is android.app.Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }
 
