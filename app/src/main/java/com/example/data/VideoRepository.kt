@@ -167,10 +167,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 Video(
                     id = "promo_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
-                    channel = "Реклама",
-                    views = "Промо",
+                    channel = "Подборка",
+                    views = "Подборка",
                     timeAgo = "Перейти по ссылке",
-                    duration = "ПРОМО",
+                    duration = "Список",
                     isPro = true,
                     category = defaultCategoryName,
                     description = card.description ?: "Спонсорский медиаконтент.",
