@@ -77,6 +77,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentTab = MutableStateFlow("home")
     val currentTab = _currentTab.asStateFlow()
 
+    // Theme switching state (true for dark, false for light)
+    private val _isDarkTheme = MutableStateFlow(true)
+    val isDarkTheme = _isDarkTheme.asStateFlow()
+
+    fun toggleTheme() {
+        _isDarkTheme.value = !_isDarkTheme.value
+    }
+
     // Navigation Category chips state: "Фильмы", "Сериалы" etc.
     private val _selectedCategory = MutableStateFlow("Фильмы")
     val selectedCategory = _selectedCategory.asStateFlow()
