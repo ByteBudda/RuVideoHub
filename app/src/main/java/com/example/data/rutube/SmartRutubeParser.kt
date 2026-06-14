@@ -541,7 +541,7 @@ object SmartRutubeParser {
             )
         }
         
-        fun normalizePromo(data: JSONObject): NormalizedCard.PromoCard {
+        fun normalizePromo(data: JSONObject): NormalizedCard.PromoCard? {
             val button = data.optJSONObject("button")
             val actionUrlCheck = button?.optString("button_url")
                 ?.takeIf { it.isNotBlank() }
@@ -550,16 +550,29 @@ object SmartRutubeParser {
                 ?: AdaptiveExtractor.getString(data, "url")
                 .takeIf { it.isNotBlank() }
             val actionUrl = normalizeUrl(actionUrlCheck)
+            val title = AdaptiveExtractor.getString(data, "title", "Untitled")
+            val description = AdaptiveExtractor.getString(data, "description")
+            
+            val checkText = (title + " " + description + " " + actionUrl).lowercase()
+            val isBlocked = checkText.contains("premier") || 
+                            checkText.contains("start") || 
+                            checkText.contains("viju") || 
+                            checkText.contains("премьер") || 
+                            checkText.contains("вижу")
+            if (isBlocked) {
+                return null
+            }
+            
             val id = AdaptiveExtractor.getString(data, "id")
                 .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractor.makeDeterministicId("promo", AdaptiveExtractor.getString(data, "title"), actionUrl)
+                ?: AdaptiveExtractor.makeDeterministicId("promo", title, actionUrl)
             
             return NormalizedCard.PromoCard(
                 id = id,
-                title = AdaptiveExtractor.getString(data, "title", "Untitled"),
+                title = title,
                 thumbnail = (AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() }
                     ?: AdaptiveExtractor.getString(data, "picture").takeIf { it.isNotBlank() }),
-                description = AdaptiveExtractor.getString(data, "description").takeIf { it.isNotBlank() },
+                description = description.takeIf { it.isNotBlank() },
                 actionUrl = actionUrl
             )
         }
@@ -699,24 +712,45 @@ object SmartRutubeParser {
                         }
                     }
                     
-                    resourceList.add(
-                        ResourceInfo(
-                            name = resObj.optString("name", "Раздел"),
-                            url = normalizeUrl(resObj.optString("url")),
-                            type = detectedType,
-                            extraParams = resObj.optJSONObject("extra_params")
+                    val nameVal = resObj.optString("name", "Раздел")
+                    val normUrl = normalizeUrl(resObj.optString("url"))
+                    val checkText = (nameVal + " " + normUrl).lowercase()
+                    val isBlocked = checkText.contains("premier") || 
+                                    checkText.contains("start") || 
+                                    checkText.contains("viju") || 
+                                    checkText.contains("премьер") || 
+                                    checkText.contains("вижу")
+                    
+                    if (!isBlocked) {
+                        resourceList.add(
+                            ResourceInfo(
+                                name = nameVal,
+                                url = normUrl,
+                                type = detectedType,
+                                extraParams = resObj.optJSONObject("extra_params")
+                            )
                         )
-                    )
-                    totalResources++
+                        totalResources++
+                    }
                 }
                 
-                tabList.add(
-                    TabInfo(
-                        id = tabObj.optInt("id", 0),
-                        name = tabObj.optString("name", "Вкладка"),
-                        resources = resourceList
+                val tabName = tabObj.optString("name", "Вкладка")
+                val tabNameLower = tabName.lowercase()
+                val isBlockedTab = tabNameLower.contains("premier") || 
+                                   tabNameLower.contains("start") || 
+                                   tabNameLower.contains("viju") || 
+                                   tabNameLower.contains("премьер") || 
+                                   tabNameLower.contains("вижу")
+                
+                if (!isBlockedTab) {
+                    tabList.add(
+                        TabInfo(
+                            id = tabObj.optInt("id", 0),
+                            name = tabName,
+                            resources = resourceList
+                        )
                     )
-                )
+                }
             }
             
             // Извлечение связанного контента
