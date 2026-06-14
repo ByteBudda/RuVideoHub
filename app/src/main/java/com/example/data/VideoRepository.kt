@@ -84,7 +84,16 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val jsonObj = JSONObject(trimmed)
             val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, isPromoGroup = false, url = url)
             for (card in parsed.items) {
-                mapped.add(mapNormalizedCardToVideo(card, defaultCategoryName))
+                val video = mapNormalizedCardToVideo(card, defaultCategoryName)
+                val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
+                val isBlocked = checkText.contains("premier") || 
+                                checkText.contains("start") || 
+                                checkText.contains("viju") || 
+                                checkText.contains("премьер") || 
+                                checkText.contains("вижу")
+                if (!isBlocked) {
+                    mapped.add(video)
+                }
             }
         } catch (ex: Exception) {
             android.util.Log.e("VideoRepository", "Error parsing results JSON list via SmartRutubeParser", ex)
@@ -524,7 +533,20 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     else -> {}
                 }
 
-                if (title.isNotBlank() && categoriesList.none { it.title.equals(title, ignoreCase = true) }) {
+                val titleLower = title.lowercase()
+                val targetLower = actionUrl.lowercase()
+                val isBlockedCat = titleLower.contains("premier") || 
+                                   titleLower.contains("start") || 
+                                   titleLower.contains("viju") || 
+                                   titleLower.contains("премьер") || 
+                                   titleLower.contains("вижу") ||
+                                   targetLower.contains("premier") || 
+                                   targetLower.contains("start") || 
+                                   targetLower.contains("viju") || 
+                                   targetLower.contains("премьер") || 
+                                   targetLower.contains("вижу")
+
+                if (!isBlockedCat && title.isNotBlank() && categoriesList.none { it.title.equals(title, ignoreCase = true) }) {
                     categoriesList.add(
                         RutubeCategory(
                             id = idVal,
