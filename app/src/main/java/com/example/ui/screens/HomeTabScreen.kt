@@ -141,6 +141,33 @@ fun HomeTabScreen(
                 }
             }
 
+            // Render folder subdirectories in a single-column layout if they have previews,
+            // or in a gorgeous 2-column grid if they do not have previews.
+            val folderItemsToRender = remember(filteredVideos) {
+                val list = mutableListOf<List<Video>>()
+                val currentPair = mutableListOf<Video>()
+                for (video in filteredVideos) {
+                    val hasPreview = !video.thumbnailUrl.isNullOrBlank()
+                    if (hasPreview) {
+                        if (currentPair.isNotEmpty()) {
+                            list.add(currentPair.toList())
+                            currentPair.clear()
+                        }
+                        list.add(listOf(video))
+                    } else {
+                        currentPair.add(video)
+                        if (currentPair.size == 2) {
+                            list.add(currentPair.toList())
+                            currentPair.clear()
+                        }
+                    }
+                }
+                if (currentPair.isNotEmpty()) {
+                    list.add(currentPair.toList())
+                }
+                list
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -211,24 +238,46 @@ fun HomeTabScreen(
                             }
                         }
                     } else {
-                        // Render folder subdirectories in a gorgeous, compact, content-dense 2-column grid!
-                        val chunkedVideos = filteredVideos.chunked(2)
-                        items(chunkedVideos) { pair ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                pair.forEach { video ->
+                        items(folderItemsToRender) { rowItems ->
+                            if (rowItems.size == 1) {
+                                val video = rowItems.first()
+                                if (!video.thumbnailUrl.isNullOrBlank()) {
                                     SleekFolderGridItem(
                                         video = video,
                                         onFolderClick = { viewModel.selectVideo(video) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 4.dp)
                                     )
+                                } else {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        SleekFolderGridItem(
+                                            video = video,
+                                            onFolderClick = { viewModel.selectVideo(video) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
-                                if (pair.size < 2) {
-                                    Spacer(modifier = Modifier.weight(1f))
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    rowItems.forEach { video ->
+                                        SleekFolderGridItem(
+                                            video = video,
+                                            onFolderClick = { viewModel.selectVideo(video) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
                             }
                         }
