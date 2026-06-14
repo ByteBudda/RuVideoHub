@@ -436,24 +436,52 @@ fun LibraryTabScreen(
     modifier: Modifier = Modifier
 ) {
     val bookmarkedVideos by viewModel.bookmarkedSavedVideos.collectAsStateWithLifecycle()
+    val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "Избранное",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Просмотр сохраненного контента и избранных видео",
-            fontSize = 12.sp,
-            color = GreyText,
-            modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Избранное",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Просмотр сохраненного контента и избранных видео",
+                    fontSize = 12.sp,
+                    color = GreyText,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            IconButton(
+                onClick = { viewModel.toggleTheme() },
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape)
+                    .sleekTvFocus(CircleShape)
+                    .testTag("theme_toggle_button")
+            ) {
+                Icon(
+                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                    contentDescription = if (isDarkTheme) "Переключить на светлую тему" else "Переключить на темную тему",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
 
         // Simple Stats Row
         Row(
