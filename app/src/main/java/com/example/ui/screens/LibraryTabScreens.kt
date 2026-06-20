@@ -117,8 +117,8 @@ fun RecentsTabScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(vertical = 2.dp)
             ) {
                 items(recentVideos, key = { it.id }) { saved ->
                     val videoRuntime = Video(
@@ -265,8 +265,8 @@ fun DownloadsTabScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(vertical = 2.dp)
             ) {
                 if (activeList.isNotEmpty()) {
                     item {
@@ -582,7 +582,7 @@ fun LibraryTabScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 items(bookmarkedVideos, key = { it.id }) { saved ->
                      val videoRuntime = Video(

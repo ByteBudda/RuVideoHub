@@ -247,14 +247,14 @@ fun HomeTabScreen(
                                         onFolderClick = { viewModel.selectVideo(video) },
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                                            .padding(horizontal = 16.dp, vertical = 2.dp)
                                     )
                                 } else {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         SleekFolderGridItem(
                                             video = video,
@@ -268,8 +268,8 @@ fun HomeTabScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     rowItems.forEach { video ->
                                         SleekFolderGridItem(
@@ -741,7 +741,7 @@ fun SecondaryVideoItemRow(
             .fillMaxWidth()
             .sleekTvFocus(shape = RoundedCornerShape(0.dp), onEnter = onVideoClick)
             .clickable(onClick = onVideoClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
