@@ -168,7 +168,7 @@ fun SleekBottomNavigation(
         color = SecondaryBackground,
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(64.dp)
             .border(width = 1.dp, color = SurfaceVariant, shape = androidx.compose.ui.graphics.RectangleShape),
         tonalElevation = 4.dp
     ) {
@@ -234,27 +234,27 @@ fun RowScope.BottomTabItem(
             .weight(1f)
             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = onClick)
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
             .testTag(testTag)
     ) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(100.dp))
                 .background(if (isActive) PrimaryContainer else Color.Transparent)
-                .padding(horizontal = 20.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = 3.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(19.dp)
             )
         }
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(1.dp))
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
             color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText
         )
