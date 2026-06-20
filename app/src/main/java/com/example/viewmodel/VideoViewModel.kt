@@ -82,7 +82,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val isDarkTheme = _isDarkTheme.asStateFlow()
 
     fun toggleTheme() {
-        _isDarkTheme.value = !_isDarkTheme.value
+        val newValue = !_isDarkTheme.value
+        _isDarkTheme.value = newValue
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("is_dark_theme", newValue).apply()
     }
 
     // Navigation Category chips state: "Фильмы", "Сериалы" etc.
@@ -269,6 +272,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             com.example.data.rutube.RutubeRetrofitClient.sessionId = savedSessionId
             com.example.data.rutube.RutubeRetrofitClient.csrfToken = savedCsrfToken
         }
+        val savedIsDarkTheme = sharedPrefs.getBoolean("is_dark_theme", true)
+        _isDarkTheme.value = savedIsDarkTheme
         fetchRealVideos()
         fetchRealCategories()
     }
