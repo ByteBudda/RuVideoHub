@@ -314,30 +314,31 @@ fun SleekHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .widthIn(max = 500.dp)
+                .height(44.dp)
+                .clip(RoundedCornerShape(22.dp))
                 .background(SecondaryBackground)
                 .border(
                     width = 1.dp,
                     color = SurfaceVariant,
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(22.dp)
                 )
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Поиск",
                 tint = GreyText,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             BasicTextField(
                 value = searchQuery,
@@ -367,13 +368,13 @@ fun SleekHeader(
             if (searchQuery.isNotEmpty()) {
                 IconButton(
                     onClick = { onSearchQueryChanged("") },
-                    modifier = Modifier.size(28.dp).sleekTvFocus(CircleShape)
+                    modifier = Modifier.size(24.dp).sleekTvFocus(CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Очистить",
                         tint = GreyText,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }
