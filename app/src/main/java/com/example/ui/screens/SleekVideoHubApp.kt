@@ -24,6 +24,8 @@ import com.example.ui.theme.Primary
 import com.example.ui.theme.PrimaryContainer
 import com.example.ui.theme.SecondaryBackground
 import com.example.ui.theme.SurfaceVariant
+import com.example.ui.theme.AmbientGlassBackground
+import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.Shape
@@ -100,14 +102,18 @@ fun SleekVideoHubApp(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+
+    AmbientGlassBackground(isDark = isDarkTheme, modifier = modifier) {
         Scaffold(
             bottomBar = {
                 SleekBottomNavigation(
                     selectedTab = currentTab,
-                    onTabSelected = { viewModel.selectTab(it) }
+                    onTabSelected = { viewModel.selectTab(it) },
+                    isDark = isDarkTheme
                 )
             },
+            containerColor = Color.Transparent,
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
             Box(
@@ -162,20 +168,19 @@ fun SleekVideoHubApp(
 fun SleekBottomNavigation(
     selectedTab: String,
     onTabSelected: (String) -> Unit,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        color = SecondaryBackground,
+    Box(
         modifier = modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
             .height(64.dp)
-            .border(width = 1.dp, color = SurfaceVariant, shape = androidx.compose.ui.graphics.RectangleShape),
-        tonalElevation = 4.dp
+            .liquidGlass(RoundedCornerShape(32.dp), borderWidth = 1.dp, isDark = isDark)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding(),
+            modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {

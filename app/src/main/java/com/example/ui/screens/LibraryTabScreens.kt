@@ -27,6 +27,7 @@ import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.ui.theme.SecondaryBackground
 import com.example.ui.theme.SurfaceVariant
+import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
 
 @Composable
@@ -138,11 +139,11 @@ fun RecentsTabScreen(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                        border = BorderStroke(1.dp, SurfaceVariant),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         modifier = Modifier
                             .fillMaxWidth()
                             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -281,9 +282,10 @@ fun DownloadsTabScreen(
                     items(activeList, key = { "active_" + it.id }) { active ->
                         Card(
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
+                            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Row(
@@ -368,11 +370,11 @@ fun DownloadsTabScreen(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = SecondaryBackground),
-                        border = BorderStroke(1.dp, SurfaceVariant),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         modifier = Modifier
                             .fillMaxWidth()
                             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -487,8 +489,7 @@ fun LibraryTabScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(SecondaryBackground)
+                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme)
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
@@ -602,11 +603,11 @@ fun LibraryTabScreen(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, SurfaceVariant),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         modifier = Modifier
                             .fillMaxWidth()
                             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(

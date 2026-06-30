@@ -40,6 +40,7 @@ import com.example.ui.theme.SecondaryBackground
 import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.ProBadgeBg
 import com.example.ui.theme.ProBadgeText
+import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -57,11 +58,14 @@ fun HomeTabScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
 
+    val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+
     Column(modifier = modifier.fillMaxSize()) {
         // App search header
         SleekHeader(
             searchQuery = searchQuery,
-            onSearchQueryChanged = { viewModel.setSearchQuery(it) }
+            onSearchQueryChanged = { viewModel.setSearchQuery(it) },
+            isDark = isDarkTheme
         )
 
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
@@ -72,7 +76,8 @@ fun HomeTabScreen(
             FeedTabRow(
                 tabs = feedTabs,
                 selectedTab = selectedFeedTab,
-                onTabSelected = { viewModel.selectFeedTab(it) }
+                onTabSelected = { viewModel.selectFeedTab(it) },
+                isDark = isDarkTheme
             )
         }
 
@@ -81,9 +86,9 @@ fun HomeTabScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), shape = RoundedCornerShape(12.dp))
                     .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.resetSubfolder() })
                     .clickable { viewModel.resetSubfolder() }
+                    .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -309,6 +314,7 @@ fun HomeTabScreen(
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -322,13 +328,7 @@ fun SleekHeader(
                 .fillMaxWidth()
                 .widthIn(max = 500.dp)
                 .height(44.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(SecondaryBackground)
-                .border(
-                    width = 1.dp,
-                    color = SurfaceVariant,
-                    shape = RoundedCornerShape(22.dp)
-                )
+                .liquidGlass(RoundedCornerShape(22.dp), borderWidth = 1.dp, isDark = isDark)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -424,6 +424,7 @@ fun FeedTabRow(
     tabs: List<com.example.data.rutube.SmartRutubeParser.TabInfo>,
     selectedTab: com.example.data.rutube.SmartRutubeParser.TabInfo?,
     onTabSelected: (com.example.data.rutube.SmartRutubeParser.TabInfo) -> Unit,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (tabs.isEmpty()) return
@@ -440,14 +441,21 @@ fun FeedTabRow(
             
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(100.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                    .sleekTvFocus(shape = RoundedCornerShape(100.dp), onEnter = { onTabSelected(tab) })
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = RoundedCornerShape(100.dp)
+                    .then(
+                        if (isSelected) {
+                            Modifier
+                                .clip(RoundedCornerShape(100.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                                .border(
+                                    width = 1.dp,
+                                    color = Color.White.copy(alpha = 0.25f),
+                                    shape = RoundedCornerShape(100.dp)
+                                )
+                        } else {
+                            Modifier.liquidGlass(RoundedCornerShape(100.dp), borderWidth = 1.dp, isDark = isDark)
+                        }
                     )
+                    .sleekTvFocus(shape = RoundedCornerShape(100.dp), onEnter = { onTabSelected(tab) })
                     .clickable { onTabSelected(tab) }
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
@@ -513,20 +521,13 @@ fun HeroVideoCard(
 ) {
     Card(
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, SurfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 560.dp)
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .sleekTvFocus(shape = RoundedCornerShape(28.dp), onEnter = onVideoClick)
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(28.dp),
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.2f),
-                spotColor = Color.Black.copy(alpha = 0.2f)
-            )
+            .liquidGlass(RoundedCornerShape(28.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
             .clickable(onClick = onVideoClick)
     ) {
         Column {
@@ -655,16 +656,12 @@ fun SleekFolderGridItem(
         hues[index]
     }
 
-    Card(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = onFolderClick)
-            .clickable(onClick = onFolderClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            .clickable(onClick = onFolderClick)
+            .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
     ) {
         Row(
             modifier = Modifier
@@ -739,9 +736,11 @@ fun SecondaryVideoItemRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .sleekTvFocus(shape = RoundedCornerShape(0.dp), onEnter = onVideoClick)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = onVideoClick)
             .clickable(onClick = onVideoClick)
-            .padding(horizontal = 16.dp, vertical = 5.dp),
+            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+            .padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

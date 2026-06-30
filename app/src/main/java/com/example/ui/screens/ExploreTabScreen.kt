@@ -91,7 +91,17 @@ fun ExploreTabScreen(
                                     viewModel.setSearchQuery("")
                                     viewModel.selectTab("home")
                                 })
-                                .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            Color.White.copy(alpha = 0.45f),
+                                            Color.White.copy(alpha = 0.1f),
+                                            Color.Black.copy(alpha = 0.25f)
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
                                 .clickable {
                                     viewModel.selectCategory(firstItem.title, firstItem.target)
                                     viewModel.setSearchQuery("")
@@ -138,7 +148,17 @@ fun ExploreTabScreen(
                                         viewModel.setSearchQuery("")
                                         viewModel.selectTab("home")
                                     })
-                                    .border(1.dp, SurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.45f),
+                                                Color.White.copy(alpha = 0.1f),
+                                                Color.Black.copy(alpha = 0.25f)
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
                                     .clickable {
                                         viewModel.selectCategory(secondItem.title, secondItem.target)
                                         viewModel.setSearchQuery("")
