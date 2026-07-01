@@ -670,7 +670,8 @@ fun LibraryTabScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
                                     text = saved.channel,
