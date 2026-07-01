@@ -23,7 +23,16 @@ class MainActivity : ComponentActivity() {
         android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
         android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
     )
-    enableEdgeToEdge()
+    enableEdgeToEdge(
+        statusBarStyle = androidx.activity.SystemBarStyle.auto(
+            android.graphics.Color.TRANSPARENT,
+            android.graphics.Color.TRANSPARENT
+        ),
+        navigationBarStyle = androidx.activity.SystemBarStyle.auto(
+            android.graphics.Color.TRANSPARENT,
+            android.graphics.Color.TRANSPARENT
+        )
+    )
     setContent {
       val isDarkTheme by viewModel.isDarkTheme.collectAsState()
       MyApplicationTheme(darkTheme = isDarkTheme) {
