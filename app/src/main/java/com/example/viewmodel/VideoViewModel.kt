@@ -88,6 +88,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putBoolean("is_dark_theme", newValue).apply()
     }
 
+    // TV Optimization / Low power state for weak devices
+    private val _isTvOptimized = MutableStateFlow(false)
+    val isTvOptimized = _isTvOptimized.asStateFlow()
+
+    fun toggleTvOptimized() {
+        val newValue = !_isTvOptimized.value
+        _isTvOptimized.value = newValue
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("is_tv_optimized", newValue).apply()
+    }
+
     // Navigation Category chips state: "Фильмы", "Сериалы" etc.
     private val _selectedCategory = MutableStateFlow("Фильмы")
     val selectedCategory = _selectedCategory.asStateFlow()
@@ -274,6 +285,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
         val savedIsDarkTheme = sharedPrefs.getBoolean("is_dark_theme", true)
         _isDarkTheme.value = savedIsDarkTheme
+
+        // Auto-detect Android TV if UI mode or leanback is active, otherwise default to user preference
+        val uiModeManager = getApplication<Application>().getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        val isDeviceTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
+                getApplication<Application>().packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+        val savedIsTvOptimized = sharedPrefs.getBoolean("is_tv_optimized", isDeviceTv)
+        _isTvOptimized.value = savedIsTvOptimized
+
         fetchRealVideos()
         fetchRealCategories()
     }
