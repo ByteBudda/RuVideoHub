@@ -59,13 +59,15 @@ fun HomeTabScreen(
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
 
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxSize()) {
         // App search header
         SleekHeader(
             searchQuery = searchQuery,
             onSearchQueryChanged = { viewModel.setSearchQuery(it) },
-            isDark = isDarkTheme
+            isDark = isDarkTheme,
+            isTvOptimized = isTvOptimized
         )
 
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
@@ -77,7 +79,8 @@ fun HomeTabScreen(
                 tabs = feedTabs,
                 selectedTab = selectedFeedTab,
                 onTabSelected = { viewModel.selectFeedTab(it) },
-                isDark = isDarkTheme
+                isDark = isDarkTheme,
+                isTvOptimized = isTvOptimized
             )
         }
 
@@ -88,7 +91,7 @@ fun HomeTabScreen(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.resetSubfolder() })
                     .clickable { viewModel.resetSubfolder() }
-                    .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme)
+                    .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -176,7 +179,7 @@ fun HomeTabScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 if (filteredVideos.isNotEmpty()) {
                     // Section recommended (hero card for videos, uniform list for folders)
@@ -197,6 +200,7 @@ fun HomeTabScreen(
                                     video = firstItem,
                                     onVideoClick = { viewModel.selectVideo(firstItem) },
                                     onDownloadToggle = { viewModel.toggleDownload(firstItem) },
+                                    isDark = isDarkTheme,
                                     onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
                                         {
                                             val channelDummy = Video(
@@ -211,7 +215,8 @@ fun HomeTabScreen(
                                             )
                                             viewModel.selectVideo(channelDummy)
                                         }
-                                    } else null
+                                    } else null,
+                                    isTvOptimized = isTvOptimized
                                 )
                             }
                         }
@@ -224,6 +229,7 @@ fun HomeTabScreen(
                                     onVideoClick = { viewModel.selectVideo(video) },
                                     onDownloadToggle = { viewModel.toggleDownload(video) },
                                     onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                    isDark = isDarkTheme,
                                     onChannelClick = if (!video.authorId.isNullOrBlank()) {
                                         {
                                             val channelDummy = Video(
@@ -238,7 +244,8 @@ fun HomeTabScreen(
                                             )
                                             viewModel.selectVideo(channelDummy)
                                         }
-                                    } else null
+                                    } else null,
+                                    isTvOptimized = isTvOptimized
                                 )
                             }
                         }
@@ -250,6 +257,8 @@ fun HomeTabScreen(
                                     SleekFolderGridItem(
                                         video = video,
                                         onFolderClick = { viewModel.selectVideo(video) },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 2.dp)
@@ -264,6 +273,8 @@ fun HomeTabScreen(
                                         SleekFolderGridItem(
                                             video = video,
                                             onFolderClick = { viewModel.selectVideo(video) },
+                                            isDark = isDarkTheme,
+                                            isTvOptimized = isTvOptimized,
                                             modifier = Modifier.weight(1f)
                                         )
                                         Spacer(modifier = Modifier.weight(1f))
@@ -280,6 +291,8 @@ fun HomeTabScreen(
                                         SleekFolderGridItem(
                                             video = video,
                                             onFolderClick = { viewModel.selectVideo(video) },
+                                            isDark = isDarkTheme,
+                                            isTvOptimized = isTvOptimized,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -315,6 +328,7 @@ fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
     isDark: Boolean,
+    isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -328,7 +342,7 @@ fun SleekHeader(
                 .fillMaxWidth()
                 .widthIn(max = 500.dp)
                 .height(44.dp)
-                .liquidGlass(RoundedCornerShape(22.dp), borderWidth = 1.dp, isDark = isDark)
+                .liquidGlass(RoundedCornerShape(22.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -425,6 +439,7 @@ fun FeedTabRow(
     selectedTab: com.example.data.rutube.SmartRutubeParser.TabInfo?,
     onTabSelected: (com.example.data.rutube.SmartRutubeParser.TabInfo) -> Unit,
     isDark: Boolean,
+    isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (tabs.isEmpty()) return
@@ -452,7 +467,7 @@ fun FeedTabRow(
                                     shape = RoundedCornerShape(100.dp)
                                 )
                         } else {
-                            Modifier.liquidGlass(RoundedCornerShape(100.dp), borderWidth = 1.dp, isDark = isDark)
+                            Modifier.liquidGlass(RoundedCornerShape(100.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
                         }
                     )
                     .sleekTvFocus(shape = RoundedCornerShape(100.dp), onEnter = { onTabSelected(tab) })
@@ -516,7 +531,9 @@ fun HeroVideoCard(
     video: Video,
     onVideoClick: () -> Unit,
     onDownloadToggle: () -> Unit,
+    isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
+    isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -527,7 +544,7 @@ fun HeroVideoCard(
             .widthIn(max = 560.dp)
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .sleekTvFocus(shape = RoundedCornerShape(28.dp), onEnter = onVideoClick)
-            .liquidGlass(RoundedCornerShape(28.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+            .liquidGlass(RoundedCornerShape(28.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .clickable(onClick = onVideoClick)
     ) {
         Column {
@@ -642,6 +659,8 @@ fun HeroVideoCard(
 fun SleekFolderGridItem(
     video: Video,
     onFolderClick: () -> Unit,
+    isDark: Boolean,
+    isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hashColor = remember(video.title) {
@@ -661,7 +680,7 @@ fun SleekFolderGridItem(
             .fillMaxWidth()
             .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = onFolderClick)
             .clickable(onClick = onFolderClick)
-            .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+            .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
     ) {
         Row(
             modifier = Modifier
@@ -730,7 +749,9 @@ fun SecondaryVideoItemRow(
     onVideoClick: () -> Unit,
     onDownloadToggle: () -> Unit,
     onBookmarkToggle: () -> Unit,
+    isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
+    isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -739,7 +760,7 @@ fun SecondaryVideoItemRow(
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = onVideoClick)
             .clickable(onClick = onVideoClick)
-            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -36,6 +36,8 @@ fun RecentsTabScreen(
     modifier: Modifier = Modifier
 ) {
     val recentVideos by viewModel.recentSavedVideos.collectAsStateWithLifecycle()
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+    val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -119,7 +121,7 @@ fun RecentsTabScreen(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(vertical = 2.dp)
+                contentPadding = PaddingValues(top = 2.dp, bottom = 80.dp)
             ) {
                 items(recentVideos, key = { it.id }) { saved ->
                     val videoRuntime = Video(
@@ -143,7 +145,7 @@ fun RecentsTabScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
-                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -209,6 +211,8 @@ fun DownloadsTabScreen(
     val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
     val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
     val activeList = remember(activeDownloads) { activeDownloads.values.toList() }
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+    val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -267,7 +271,7 @@ fun DownloadsTabScreen(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(vertical = 2.dp)
+                contentPadding = PaddingValues(top = 2.dp, bottom = 80.dp)
             ) {
                 if (activeList.isNotEmpty()) {
                     item {
@@ -285,7 +289,7 @@ fun DownloadsTabScreen(
                             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+                                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Row(
@@ -374,7 +378,7 @@ fun DownloadsTabScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
-                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(
@@ -439,6 +443,7 @@ fun LibraryTabScreen(
 ) {
     val bookmarkedVideos by viewModel.bookmarkedSavedVideos.collectAsStateWithLifecycle()
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -467,21 +472,53 @@ fun LibraryTabScreen(
                 )
             }
 
-            IconButton(
-                onClick = { viewModel.toggleTheme() },
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape)
-                    .sleekTvFocus(CircleShape)
-                    .testTag("theme_toggle_button")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                    contentDescription = if (isDarkTheme) "Переключить на светлую тему" else "Переключить на темную тему",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
+                // TV Optimization Toggle button
+                IconButton(
+                    onClick = { viewModel.toggleTvOptimized() },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(
+                            if (isTvOptimized) MaterialTheme.colorScheme.primaryContainer 
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            CircleShape
+                        )
+                        .border(
+                            1.dp,
+                            if (isTvOptimized) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                            CircleShape
+                        )
+                        .sleekTvFocus(CircleShape)
+                        .testTag("tv_optimization_toggle_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = if (isTvOptimized) "Отключить ТВ-оптимизацию" else "Включить ТВ-оптимизацию",
+                        tint = if (isTvOptimized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { viewModel.toggleTheme() },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape)
+                        .sleekTvFocus(CircleShape)
+                        .testTag("theme_toggle_button")
+                ) {
+                    Icon(
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = if (isDarkTheme) "Переключить на светлую тему" else "Переключить на темную тему",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -489,7 +526,7 @@ fun LibraryTabScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme)
+                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
@@ -583,7 +620,8 @@ fun LibraryTabScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 items(bookmarkedVideos, key = { it.id }) { saved ->
                      val videoRuntime = Video(
@@ -607,7 +645,7 @@ fun LibraryTabScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
-                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isSystemInDarkTheme())
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                             .clickable { viewModel.selectVideo(videoRuntime) }
                     ) {
                         Row(

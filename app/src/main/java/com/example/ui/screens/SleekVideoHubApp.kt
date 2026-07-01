@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.ui.theme.PrimaryContainer
@@ -103,40 +104,87 @@ fun SleekVideoHubApp(
     }
 
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
-    AmbientGlassBackground(isDark = isDarkTheme, modifier = modifier) {
-        Scaffold(
-            bottomBar = {
-                SleekBottomNavigation(
+    AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
+        if (isTvOptimized) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                SleekTvNavigationRail(
                     selectedTab = currentTab,
                     onTabSelected = { viewModel.selectTab(it) },
-                    isDark = isDarkTheme
+                    isDark = isDarkTheme,
+                    isTvOptimized = isTvOptimized
                 )
-            },
-            containerColor = Color.Transparent,
-            modifier = Modifier.fillMaxSize()
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                // Main switcher content based on selected tab
-                AnimatedContent(
-                    targetState = currentTab,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(250)) togetherWith fadeOut(animationSpec = tween(200))
-                    },
-                    label = "tab_fade",
-                    modifier = Modifier.fillMaxSize()
-                ) { tab ->
-                    when (tab) {
-                        "home" -> HomeTabScreen(viewModel = viewModel)
-                        "explore" -> ExploreTabScreen(viewModel = viewModel)
-                        "recents" -> RecentsTabScreen(viewModel = viewModel)
-                        "downloads" -> DownloadsTabScreen(viewModel = viewModel)
-                        "library" -> LibraryTabScreen(viewModel = viewModel)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    // Main switcher content based on selected tab
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(120))
+                        },
+                        label = "tab_fade",
+                        modifier = Modifier.fillMaxSize()
+                    ) { tab ->
+                        when (tab) {
+                            "home" -> HomeTabScreen(viewModel = viewModel)
+                            "explore" -> ExploreTabScreen(viewModel = viewModel)
+                            "recents" -> RecentsTabScreen(viewModel = viewModel)
+                            "downloads" -> DownloadsTabScreen(viewModel = viewModel)
+                            "library" -> LibraryTabScreen(viewModel = viewModel)
+                        }
                     }
+                }
+            }
+        } else {
+            Scaffold(
+                containerColor = Color.Transparent,
+                modifier = Modifier.fillMaxSize()
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Main switcher content based on selected tab
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(250)) togetherWith fadeOut(animationSpec = tween(200))
+                        },
+                        label = "tab_fade",
+                        modifier = Modifier.fillMaxSize()
+                    ) { tab ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = innerPadding.calculateTopPadding())
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                when (tab) {
+                                    "home" -> HomeTabScreen(viewModel = viewModel)
+                                    "explore" -> ExploreTabScreen(viewModel = viewModel)
+                                    "recents" -> RecentsTabScreen(viewModel = viewModel)
+                                    "downloads" -> DownloadsTabScreen(viewModel = viewModel)
+                                    "library" -> LibraryTabScreen(viewModel = viewModel)
+                                }
+                            }
+                        }
+                    }
+
+                    // Floating dock panel at the bottom center (like macOS Dock)
+                    SleekBottomNavigation(
+                        selectedTab = currentTab,
+                        onTabSelected = { viewModel.selectTab(it) },
+                        isDark = isDarkTheme,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 6.dp)
+                    )
                 }
             }
         }
@@ -173,11 +221,28 @@ fun SleekBottomNavigation(
 ) {
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-            .height(64.dp)
-            .liquidGlass(RoundedCornerShape(32.dp), borderWidth = 1.dp, isDark = isDark)
+            .widthIn(max = 480.dp)
+            .fillMaxWidth(0.92f)
+            .height(68.dp)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDark) {
+                        listOf(
+                            Color(0xCC221F2E),
+                            Color(0xD9161421)
+                        )
+                    } else {
+                        listOf(
+                            Color(0xF2FFFFFF),
+                            Color(0xE6EAE6F3)
+                        )
+                    }
+                ),
+                shape = RoundedCornerShape(24.dp)
+            )
+            .liquidGlass(RoundedCornerShape(24.dp), borderWidth = 1.5.dp, isDark = isDark)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -265,3 +330,82 @@ fun RowScope.BottomTabItem(
         )
     }
 }
+
+@Composable
+fun SleekTvNavigationRail(
+    selectedTab: String,
+    onTabSelected: (String) -> Unit,
+    isDark: Boolean,
+    isTvOptimized: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(88.dp)
+            .background(if (isDark) Color(0xFF14131A) else Color(0xFFF0EDF5))
+            .padding(vertical = 16.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // App logo or accent
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Rutube Logo",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        listOf(
+            Triple("home", Icons.Default.Home, "Главная"),
+            Triple("explore", Icons.Default.Explore, "Обзор"),
+            Triple("recents", Icons.Default.History, "Недавние"),
+            Triple("downloads", Icons.Default.Download, "Загрузки"),
+            Triple("library", Icons.Default.Favorite, "Избранное")
+        ).forEach { (tabId, icon, label) ->
+            val isActive = selectedTab == tabId
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { onTabSelected(tabId) })
+                    .clickable { onTabSelected(tabId) }
+                    .padding(vertical = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isActive) PrimaryContainer else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = label,
+                    fontSize = 10.sp,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText
+                )
+            }
+        }
+    }
+}
+
