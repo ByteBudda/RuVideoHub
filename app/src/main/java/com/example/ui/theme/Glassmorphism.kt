@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 fun AmbientGlassBackground(
     isDark: Boolean,
     modifier: Modifier = Modifier,
+    isTvOptimized: Boolean = false,
     content: @Composable () -> Unit
 ) {
     Box(
@@ -34,7 +35,7 @@ fun AmbientGlassBackground(
             .drawBehind {
                 val width = size.width
                 val height = size.height
-                if (width > 0 && height > 0) {
+                if (width > 0 && height > 0 && !isTvOptimized) {
                     // Blob 1: Top Right - Amethyst Purple
                     drawCircle(
                         brush = Brush.radialGradient(
@@ -93,42 +94,61 @@ fun AmbientGlassBackground(
 fun Modifier.liquidGlass(
     shape: Shape,
     borderWidth: Dp = 1.dp,
-    isDark: Boolean
-): Modifier = this
-    .clip(shape)
-    .background(
-        Brush.linearGradient(
-            colors = if (isDark) {
-                listOf(
-                    Color(0x3D1A1625), // Ultra-premium dark translucent
-                    Color(0x1A09070F)
-                )
-            } else {
-                listOf(
-                    Color(0xA6FFFFFF), // Pure clear glassy white
-                    Color(0x66F1EDF8)
-                )
-            }
+    isDark: Boolean,
+    isTvOptimized: Boolean = false
+): Modifier {
+    val bgModifier = if (isTvOptimized) {
+        Modifier.background(if (isDark) Color(0xFF1D1B22) else Color(0xFFECE7F2))
+    } else {
+        Modifier.background(
+            Brush.linearGradient(
+                colors = if (isDark) {
+                    listOf(
+                        Color(0x3D1A1625), // Ultra-premium dark translucent
+                        Color(0x1A09070F)
+                    )
+                } else {
+                    listOf(
+                        Color(0xA6FFFFFF), // Pure clear glassy white
+                        Color(0x66F1EDF8)
+                    )
+                }
+            )
         )
-    )
-    .border(
-        width = borderWidth,
-        brush = Brush.linearGradient(
-            colors = if (isDark) {
-                listOf(
-                    Color(0x3DFFFFFF), // Refractive highlight on top edge
-                    Color(0x10FFFFFF),
-                    Color(0x08FFFFFF),
-                    Color(0x24000000)  // Shadow on bottom edge
-                )
-            } else {
-                listOf(
-                    Color(0x99FFFFFF),
-                    Color(0x30FFFFFF),
-                    Color(0x15FFFFFF),
-                    Color(0x267F52FF)  // Hint of violet reflection
-                )
-            }
-        ),
-        shape = shape
-    )
+    }
+
+    val borderModifier = if (isTvOptimized) {
+        Modifier.border(
+            width = borderWidth,
+            color = if (isDark) Color(0x26FFFFFF) else Color(0x1F000000),
+            shape = shape
+        )
+    } else {
+        Modifier.border(
+            width = borderWidth,
+            brush = Brush.linearGradient(
+                colors = if (isDark) {
+                    listOf(
+                        Color(0x3DFFFFFF), // Refractive highlight on top edge
+                        Color(0x10FFFFFF),
+                        Color(0x08FFFFFF),
+                        Color(0x24000000)  // Shadow on bottom edge
+                    )
+                } else {
+                    listOf(
+                        Color(0x99FFFFFF),
+                        Color(0x30FFFFFF),
+                        Color(0x15FFFFFF),
+                        Color(0x267F52FF)  // Hint of violet reflection
+                    )
+                }
+            ),
+            shape = shape
+        )
+    }
+
+    return this
+        .clip(shape)
+        .then(bgModifier)
+        .then(borderModifier)
+}
