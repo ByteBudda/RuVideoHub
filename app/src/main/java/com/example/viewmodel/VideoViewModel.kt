@@ -124,6 +124,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     // Playback progress tracking (videoId -> playback position in milliseconds)
     private val _videoPositions = mutableMapOf<String, Long>()
+    
+    // In-memory cache for loaded channel and playlist contents to enable instant navigation
+    private val subfolderCache = java.util.concurrent.ConcurrentHashMap<String, List<Video>>()
 
     fun saveVideoPosition(videoId: String, position: Long) {
         _videoPositions[videoId] = position
@@ -157,13 +160,18 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedSubfolderName = MutableStateFlow<String?>(null)
     val selectedSubfolderName = _selectedSubfolderName.asStateFlow()
 
+    private val _isViewingChannel = MutableStateFlow(false)
+    val isViewingChannel = _isViewingChannel.asStateFlow()
+
     data class NavigationSnapshot(
         val tab: String,
         val category: String,
         val feedTab: com.example.data.rutube.SmartRutubeParser.TabInfo?,
         val subfolderName: String?,
         val searchQuery: String,
-        val selectedVideo: Video?
+        val selectedVideo: Video?,
+        val isViewingChannel: Boolean,
+        val dynamicVideos: List<Video> = emptyList()
     )
 
     private val navHistory = java.util.Stack<NavigationSnapshot>()
@@ -175,7 +183,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             feedTab = _selectedFeedTab.value,
             subfolderName = _selectedSubfolderName.value,
             searchQuery = _searchQuery.value,
-            selectedVideo = _currentSelectedVideo.value
+            selectedVideo = _currentSelectedVideo.value,
+            isViewingChannel = _isViewingChannel.value,
+            dynamicVideos = _dynamicVideos.value
         )
         if (navHistory.isEmpty() || navHistory.peek() != currentSnapshot) {
             navHistory.push(currentSnapshot)
@@ -192,13 +202,36 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun navigateBack(): Boolean {
+        if (!navHistory.isEmpty()) {
+            val last = navHistory.pop()
+            _currentTab.value = last.tab
+            _selectedCategory.value = last.category
+            _selectedFeedTab.value = last.feedTab
+            _selectedSubfolderName.value = last.subfolderName
+            _searchQuery.value = last.searchQuery
+            _currentSelectedVideo.value = last.selectedVideo
+            _isViewingChannel.value = last.isViewingChannel
+            _dynamicVideos.value = last.dynamicVideos
+
+            if (last.subfolderName == null && last.dynamicVideos.isEmpty()) {
+                if (last.feedTab != null) {
+                    selectFeedTab(last.feedTab)
+                } else {
+                    fetchRealVideos(query = if (last.searchQuery.isEmpty()) null else last.searchQuery, category = last.category)
+                }
+            }
+            return true
+        }
+
         if (_currentSelectedVideo.value != null) {
             _currentSelectedVideo.value = null
             return true
         }
 
         if (_selectedSubfolderName.value != null) {
-            resetSubfolder()
+            _selectedSubfolderName.value = null
+            _isViewingChannel.value = false
+            _selectedFeedTab.value?.let { selectFeedTab(it) } ?: fetchRealVideos(query = null, category = _selectedCategory.value)
             return true
         }
 
@@ -218,39 +251,30 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             return true
         }
 
-        if (!navHistory.isEmpty()) {
-            val last = navHistory.pop()
-            _currentTab.value = last.tab
-            _selectedCategory.value = last.category
-            _selectedFeedTab.value = last.feedTab
-            _selectedSubfolderName.value = last.subfolderName
-            _searchQuery.value = last.searchQuery
-            _currentSelectedVideo.value = last.selectedVideo
-
-            if (last.subfolderName == null) {
-                if (last.feedTab != null) {
-                    selectFeedTab(last.feedTab)
-                } else {
-                    fetchRealVideos(query = if (last.searchQuery.isEmpty()) null else last.searchQuery, category = last.category)
-                }
-            }
-            return true
-        }
-
         return false
     }
 
     fun resetSubfolder() {
-        pushToHistory()
-        _selectedSubfolderName.value = null
-        _selectedFeedTab.value?.let { selectFeedTab(it) }
+        if (!navHistory.isEmpty()) {
+            navigateBack()
+        } else {
+            _selectedSubfolderName.value = null
+            _isViewingChannel.value = false
+            _selectedFeedTab.value?.let { selectFeedTab(it) } ?: fetchRealVideos(query = null, category = _selectedCategory.value)
+        }
     }
 
     // yt-dlp downloading state parameters
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
 
-    private val _streamUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val downloadAndBookmarkHelper = DownloadAndBookmarkHelper(
+        application = getApplication(),
+        repository = repository,
+        activeDownloads = _activeDownloads
+    )
+
+    private val hlsStreamAndCommentHelper = HlsStreamAndCommentHelper()
 
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
@@ -748,6 +772,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 "api/video/playlist/$plId/"
             }
             path.startsWith("api/video/playlist/") -> path
+            path.startsWith("api/playlist/custom/") -> path
+            path.startsWith("playlist/custom/") -> {
+                val plId = path.substringAfter("playlist/custom/").trim('/')
+                "api/playlist/custom/$plId/videos/"
+            }
             path.startsWith("tv/") -> {
                 val tvId = path.substringAfter("tv/")
                 if (tvId.contains("video")) "api/metainfo/$path" else "api/metainfo/tv/$tvId/video/"
@@ -794,8 +823,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectVideo(video: Video?) {
-        pushToHistory()
+        if (video != null) {
+            pushToHistory()
+        }
         if (video != null && video.id.startsWith("tv_")) {
+            _isViewingChannel.value = false
             val fullTvId = video.id.substringAfter("tv_")
             val idParts = fullTvId.split("__")
             val tvId = idParts.getOrNull(0) ?: ""
@@ -874,59 +906,52 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (video != null && video.id.startsWith("channel_")) {
+            _isViewingChannel.value = true
             val fullChannelId = video.id.substringAfter("channel_")
             val idParts = fullChannelId.split("__")
             val channelId = idParts.getOrNull(0) ?: ""
             val rawActionUrl = idParts.getOrNull(1) ?: ""
 
+            val cached = subfolderCache[video.id]
+            if (cached != null) {
+                _selectedSubfolderName.value = video.title
+                _dynamicVideos.value = cached
+                _searchQuery.value = ""
+                selectTab("home")
+                currentPage = 1
+                isEndReached = false
+                
+                // Silent background update to keep data fresh without interrupting the user
+                viewModelScope.launch {
+                    try {
+                        val (combinedList, bestEndpoint) = fetchChannelData(channelId, rawActionUrl, video.category)
+                        if (combinedList.isNotEmpty()) {
+                            subfolderCache[video.id] = combinedList
+                            _dynamicVideos.value = combinedList
+                            if (bestEndpoint != null) {
+                                currentActiveApiEndpoint = bestEndpoint
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoViewModel", "Silent channel update failed", e)
+                    }
+                }
+                return
+            }
+
             viewModelScope.launch {
                 _isLoading.value = true
                 try {
-                    var loadedVideos: List<Video> = emptyList()
-                    val fallbackUrls = mutableListOf<String>()
-
-                    if (rawActionUrl.isNotBlank() && rawActionUrl != "null") {
-                        val cleanApiUrl = toRutubeApiUrl(rawActionUrl)
-                        val finalUrl = if (cleanApiUrl.contains("?")) {
-                            if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
-                        } else {
-                            "$cleanApiUrl?format=json"
-                        }
-                        fallbackUrls.add(finalUrl)
-                    }
-
-                    if (channelId.isNotBlank()) {
-                        fallbackUrls.add("https://rutube.ru/api/video/person/$channelId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/video/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/metainfo/person/$channelId/video/?format=json")
-                    }
-
-                    for (url in fallbackUrls.distinct()) {
-                        val candidates = fetchVideosResolvingTabs(url, video.category)
-                        val hasPlayableVideos = candidates.any {
-                            it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
-                            it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
-                            it.duration != "КАТАЛОГ"
-                        }
-                        if (candidates.isNotEmpty()) {
-                            if (hasPlayableVideos) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
-                                break
-                            } else if (loadedVideos.isEmpty()) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
-                            }
-                        }
-                    }
-
-                    if (loadedVideos.isNotEmpty()) {
+                    val (combinedList, bestEndpoint) = fetchChannelData(channelId, rawActionUrl, video.category)
+                    if (combinedList.isNotEmpty()) {
                         _selectedSubfolderName.value = video.title
-                        _dynamicVideos.value = loadedVideos
+                        subfolderCache[video.id] = combinedList
+                        _dynamicVideos.value = combinedList
                         _searchQuery.value = ""
                         selectTab("home")
-                        
+                        if (bestEndpoint != null) {
+                            currentActiveApiEndpoint = bestEndpoint
+                        }
                         currentPage = 1
                         isEndReached = false
                     } else {
@@ -943,67 +968,48 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (video != null && (video.id.startsWith("unknown_") || video.id.startsWith("playlist_") || video.id.startsWith("promo_"))) {
-            val prefix = when {
-                video.id.startsWith("unknown_") -> "unknown_"
-                video.id.startsWith("playlist_") -> "playlist_"
-                video.id.startsWith("promo_") -> "promo_"
-                else -> ""
-            }
-            val parts = video.id.substringAfter(prefix).split("__")
-            val rawId = parts.getOrNull(0) ?: ""
-            val actionUrl = parts.getOrNull(1) ?: ""
+            _isViewingChannel.value = false
             
+            val cached = subfolderCache[video.id]
+            if (cached != null) {
+                _selectedSubfolderName.value = video.title
+                _dynamicVideos.value = cached
+                _searchQuery.value = ""
+                selectTab("home")
+                currentPage = 1
+                isEndReached = false
+                
+                // Silent background update to keep data fresh
+                viewModelScope.launch {
+                    try {
+                        val (loadedVideos, bestEndpoint) = fetchPlaylistOrContainerData(video)
+                        if (loadedVideos.isNotEmpty()) {
+                            subfolderCache[video.id] = loadedVideos
+                            _dynamicVideos.value = loadedVideos
+                            if (bestEndpoint != null) {
+                                currentActiveApiEndpoint = bestEndpoint
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoViewModel", "Silent playlist/container update failed", e)
+                    }
+                }
+                return
+            }
+
             viewModelScope.launch {
                 _isLoading.value = true
                 try {
-                    var loadedVideos: List<Video> = emptyList()
-                    val fallbackUrls = mutableListOf<String>()
-
-                    if (actionUrl.isNotBlank() && actionUrl != "null") {
-                        val cleanApiUrl = toRutubeApiUrl(actionUrl)
-                        val finalUrl = if (cleanApiUrl.contains("?")) {
-                            if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
-                        } else {
-                            "$cleanApiUrl?format=json"
-                        }
-                        fallbackUrls.add(finalUrl)
-                    }
-
-                    if (rawId.isNotBlank() && rawId.all { it.isDigit() }) {
-                        fallbackUrls.add("https://rutube.ru/api/feeds/promogroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/video/playlist/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/?format=json")
-                    }
-
-                    for (url in fallbackUrls.distinct()) {
-                        val candidates = fetchVideosResolvingTabs(url, video.category)
-                        val hasPlayableVideos = candidates.any {
-                            it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
-                            it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
-                            it.duration != "КАТАЛОГ"
-                        }
-                        if (candidates.isNotEmpty()) {
-                            if (hasPlayableVideos) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
-                                break
-                            } else if (loadedVideos.isEmpty()) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
-                            }
-                        }
-                    }
-
+                    val (loadedVideos, bestEndpoint) = fetchPlaylistOrContainerData(video)
                     if (loadedVideos.isNotEmpty()) {
                         _selectedSubfolderName.value = video.title
+                        subfolderCache[video.id] = loadedVideos
                         _dynamicVideos.value = loadedVideos
                         _searchQuery.value = ""
                         selectTab("home")
-                        
+                        if (bestEndpoint != null) {
+                            currentActiveApiEndpoint = bestEndpoint
+                        }
                         currentPage = 1
                         isEndReached = false
                     } else {
@@ -1032,6 +1038,138 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _playProgress.value = 0f
             stopPlaybackTicker()
         }
+    }
+
+    private suspend fun fetchChannelData(
+        channelId: String,
+        rawActionUrl: String,
+        category: String
+    ): Pair<List<Video>, String?> {
+        val combinedList = mutableListOf<Video>()
+
+        // 1. Fetch channel playlists
+        if (channelId.isNotBlank()) {
+            try {
+                val playlistUrl = "https://rutube.ru/api/playlist/user/$channelId/?format=json"
+                val playlistResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(playlistUrl)
+                val playlistBody = playlistResponse.string()
+                val parsedPlaylists = repository.parseVideoListJson(playlistBody, category, playlistUrl)
+                combinedList.addAll(parsedPlaylists)
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Error fetching channel playlists via user/channel_id", e)
+            }
+        }
+
+        // 2. Fetch channel videos
+        var loadedVideos: List<Video> = emptyList()
+        val fallbackUrls = mutableListOf<String>()
+
+        if (rawActionUrl.isNotBlank() && rawActionUrl != "null") {
+            val cleanApiUrl = toRutubeApiUrl(rawActionUrl)
+            val finalUrl = if (cleanApiUrl.contains("?")) {
+                if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
+            } else {
+                "$cleanApiUrl?format=json"
+            }
+            fallbackUrls.add(finalUrl)
+        }
+
+        if (channelId.isNotBlank()) {
+            fallbackUrls.add("https://rutube.ru/api/video/person/$channelId/?format=json")
+            fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/?format=json")
+            fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/video/?format=json")
+            fallbackUrls.add("https://rutube.ru/api/metainfo/person/$channelId/video/?format=json")
+        }
+
+        var bestEndpoint: String? = null
+        for (url in fallbackUrls.distinct()) {
+            val candidates = fetchVideosResolvingTabs(url, category)
+            val hasPlayableVideos = candidates.any {
+                it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
+                it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
+                it.duration != "КАТАЛОГ"
+            }
+            if (candidates.isNotEmpty()) {
+                if (hasPlayableVideos) {
+                    loadedVideos = candidates
+                    bestEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                    break
+                } else if (loadedVideos.isEmpty()) {
+                    loadedVideos = candidates
+                    bestEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                }
+            }
+        }
+
+        combinedList.addAll(loadedVideos)
+        return Pair(combinedList.distinctBy { it.id }, bestEndpoint)
+    }
+
+    private suspend fun fetchPlaylistOrContainerData(video: Video): Pair<List<Video>, String?> {
+        val prefix = when {
+            video.id.startsWith("unknown_") -> "unknown_"
+            video.id.startsWith("playlist_") -> "playlist_"
+            video.id.startsWith("promo_") -> "promo_"
+            else -> ""
+        }
+        val parts = video.id.substringAfter(prefix).split("__")
+        val rawId = parts.getOrNull(0) ?: ""
+        val actionUrl = parts.getOrNull(1) ?: ""
+
+        var loadedVideos: List<Video> = emptyList()
+        val fallbackUrls = mutableListOf<String>()
+
+        if (video.id.startsWith("playlist_") && rawId.isNotBlank()) {
+            fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/videos/?format=json")
+            fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/?format=json")
+        }
+
+        if (actionUrl.isNotBlank() && actionUrl != "null") {
+            val cleanApiUrl = toRutubeApiUrl(actionUrl)
+            val finalUrl = if (cleanApiUrl.contains("?")) {
+                if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
+            } else {
+                "$cleanApiUrl?format=json"
+            }
+            fallbackUrls.add(finalUrl)
+        }
+
+        if (rawId.isNotBlank()) {
+            if (rawId.all { it.isDigit() }) {
+                fallbackUrls.add("https://rutube.ru/api/feeds/promogroup/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/video/playlist/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/?format=json")
+            } else {
+                fallbackUrls.add("https://rutube.ru/api/video/playlist/$rawId/?format=json")
+                fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
+            }
+        }
+
+        var bestEndpoint: String? = null
+        for (url in fallbackUrls.distinct()) {
+            val candidates = fetchVideosResolvingTabs(url, video.category)
+            val hasPlayableVideos = candidates.any {
+                it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
+                it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
+                it.duration != "КАТАЛОГ"
+            }
+            if (candidates.isNotEmpty()) {
+                if (hasPlayableVideos) {
+                    loadedVideos = candidates
+                    bestEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                    break
+                } else if (loadedVideos.isEmpty()) {
+                    loadedVideos = candidates
+                    bestEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                }
+            }
+        }
+
+        return Pair(loadedVideos, bestEndpoint)
     }
 
     fun loadVideoByUrlOrId(urlOrId: String) {
@@ -1088,13 +1226,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // 2.5 Is it a Playlist? E.g., .../video/playlist/([a-zA-Z0-9_-]+)... or .../playlist/([a-zA-Z0-9_-]+)...
-                val playlistPattern = java.util.regex.Pattern.compile("/(?:video/playlist|playlist)/([0-9a-zA-Z_-]+)")
+                val playlistPattern = java.util.regex.Pattern.compile("/(?:video/playlist|playlist|playlist/custom)/([0-9a-zA-Z_-]+)")
                 val playlistMatcher = playlistPattern.matcher(trimmedUrl)
                 if (playlistMatcher.find()) {
                     val playlistId = playlistMatcher.group(1) ?: ""
                     if (playlistId.isNotBlank()) {
                         val dummyPlaylistVideo = Video(
-                            id = "playlist_${playlistId}__https://rutube.ru/api/video/playlist/$playlistId/",
+                            id = "playlist_${playlistId}__https://rutube.ru/api/playlist/custom/$playlistId/videos/",
                             title = "Плейлист Rutube ($playlistId)",
                             channel = "Плейлист • Загрузка...",
                             views = "",
@@ -1191,115 +1329,19 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleBookmark(video: Video) {
-        viewModelScope.launch {
-            repository.toggleBookmark(video)
-            // Keep active player in-sync
-            if (_currentSelectedVideo.value?.id == video.id) {
-                _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isBookmarked = !video.isBookmarked)
-            }
-        }
+        downloadAndBookmarkHelper.toggleBookmark(video, _currentSelectedVideo, viewModelScope)
     }
 
     fun toggleDownload(video: Video) {
-        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "${video.id}.mp4")
-
-        viewModelScope.launch {
-            if (video.isDownloaded) {
-                // Revert download status and clean disk
-                if (targetFile.exists()) {
-                    targetFile.delete()
-                }
-                repository.toggleDownload(video)
-                if (_currentSelectedVideo.value?.id == video.id) {
-                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
-                }
-            } else {
-                // Run live yt-dlp downloader coroutine
-                startYtDlpDownload(video)
-            }
-        }
+        downloadAndBookmarkHelper.toggleDownload(video, _currentSelectedVideo, viewModelScope)
     }
 
     fun deleteDownload(video: Video) {
-        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "${video.id}.mp4")
-        viewModelScope.launch {
-            if (targetFile.exists()) {
-                targetFile.delete()
-            }
-            if (video.isDownloaded) {
-                repository.toggleDownload(video)
-                if (_currentSelectedVideo.value?.id == video.id) {
-                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
-                }
-            }
-        }
+        downloadAndBookmarkHelper.deleteDownload(video, _currentSelectedVideo, viewModelScope)
     }
 
     fun saveToDevice(video: Video, context: android.content.Context, onResult: (Boolean, String) -> Unit) {
-        val inputFolder = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val inputFile = File(inputFolder, "${video.id}.mp4")
-        if (!inputFile.exists()) {
-            onResult(false, "Сначала скачайте видео в приложение.")
-            return
-        }
-
-        try {
-            val resolver = context.contentResolver
-            val contentValues = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "${video.title}.mp4".replace("[\\\\/:*?\"<>|]".toRegex(), "_"))
-                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
-                }
-            }
-
-            var uri: android.net.Uri? = null
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-            }
-
-            if (uri != null) {
-                resolver.openOutputStream(uri)?.use { outputStream ->
-                    inputFile.inputStream().use { inputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-                }
-                onResult(true, "Файл успешно сохранен в папку 'Загрузки' устройства!")
-            } else {
-                // Fallback for older Android versions
-                val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                if (!publicDownloads.exists()) {
-                    publicDownloads.mkdirs()
-                }
-                val outputFile = File(publicDownloads, "${video.title}.mp4".replace("[\\\\/:*?\"<>|]".toRegex(), "_"))
-                inputFile.inputStream().use { inputStream ->
-                    outputFile.outputStream().use { outputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-                }
-                onResult(true, "Файл успешно сохранен в папку 'Загрузки': ${outputFile.name}")
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("VideoViewModel", "Error saving file to public downloads", e)
-            onResult(false, "Ошибка сохранения: ${e.localizedMessage ?: e.message}")
-        }
-    }
-
-    private fun startYtDlpDownload(video: Video) {
-        viewModelScope.launch {
-            YtDlpDownloader.startYtDlpDownload(
-                getApplication(),
-                video,
-                repository,
-                _activeDownloads
-            ) { completedId ->
-                if (_currentSelectedVideo.value?.id == completedId) {
-                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
-                }
-            }
-        }
+        downloadAndBookmarkHelper.saveToDevice(video, context, onResult)
     }
 
     fun toggleMicrophone(status: Boolean) {
@@ -1398,111 +1440,118 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearHlsCache(videoId: String) {
-        _streamUrlCache.remove(videoId)
+        hlsStreamAndCommentHelper.clearHlsCache(videoId)
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String): String? {
-        val cachedUrl = _streamUrlCache[videoId]
-        if (cachedUrl != null) {
-            return cachedUrl
-        }
-        val resolvedUrl = withContext(Dispatchers.IO) {
-            try {
-                val tizenUas = listOf(
-                    "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/4.0 Chrome/108.0.5359.128",
-                    "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 5.5) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/4.0 Chrome/96.0.4664.45",
-                    "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 7.0) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/5.0 Chrome/112.0.5615.204",
-                    "Mozilla/5.0 (Linux; Tizen 6.5) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 SamsungBrowser/4.0 Chrome/106.0.5249.65"
-                )
-                val randomUa = tizenUas.random()
-
-                val okHttpClient = OkHttpClient.Builder()
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .addInterceptor { chain ->
-                        val req = chain.request().newBuilder()
-                            .header("User-Agent", randomUa)
-                            .header("Referer", "https://rutube.ru/")
-                            .header("Accept", "application/json")
-                            .build()
-                        chain.proceed(req)
-                    }
-                    .build()
-
-                val req = Request.Builder()
-                    .url("https://rutube.ru/api/play/options/$videoId/?format=json")
-                    .build()
-
-                okHttpClient.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) return@withContext null
-                    val bodyString = resp.body?.string() ?: return@withContext null
-                    val jsonObject = JSONObject(bodyString)
-
-                    var extractedStreamUrl: String? = null
-                    val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
-                    if (videoBalancerObj != null) {
-                        extractedStreamUrl = videoBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
-                            ?: videoBalancerObj.optString("default").takeIf { it.isNotBlank() }
-                    }
-
-                    if (extractedStreamUrl.isNullOrBlank()) {
-                        val liveBalancerObj = jsonObject.optJSONObject("live_balancer") ?: jsonObject.optJSONObject("live_streams")
-                        if (liveBalancerObj != null) {
-                            extractedStreamUrl = liveBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
-                                ?: liveBalancerObj.optString("default").takeIf { it.isNotBlank() }
-                        }
-                    }
-
-                    if (extractedStreamUrl.isNullOrBlank()) {
-                        val keys = jsonObject.keys()
-                        while (keys.hasNext()) {
-                            val key = keys.next()
-                            val value = jsonObject.opt(key)
-                            if (value is String && value.contains(".m3u8")) {
-                                extractedStreamUrl = value
-                                break
-                            } else if (value is JSONObject) {
-                                val subKeys = value.keys()
-                                while (subKeys.hasNext()) {
-                                    val sk = subKeys.next()
-                                    val sv = value.opt(sk)
-                                    if (sv is String && sv.contains(".m3u8")) {
-                                        extractedStreamUrl = sv
-                                        break
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    extractedStreamUrl
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("VideoViewModel", "Error fetching direct stream URL", e)
-                null
-            }
-        }
-        if (resolvedUrl != null) {
-            _streamUrlCache[videoId] = resolvedUrl
-        }
-        return resolvedUrl
+        return hlsStreamAndCommentHelper.fetchHlsStreamUrl(videoId)
     }
 
     fun loadComments(videoId: String) {
         _isCommentsLoading.value = true
         _comments.value = emptyList()
         viewModelScope.launch {
-            try {
-                val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
-                val commentsResponse = apiService.getDynamicUrl("https://rutube.ru/api/v2/comments/?video_id=$videoId&format=json")
-                val bodyStr = commentsResponse.string()
-                val jsonObject = JSONObject(bodyStr)
-                val resultsArr = jsonObject.optJSONArray("results")
-                val commentsList = mutableListOf<RutubeComment>()
-                if (resultsArr != null) {
-                    for (i in 0 until resultsArr.length()) {
-                        val cJson = resultsArr.optJSONObject(i) ?: continue
-                        val authorObj = cJson.optJSONObject("author")
-                        val authorName = authorObj?.optString("name") ?: "Anonymous"
+            _comments.value = hlsStreamAndCommentHelper.loadComments(videoId)
+            _isCommentsLoading.value = false
+        }
+    }
+
+    private fun mapResourceToVideo(resource: com.example.data.rutube.SmartRutubeParser.ResourceInfo, tabId: Int, categoryName: String): Video {
+        val url = resource.url ?: ""
+        val extractedId = "\\d+".toRegex().find(url)?.value ?: ""
+        
+        return when (resource.type) {
+            com.example.data.rutube.SmartRutubeParser.EntityType.CHANNEL -> {
+                Video(
+                    id = "channel_${extractedId}__$url",
+                    title = resource.name,
+                    channel = "Авторский канал",
+                    views = "Открыть канал",
+                    timeAgo = "Автор",
+                    duration = "КАНАЛ",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Официальный канал: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+            com.example.data.rutube.SmartRutubeParser.EntityType.TV_SERIES -> {
+                Video(
+                    id = "tv_${extractedId}__$url",
+                    title = resource.name,
+                    channel = "Телешоу / Передача",
+                    views = "Смотреть выпуски",
+                    timeAgo = "Шоу",
+                    duration = "СЕРИАЛ",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Смотрите оригинальные сезоны: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+            com.example.data.rutube.SmartRutubeParser.EntityType.PLAYLIST -> {
+                Video(
+                    id = "playlist_${extractedId}__$url",
+                    title = resource.name,
+                    channel = "Плейлист • Подборка",
+                    views = "Смотреть плейлист",
+                    timeAgo = "Плейлист",
+                    duration = "ПЛЕЙЛИСТ",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Смотрите полную подборку видео из плейлиста: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+            else -> {
+                Video(
+                    id = "unknown_res_${tabId}_${resource.name.hashCode()}__$url",
+                    title = resource.name,
+                    channel = "Папка каталога",
+                    views = "Подраздел",
+                    timeAgo = "Открыть",
+                    duration = "ПАПКА",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Коллекция контента из раздела: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+        }
+    }
+
+    // Factory helper in case we instantiate standard lifecycle
+    class Factory(private val application: Application) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return VideoViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
+}
+
+data class YtDlpDownload(
+    val id: String,
+    val title: String,
+    val channel: String,
+    val thumbnailUrl: String?,
+    val progress: Float,
+    val speed: String,
+    val eta: String,
+    val status: String,
+    val logs: List<String>
+)
+
+data class RutubeComment(
+    val id: String,
+    val author: String,
+    val text: String,
+    val date: String?,
+    val likes: Int
+)
+ring("name") ?: "Anonymous"
                         commentsList.add(
                             RutubeComment(
                                 id = cJson.optString("id"),
