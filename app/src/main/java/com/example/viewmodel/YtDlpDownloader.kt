@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.currentCoroutineContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -33,6 +35,7 @@ object YtDlpDownloader {
         video: Video,
         repository: VideoRepository,
         activeDownloads: MutableStateFlow<Map<String, YtDlpDownload>>,
+        downloadQuality: String,
         onDownloadComplete: suspend (String) -> Unit
     ) {
         val id = video.id
@@ -215,25 +218,16 @@ object YtDlpDownloader {
                 val hasStreams = masterLines.any { it.startsWith("#EXT-X-STREAM-INF") }
                 
                 if (hasStreams) {
-                    val candidates = mutableListOf<String>()
-                    for (i in masterLines.indices) {
-                        val line = masterLines[i]
-                        if (line.startsWith("#EXT-X-STREAM-INF")) {
-                            var nextIndex = i + 1
-                            while (nextIndex < masterLines.size && masterLines[nextIndex].startsWith("#")) {
-                                nextIndex++
-                            }
-                            if (nextIndex < masterLines.size) {
-                                candidates.add(masterLines[nextIndex])
-                            }
-                        }
-                    }
-                    if (candidates.isNotEmpty()) {
-                        val best = candidates.firstOrNull { it.contains("720") }
-                            ?: candidates.firstOrNull { it.contains("480") }
-                            ?: candidates.lastOrNull()
-                            ?: candidates.first()
-                        mediaPlaylistUrl = resolveUrl(extractedStreamUrl, best)
+                    val streams = com.example.data.rutube.HlsParser.parseMasterPlaylist(extractedStreamUrl, masterM3u8Text)
+                    if (streams.isNotEmpty()) {
+                        val target = streams.firstOrNull { it.resolution.equals(downloadQuality, ignoreCase = true) }
+                            ?: streams.firstOrNull { it.resolution.contains("720") }
+                            ?: streams.firstOrNull { it.resolution.contains("480") }
+                            ?: streams.first()
+                        mediaPlaylistUrl = target.url
+                        log("[download] Выбрано качество: ${target.resolution} (битрейт: ${target.bandwidth})")
+                    } else {
+                        mediaPlaylistUrl = extractedStreamUrl
                     }
                     log("[download] Loading media segment index playlist...")
                     mediaM3u8Text = loadText(mediaPlaylistUrl)
@@ -307,6 +301,9 @@ object YtDlpDownloader {
                     
                     FileOutputStream(targetFile).use { outputStream ->
                         for (index in segments.indices) {
+                            if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                throw kotlinx.coroutines.CancellationException("Cancelled by user")
+                            }
                             val segmentUrl = segments[index]
                             val seq = startSequence + index
                             
@@ -441,6 +438,9 @@ object YtDlpDownloader {
                             var lastReportedPercent = -1
 
                             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                    throw kotlinx.coroutines.CancellationException("Cancelled by user")
+                                }
                                 outputStream.write(buffer, 0, bytesRead)
                                 totalBytesRead += bytesRead
 
