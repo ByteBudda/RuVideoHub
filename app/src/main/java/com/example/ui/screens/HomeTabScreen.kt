@@ -73,75 +73,9 @@ fun HomeTabScreen(
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxSize()) {
-        // App search header
-        SleekHeader(
-            searchQuery = searchQuery,
-            onSearchQueryChanged = { viewModel.setSearchQuery(it) },
-            isDark = isDarkTheme,
-            isTvOptimized = isTvOptimized
-        )
-
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
         val selectedFeedTab by viewModel.selectedFeedTab.collectAsStateWithLifecycle()
         val selectedSubfolderName by viewModel.selectedSubfolderName.collectAsStateWithLifecycle()
-
-        if (feedTabs.isNotEmpty()) {
-            FeedTabRow(
-                tabs = feedTabs,
-                selectedTab = selectedFeedTab,
-                onTabSelected = { viewModel.selectFeedTab(it) },
-                isDark = isDarkTheme,
-                isTvOptimized = isTvOptimized
-            )
-        }
-
-        if (selectedSubfolderName != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.navigateBack() })
-                    .clickable { viewModel.navigateBack() }
-                    .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Назад",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "${selectedFeedTab?.name ?: "Назад"} › $selectedSubfolderName",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        
-        if (isChannelView) {
-            androidx.compose.material3.TabRow(
-                selectedTabIndex = if (channelActiveTab == "Плейлисты") 1 else 0,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary
-            ) {
-                androidx.compose.material3.Tab(
-                    selected = channelActiveTab == "Видео",
-                    onClick = { viewModel.setChannelActiveTab("Видео") },
-                    text = { Text("Видео") }
-                )
-                androidx.compose.material3.Tab(
-                    selected = channelActiveTab == "Плейлисты",
-                    onClick = { viewModel.setChannelActiveTab("Плейлисты") },
-                    text = { Text("Плейлисты") }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
 
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val isMoreLoading by viewModel.isMoreLoading.collectAsStateWithLifecycle()
@@ -152,170 +86,233 @@ fun HomeTabScreen(
             isLoading
         }
 
-        // Video lists
-        if (isCurrentTabLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = Primary,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(44.dp)
-                )
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        
+        val shouldLoadMore by remember {
+            derivedStateOf {
+                val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                    ?: return@derivedStateOf false
+                lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
             }
-        } else if (currentVideos.isEmpty()) {
-            EmptySearchState(query = searchQuery)
-        } else {
-            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-            
-            val shouldLoadMore by remember {
-                derivedStateOf {
-                    val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                        ?: return@derivedStateOf false
-                    lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
-                }
-            }
+        }
 
-            LaunchedEffect(shouldLoadMore) {
-                if (shouldLoadMore && !isChannelView) {
-                    viewModel.loadNextPage()
-                }
+        LaunchedEffect(shouldLoadMore) {
+            if (shouldLoadMore && !isChannelView) {
+                viewModel.loadNextPage()
             }
+        }
 
-            // Render folder subdirectories in a single-column layout if they have previews,
-            // or in a gorgeous 2-column grid if they do not have previews.
-            val folderItemsToRender = remember(currentVideos) {
-                val list = mutableListOf<List<Video>>()
-                val currentPair = mutableListOf<Video>()
-                for (video in currentVideos) {
-                    val hasPreview = !video.thumbnailUrl.isNullOrBlank()
-                    if (hasPreview) {
-                        if (currentPair.isNotEmpty()) {
-                            list.add(currentPair.toList())
-                            currentPair.clear()
-                        }
-                        list.add(listOf(video))
-                    } else {
-                        currentPair.add(video)
-                        if (currentPair.size == 2) {
-                            list.add(currentPair.toList())
-                            currentPair.clear()
-                        }
+        val folderItemsToRender = remember(currentVideos) {
+            val list = mutableListOf<List<Video>>()
+            val currentPair = mutableListOf<Video>()
+            for (video in currentVideos) {
+                val hasPreview = !video.thumbnailUrl.isNullOrBlank()
+                if (hasPreview) {
+                    if (currentPair.isNotEmpty()) {
+                        list.add(currentPair.toList())
+                        currentPair.clear()
+                    }
+                    list.add(listOf(video))
+                } else {
+                    currentPair.add(video)
+                    if (currentPair.size == 2) {
+                        list.add(currentPair.toList())
+                        currentPair.clear()
                     }
                 }
-                if (currentPair.isNotEmpty()) {
-                    list.add(currentPair.toList())
-                }
-                list
+            }
+            if (currentPair.isNotEmpty()) {
+                list.add(currentPair.toList())
+            }
+            list
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            // 1. App search header
+            item {
+                SleekHeader(
+                    searchQuery = searchQuery,
+                    onSearchQueryChanged = { viewModel.setSearchQuery(it) },
+                    isDark = isDarkTheme,
+                    isTvOptimized = isTvOptimized
+                )
             }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                if (currentVideos.isNotEmpty()) {
-                    // Section recommended (hero card for videos, uniform list for folders)
-                    val firstItem = currentVideos.first()
-                    val isFolderList = firstItem.duration == "ПАПКА" || 
-                                       firstItem.duration == "КАТАЛОГ" ||
-                                       firstItem.duration == "СЕРИАЛ" ||
-                                       firstItem.duration == "КАНАЛ" ||
-                                       firstItem.duration == "ПЛЕЙЛИСТ"
+            // 2. Feed tabs
+            if (feedTabs.isNotEmpty()) {
+                item {
+                    FeedTabRow(
+                        tabs = feedTabs,
+                        selectedTab = selectedFeedTab,
+                        onTabSelected = { viewModel.selectFeedTab(it) },
+                        isDark = isDarkTheme,
+                        isTvOptimized = isTvOptimized
+                    )
+                }
+            }
 
-                    if (!isFolderList) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                HeroVideoCard(
-                                    video = firstItem,
-                                    onVideoClick = { viewModel.selectVideo(firstItem) },
-                                    onDownloadToggle = { viewModel.toggleDownload(firstItem) },
-                                    isDark = isDarkTheme,
-                                    onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
-                                        {
-                                            val channelDummy = Video(
-                                                id = "channel_${firstItem.authorId}__${firstItem.authorActionUrl ?: ""}",
-                                                title = firstItem.channel,
-                                                channel = firstItem.channel,
-                                                views = "",
-                                                timeAgo = "",
-                                                duration = "КАНАЛ",
-                                                category = firstItem.category,
-                                                description = ""
-                                            )
-                                            viewModel.selectVideo(channelDummy)
-                                        }
-                                    } else null,
-                                    isTvOptimized = isTvOptimized
-                                )
-                            }
-                        }
+            // 3. Subfolder back button / path
+            if (selectedSubfolderName != null) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.navigateBack() })
+                            .clickable { viewModel.navigateBack() }
+                            .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "${selectedFeedTab?.name ?: "Назад"} › $selectedSubfolderName",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            // 4. Channel view tabs
+            if (isChannelView) {
+                item {
+                    androidx.compose.material3.TabRow(
+                        selectedTabIndex = if (channelActiveTab == "Плейлисты") 1 else 0,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        androidx.compose.material3.Tab(
+                            selected = channelActiveTab == "Видео",
+                            onClick = { viewModel.setChannelActiveTab("Видео") },
+                            text = { Text("Видео") }
+                        )
+                        androidx.compose.material3.Tab(
+                            selected = channelActiveTab == "Плейлисты",
+                            onClick = { viewModel.setChannelActiveTab("Плейлисты") },
+                            text = { Text("Плейлисты") }
+                        )
+                    }
+                }
+            }
 
-                        // Section listed items
-                        if (currentVideos.size > 1) {
-                            items(currentVideos.subList(1, currentVideos.size), key = { it.id }) { video ->
-                                SecondaryVideoItemRow(
-                                    video = video,
-                                    onVideoClick = { viewModel.selectVideo(video) },
-                                    onDownloadToggle = { viewModel.toggleDownload(video) },
-                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                    isDark = isDarkTheme,
-                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                        {
-                                            val channelDummy = Video(
-                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                                title = video.channel,
-                                                channel = video.channel,
-                                                views = "",
-                                                timeAgo = "",
-                                                duration = "КАНАЛ",
-                                                category = video.category,
-                                                description = ""
-                                            )
-                                            viewModel.selectVideo(channelDummy)
-                                        }
-                                    } else null,
-                                    isTvOptimized = isTvOptimized
-                                )
-                            }
-                        }
-                    } else {
-                        items(folderItemsToRender) { rowItems ->
-                            if (rowItems.size == 1) {
-                                val video = rowItems.first()
-                                if (!video.thumbnailUrl.isNullOrBlank()) {
-                                    SleekFolderGridItem(
-                                        video = video,
-                                        onFolderClick = { viewModel.selectVideo(video) },
-                                        isDark = isDarkTheme,
-                                        isTvOptimized = isTvOptimized,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 2.dp)
-                                    )
-                                } else {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 2.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        SleekFolderGridItem(
-                                            video = video,
-                                            onFolderClick = { viewModel.selectVideo(video) },
-                                            isDark = isDarkTheme,
-                                            isTvOptimized = isTvOptimized,
-                                            modifier = Modifier.weight(1f)
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // 5. Loading State
+            if (isCurrentTabLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(250.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Primary,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
+                }
+            } else if (currentVideos.isEmpty()) {
+                item {
+                    EmptySearchState(query = searchQuery)
+                }
+            } else {
+                // Section recommended (hero card for videos, uniform list for folders)
+                val firstItem = currentVideos.first()
+                val isFolderList = firstItem.duration == "ПАПКА" || 
+                                   firstItem.duration == "КАТАЛОГ" ||
+                                   firstItem.duration == "СЕРИАЛ" ||
+                                   firstItem.duration == "КАНАЛ" ||
+                                   firstItem.duration == "ПЛЕЙЛИСТ"
+
+                if (!isFolderList) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            HeroVideoCard(
+                                video = firstItem,
+                                onVideoClick = { viewModel.selectVideo(firstItem) },
+                                onDownloadToggle = { viewModel.toggleDownload(firstItem) },
+                                isDark = isDarkTheme,
+                                onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
+                                    {
+                                        val channelDummy = Video(
+                                            id = "channel_${firstItem.authorId}__${firstItem.authorActionUrl ?: ""}",
+                                            title = firstItem.channel,
+                                            channel = firstItem.channel,
+                                            views = "",
+                                            timeAgo = "",
+                                            duration = "КАНАЛ",
+                                            category = firstItem.category,
+                                            description = ""
                                         )
-                                        Spacer(modifier = Modifier.weight(1f))
+                                        viewModel.selectVideo(channelDummy)
                                     }
-                                }
+                                } else null,
+                                isTvOptimized = isTvOptimized
+                            )
+                        }
+                    }
+
+                    // Section listed items
+                    if (currentVideos.size > 1) {
+                        items(currentVideos.subList(1, currentVideos.size), key = { it.id }) { video ->
+                            SecondaryVideoItemRow(
+                                video = video,
+                                onVideoClick = { viewModel.selectVideo(video) },
+                                onDownloadToggle = { viewModel.toggleDownload(video) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                isDark = isDarkTheme,
+                                onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                    {
+                                        val channelDummy = Video(
+                                            id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                            title = video.channel,
+                                            channel = video.channel,
+                                            views = "",
+                                            timeAgo = "",
+                                            duration = "КАНАЛ",
+                                            category = video.category,
+                                            description = ""
+                                        )
+                                        viewModel.selectVideo(channelDummy)
+                                    }
+                                } else null,
+                                isTvOptimized = isTvOptimized
+                            )
+                        }
+                    }
+                } else {
+                    items(folderItemsToRender) { rowItems ->
+                        if (rowItems.size == 1) {
+                            val video = rowItems.first()
+                            if (!video.thumbnailUrl.isNullOrBlank()) {
+                                SleekFolderGridItem(
+                                    video = video,
+                                    onFolderClick = { viewModel.selectVideo(video) },
+                                    isDark = isDarkTheme,
+                                    isTvOptimized = isTvOptimized,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                                )
                             } else {
                                 Row(
                                     modifier = Modifier
@@ -323,15 +320,31 @@ fun HomeTabScreen(
                                         .padding(horizontal = 16.dp, vertical = 2.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    rowItems.forEach { video ->
-                                        SleekFolderGridItem(
-                                            video = video,
-                                            onFolderClick = { viewModel.selectVideo(video) },
-                                            isDark = isDarkTheme,
-                                            isTvOptimized = isTvOptimized,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+                                    SleekFolderGridItem(
+                                        video = video,
+                                        onFolderClick = { viewModel.selectVideo(video) },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowItems.forEach { video ->
+                                    SleekFolderGridItem(
+                                        video = video,
+                                        onFolderClick = { viewModel.selectVideo(video) },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
                             }
                         }

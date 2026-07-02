@@ -59,11 +59,14 @@ fun TvMiniPlayerScreen(
     var localIsFullscreen by remember { mutableStateOf(false) }
 
     // D-pad back handler
-    androidx.activity.compose.BackHandler(enabled = currentVideo != null) {
+    androidx.activity.compose.BackHandler(enabled = true) {
         if (localIsFullscreen) {
             localIsFullscreen = false
         } else {
             viewModel.selectVideo(null)
+            if (!viewModel.navigateBack()) {
+                viewModel.selectTab("home")
+            }
         }
     }
 
