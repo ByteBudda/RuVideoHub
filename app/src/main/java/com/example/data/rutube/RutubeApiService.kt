@@ -14,6 +14,14 @@ interface RutubeApiService {
         @Query("content_type") contentType: String? = null
     ): ResponseBody
 
+    @GET("api/search/combined/cards/list/")
+    suspend fun searchCombined(
+        @Query("query") query: String,
+        @Query("page") page: Int = 1,
+        @Query("format") format: String = "json",
+        @Query("fields") fields: String = "video_count"
+    ): ResponseBody
+
     @GET("api/playlist/user/{channel_id}/")
     suspend fun getChannelPlaylists(
         @retrofit2.http.Path("channel_id") channelId: String,
