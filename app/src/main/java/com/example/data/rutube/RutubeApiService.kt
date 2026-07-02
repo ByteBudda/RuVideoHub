@@ -10,14 +10,27 @@ interface RutubeApiService {
     suspend fun searchVideos(
         @Query("query") query: String,
         @Query("page") page: Int = 1,
+        @Query("format") format: String = "json",
+        @Query("content_type") contentType: String? = null
+    ): ResponseBody
+
+    @GET("api/playlist/user/{channel_id}/")
+    suspend fun getChannelPlaylists(
+        @retrofit2.http.Path("channel_id") channelId: String,
+        @Query("page") page: Int = 1,
         @Query("format") format: String = "json"
     ): ResponseBody
 
-    @GET("api/search/video/")
-    suspend fun searchChannels(
-        @Query("query") query: String,
-        @Query("content_type") contentType: String = "channel",
+    @GET("api/playlist/custom/{playlist_id}/videos/")
+    suspend fun getPlaylistVideos(
+        @retrofit2.http.Path("playlist_id") playlistId: String,
         @Query("page") page: Int = 1,
+        @Query("format") format: String = "json"
+    ): ResponseBody
+
+    @GET("api/playlist/custom/{playlist_id}/")
+    suspend fun getPlaylistInfo(
+        @retrofit2.http.Path("playlist_id") playlistId: String,
         @Query("format") format: String = "json"
     ): ResponseBody
 

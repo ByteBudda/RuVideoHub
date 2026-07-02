@@ -411,12 +411,7 @@ object SmartRutubeParser {
             val isLive = typeId == 12 || model == "live" || data.optBoolean("is_live", false)
             
             return when {
-                // Channel / Author/ User / Person Check (Highest priority for explicit channel models)
-                model in listOf("userchannel", "person", "channel", "author", "user") 
-                        || data.has("subscribers_count") 
-                        || (data.has("avatar") && !data.has("duration") && !data.has("video_url") && !data.has("code")) -> normalizeChannel(data)
-
-                // Video / Broadcast / Live Check (Playable objects)
+                // Video / Broadcast / Live Check (Highest priority for playable objects)
                 (isLive || data.has("duration") || data.has("video_url") || data.has("video_length") || model == "video") 
                     && !data.has("seasons_count") && !data.has("videos_count") && model != "tv" && model != "serial" -> normalizeVideo(data, isLive)
                 
@@ -426,6 +421,11 @@ object SmartRutubeParser {
                 // TV Show / Series Check
                 model == "tv" || model == "show" || model == "serial" || model == "tvshow" || model == "movie" 
                         || data.has("seasons_count") || data.has("seasons") || data.has("genres") -> normalizeTvShow(data)
+                
+                // Channel / Author/ User / Person Check
+                model in listOf("userchannel", "person", "channel", "author", "user") 
+                        || data.has("subscribers_count") 
+                        || (data.has("avatar") && !data.has("duration") && !data.has("video_url") && !data.has("code")) -> normalizeChannel(data)
                 
                 // Promo / Landing / Button Check
                 json.has("button") || json.has("target") || model == "promo" -> normalizePromo(json)
@@ -581,29 +581,14 @@ object SmartRutubeParser {
             val url = AdaptiveExtractor.getString(data, "url")
             val id = AdaptiveExtractor.getString(data, "id")
                 .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractor.getString(data, "playlist_id")
-                .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractor.getString(data, "playlist_id_string")
-                .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.makeDeterministicId("playlist", AdaptiveExtractor.getString(data, "title"), url)
             
-            val finalUrl = url.takeIf { it.isNotBlank() } ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
-            val vCount = if (data.has("videos_count")) {
-                data.optInt("videos_count")
-            } else if (data.has("video_count")) {
-                data.optInt("video_count")
-            } else {
-                AdaptiveExtractor.getInt(data, "videos", 0)
-            }
-
             return NormalizedCard.PlaylistCard(
                 id = id,
                 title = AdaptiveExtractor.getString(data, "title", "Untitled"),
-                thumbnail = (AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractor.getString(data, "picture").takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractor.getString(data, "image").takeIf { it.isNotBlank() }),
-                videosCount = vCount,
-                actionUrl = normalizeUrl(finalUrl)
+                thumbnail = AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() },
+                videosCount = AdaptiveExtractor.getInt(data, "videos", 0),
+                actionUrl = normalizeUrl(url)
             )
         }
         
@@ -665,18 +650,9 @@ object SmartRutubeParser {
                 return parseCatalogFeed(jsonObj)
             }
             
-            // Пагинированный ответ или список видео/элементов
-            if (jsonObj.has("results") || jsonObj.has("videos") || jsonObj.has("items")) {
+            // Пагинированный ответ
+            if (jsonObj.has("results")) {
                 return parsePaginatedResponse(jsonObj, actualPromoGroup)
-            }
-            
-            // Одиночный плейлист
-            if (jsonObj.has("title") && (jsonObj.has("playlist_id") || jsonObj.has("playlist_id_string") || jsonObj.has("videos_count") || jsonObj.has("video_count"))) {
-                val playlist = CardNormalizer.normalizeOrNull(jsonObj)
-                return ParsedResponse(
-                    type = if (playlist != null) EntityType.PLAYLIST else EntityType.EMPTY,
-                    items = playlist?.let { listOf(it) } ?: emptyList()
-                )
             }
             
             // Одиночное видео
@@ -694,6 +670,24 @@ object SmartRutubeParser {
                 return ParsedResponse(
                     type = if (series != null) EntityType.TV_SERIES else EntityType.EMPTY,
                     items = series?.let { listOf(it) } ?: emptyList()
+                )
+            }
+
+            // Плейлист
+            if (jsonObj.has("id") && jsonObj.has("videos_count")) {
+                val playlist = CardNormalizer.normalizeOrNull(jsonObj)
+                return ParsedResponse(
+                    type = if (playlist != null) EntityType.PLAYLIST else EntityType.EMPTY,
+                    items = playlist?.let { listOf(it) } ?: emptyList()
+                )
+            }
+            
+            // Канал
+            if (jsonObj.has("id") && jsonObj.has("subscribers_count")) {
+                val channel = CardNormalizer.normalizeOrNull(jsonObj)
+                return ParsedResponse(
+                    type = if (channel != null) EntityType.CHANNEL else EntityType.EMPTY,
+                    items = channel?.let { listOf(it) } ?: emptyList()
                 )
             }
             
@@ -828,10 +822,7 @@ object SmartRutubeParser {
         }
         
         private fun parsePaginatedResponse(jsonObj: JSONObject, isPromoGroup: Boolean): ParsedResponse {
-            val resultsArray = jsonObj.optJSONArray("results") 
-                ?: jsonObj.optJSONArray("videos")
-                ?: jsonObj.optJSONArray("items")
-                ?: JSONArray()
+            val resultsArray = jsonObj.optJSONArray("results") ?: JSONArray()
             val pagination = PaginationExtractor.extract(jsonObj)
             
             if (resultsArray.length() == 0) {
