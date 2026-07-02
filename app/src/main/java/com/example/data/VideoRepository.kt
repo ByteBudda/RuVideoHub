@@ -258,11 +258,16 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 // Try fetching channels search results
                 try {
                     val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
-                    val url = "https://rutube.ru/api/search/video/?query=$encodedQ&content_type=channel&page=$page&format=json"
-                    val channelResponse = apiService.getDynamicUrl(url)
-                    val bodyString = channelResponse.string()
-                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", url)
+                    var url = "https://rutube.ru/api/search/channel/?query=$encodedQ&page=$page&format=json"
+                    var bodyString = ""
+                    try {
+                        bodyString = apiService.getDynamicUrl(url).string()
+                    } catch (e: Exception) {
+                        url = "https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json"
+                        bodyString = apiService.getDynamicUrl(url).string()
+                    }
                     
+                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", url)
                     val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") }
                     resultsList.addAll(0, channelsOnly)
                 } catch (ioEx: java.io.IOException) {
