@@ -100,8 +100,8 @@ fun HomeTabScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.resetSubfolder() })
-                    .clickable { viewModel.resetSubfolder() }
+                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.navigateBack() })
+                    .clickable { viewModel.navigateBack() }
                     .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -636,25 +636,38 @@ fun HeroVideoCard(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = video.channel,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                            Row(
                                 modifier = Modifier
-                                    .sleekTvFocus(shape = RoundedCornerShape(4.dp), onEnter = onChannelClick)
-                                    .clickable(onClick = onChannelClick ?: {})
-                                    .weight(1f, fill = false)
-                            )
+                                    .sleekTvFocus(shape = RoundedCornerShape(8.dp), onEnter = onChannelClick)
+                                    .clickable(onClick = onChannelClick)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Канал",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = video.channel,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             Text(
                                 text = " • ${video.views} • ${video.timeAgo}",
                                 color = GreyText,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 4.dp)
                             )
                         }
                     } else {
@@ -831,15 +844,30 @@ fun SecondaryVideoItemRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (onChannelClick != null) {
-                    Text(
-                        text = video.channel,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                    Row(
                         modifier = Modifier
-                            .sleekTvFocus(shape = RoundedCornerShape(4.dp), onEnter = onChannelClick)
-                            .clickable(onClick = onChannelClick ?: {})
-                    )
+                            .sleekTvFocus(shape = RoundedCornerShape(8.dp), onEnter = onChannelClick)
+                            .clickable(onClick = onChannelClick)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Канал",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(10.dp)
+                        )
+                        Text(
+                            text = video.channel,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 } else {
                     Text(
                         text = video.channel,

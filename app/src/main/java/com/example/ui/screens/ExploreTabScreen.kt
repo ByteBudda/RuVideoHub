@@ -88,7 +88,6 @@ fun ExploreTabScreen(
                                 .background(getCategoryGradient(firstItem.title))
                                 .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
                                     viewModel.selectCategory(firstItem.title, firstItem.target)
-                                    viewModel.setSearchQuery("")
                                     viewModel.selectTab("home")
                                 })
                                 .border(
@@ -104,7 +103,6 @@ fun ExploreTabScreen(
                                 )
                                 .clickable {
                                     viewModel.selectCategory(firstItem.title, firstItem.target)
-                                    viewModel.setSearchQuery("")
                                     viewModel.selectTab("home")
                                 }
                         ) {
@@ -145,7 +143,6 @@ fun ExploreTabScreen(
                                     .background(getCategoryGradient(secondItem.title))
                                     .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
                                         viewModel.selectCategory(secondItem.title, secondItem.target)
-                                        viewModel.setSearchQuery("")
                                         viewModel.selectTab("home")
                                     })
                                     .border(
@@ -161,7 +158,6 @@ fun ExploreTabScreen(
                                     )
                                     .clickable {
                                         viewModel.selectCategory(secondItem.title, secondItem.target)
-                                        viewModel.setSearchQuery("")
                                         viewModel.selectTab("home")
                                     }
                             ) {
@@ -189,6 +185,18 @@ fun ExploreTabScreen(
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
                                         .padding(horizontal = 12.dp, vertical = 10.dp)
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+0.dp)
                                 )
                             }
                         } else {
