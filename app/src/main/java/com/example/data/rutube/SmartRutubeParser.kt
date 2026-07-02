@@ -411,7 +411,12 @@ object SmartRutubeParser {
             val isLive = typeId == 12 || model == "live" || data.optBoolean("is_live", false)
             
             return when {
-                // Video / Broadcast / Live Check (Highest priority for playable objects)
+                // Channel / Author/ User / Person Check (Highest priority for explicit channel models)
+                model in listOf("userchannel", "person", "channel", "author", "user") 
+                        || data.has("subscribers_count") 
+                        || (data.has("avatar") && !data.has("duration") && !data.has("video_url") && !data.has("code")) -> normalizeChannel(data)
+
+                // Video / Broadcast / Live Check (Playable objects)
                 (isLive || data.has("duration") || data.has("video_url") || data.has("video_length") || model == "video") 
                     && !data.has("seasons_count") && !data.has("videos_count") && model != "tv" && model != "serial" -> normalizeVideo(data, isLive)
                 
@@ -421,11 +426,6 @@ object SmartRutubeParser {
                 // TV Show / Series Check
                 model == "tv" || model == "show" || model == "serial" || model == "tvshow" || model == "movie" 
                         || data.has("seasons_count") || data.has("seasons") || data.has("genres") -> normalizeTvShow(data)
-                
-                // Channel / Author/ User / Person Check
-                model in listOf("userchannel", "person", "channel", "author", "user") 
-                        || data.has("subscribers_count") 
-                        || (data.has("avatar") && !data.has("duration") && !data.has("video_url") && !data.has("code")) -> normalizeChannel(data)
                 
                 // Promo / Landing / Button Check
                 json.has("button") || json.has("target") || model == "promo" -> normalizePromo(json)
