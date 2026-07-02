@@ -245,39 +245,55 @@ class VideoRepository(private val dao: SavedVideoDao) {
             if (q.isNotEmpty()) {
                 val resultsList = mutableListOf<Video>()
                 
-                // Try fetching videos search results
+                // Try fetching combined search results first
                 try {
-                    val responseBody = apiService.searchVideos(q, page = page)
+                    val responseBody = apiService.searchCombined(q, page = page)
                     val bodyString = responseBody.string()
-                    val parsed = parseVideoListJson(bodyString, "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&page=$page")
+                    val parsed = parseVideoListJson(bodyString, "Поиск: $q", "https://rutube.ru/api/search/combined/cards/list/?query=$q&page=$page")
                     resultsList.addAll(parsed)
                 } catch (ioEx: java.io.IOException) {
                     isNetworkError = true
-                    android.util.Log.e("VideoRepository", "Network error searching videos", ioEx)
+                    android.util.Log.e("VideoRepository", "Network error searching combined cards", ioEx)
                 } catch (e: Exception) {
-                    android.util.Log.e("VideoRepository", "Error searching videos", e)
+                    android.util.Log.e("VideoRepository", "Error searching combined cards, falling back to legacy search", e)
                 }
 
-                // Try fetching channels search results
-                try {
-                    val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
-                    var url = "https://rutube.ru/api/search/channel/?query=$encodedQ&page=$page&format=json"
-                    var bodyString = ""
+                // If combined search returned empty or failed (but not because of network error), fall back to legacy search
+                if (resultsList.isEmpty() && !isNetworkError) {
+                    // Try fetching videos search results
                     try {
-                        bodyString = apiService.getDynamicUrl(url).string()
+                        val responseBody = apiService.searchVideos(q, page = page)
+                        val bodyString = responseBody.string()
+                        val parsed = parseVideoListJson(bodyString, "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&page=$page")
+                        resultsList.addAll(parsed)
+                    } catch (ioEx: java.io.IOException) {
+                        isNetworkError = true
+                        android.util.Log.e("VideoRepository", "Network error searching videos fallback", ioEx)
                     } catch (e: Exception) {
-                        url = "https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json"
-                        bodyString = apiService.getDynamicUrl(url).string()
+                        android.util.Log.e("VideoRepository", "Error searching videos fallback", e)
                     }
-                    
-                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", url)
-                    val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") }
-                    resultsList.addAll(0, channelsOnly)
-                } catch (ioEx: java.io.IOException) {
-                    isNetworkError = true
-                    android.util.Log.e("VideoRepository", "Network error searching channels", ioEx)
-                } catch (e: Exception) {
-                    android.util.Log.e("VideoRepository", "Error searching channels via person endpoint", e)
+
+                    // Try fetching channels search results
+                    try {
+                        val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
+                        var url = "https://rutube.ru/api/search/channel/?query=$encodedQ&page=$page&format=json"
+                        var bodyString = ""
+                        try {
+                            bodyString = apiService.getDynamicUrl(url).string()
+                        } catch (e: Exception) {
+                            url = "https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json"
+                            bodyString = apiService.getDynamicUrl(url).string()
+                        }
+                        
+                        val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", url)
+                        val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") }
+                        resultsList.addAll(0, channelsOnly)
+                    } catch (ioEx: java.io.IOException) {
+                        isNetworkError = true
+                        android.util.Log.e("VideoRepository", "Network error searching channels fallback", ioEx)
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoRepository", "Error searching channels fallback", e)
+                    }
                 }
 
                 if (resultsList.isNotEmpty()) {
