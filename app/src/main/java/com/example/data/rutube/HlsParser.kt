@@ -39,7 +39,7 @@ object HlsParser {
                     resLabel = "${height}p"
                 } else {
                     // Fallback to searching standard resolution numbers
-                    val possibleHeights = listOf("1080", "720", "480", "360", "240")
+                    val possibleHeights = listOf("2160", "1440", "1080", "720", "480", "360", "240")
                     for (h in possibleHeights) {
                         if (line.contains(h)) {
                             resLabel = "${h}p"
@@ -67,10 +67,14 @@ object HlsParser {
                     // If resLabel is still empty, let's assign a fallback from the URL or bandwidth
                     if (resLabel.isBlank()) {
                         resLabel = when {
+                            absoluteUrl.contains("2160") || absoluteUrl.lowercase().contains("4k") -> "2160p"
+                            absoluteUrl.contains("1440") -> "1440p"
                             absoluteUrl.contains("1080") -> "1080p"
                             absoluteUrl.contains("720") -> "720p"
                             absoluteUrl.contains("480") -> "480p"
                             absoluteUrl.contains("360") -> "360p"
+                            bw > 10000000 -> "2160p"
+                            bw > 6000000 -> "1440p"
                             bw > 3000000 -> "1080p"
                             bw > 1500000 -> "720p"
                             bw > 800000 -> "480p"
