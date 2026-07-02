@@ -15,18 +15,4 @@ data class Video(
     val isBookmarked: Boolean = false,
     val authorId: String? = null,
     val authorActionUrl: String? = null
-) {
-    fun createChannelDummy(): Video? {
-        if (authorId.isNullOrBlank()) return null
-        return Video(
-            id = "channel_${authorId}__${authorActionUrl ?: ""}",
-            title = channel,
-            channel = channel,
-            views = "",
-            timeAgo = "",
-            duration = "КАНАЛ",
-            category = category,
-            description = ""
-        )
-    }
-}
+)
