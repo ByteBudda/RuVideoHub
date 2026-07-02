@@ -532,7 +532,7 @@ object SmartRutubeParser {
             return NormalizedCard.ChannelCard(
                 id = id,
                 name = AdaptiveExtractor.getString(data, "title", "Untitled"),
-                avatar = AdaptiveExtractor.getString(data, "avatar").takeIf { it.isNotBlank() },
+                avatar = AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() } ?: AdaptiveExtractor.getString(data, "avatar").takeIf { it.isNotBlank() },
                 description = AdaptiveExtractor.getString(data, "description").takeIf { it.isNotBlank() },
                 subscribers = formatCount(subsCount),
                 rawSubscribers = subsCount,
