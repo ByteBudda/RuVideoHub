@@ -119,12 +119,14 @@ fun SleekVideoHubApp(
     AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
         if (isTvOptimized) {
             Row(modifier = Modifier.fillMaxSize()) {
-                SleekTvNavigationRail(
-                    selectedTab = currentTab,
-                    onTabSelected = { viewModel.selectTab(it) },
-                    isDark = isDarkTheme,
-                    isTvOptimized = isTvOptimized
-                )
+                if (currentSelectedVideo == null || currentTab == "tv_mini") {
+                    SleekTvNavigationRail(
+                        selectedTab = currentTab,
+                        onTabSelected = { viewModel.selectTab(it) },
+                        isDark = isDarkTheme,
+                        isTvOptimized = isTvOptimized
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -212,7 +214,8 @@ fun SleekVideoHubApp(
             exit = slideOutVertically(
                 targetOffsetY = { it },
                 animationSpec = tween(220)
-            )
+            ),
+            modifier = Modifier.fillMaxSize()
         ) {
             currentSelectedVideo?.let { video ->
                 SleekPlayerDetailOverlay(

@@ -105,7 +105,17 @@ fun RutubeVideoPlayer(
     var useEmbedPlayer by remember(videoId, selectedQuality) { mutableStateOf(false) }
 
     // Position & duration states for custom controls
-    var isPlayingState by remember { mutableStateOf(true) }
+    val isPlayingFromViewModel by viewModel.isPlaying.collectAsStateWithLifecycle()
+    var isPlayingState by remember { mutableStateOf(viewModel.isPlaying.value) }
+
+    LaunchedEffect(isPlayingFromViewModel) {
+        isPlayingState = isPlayingFromViewModel
+    }
+
+    LaunchedEffect(isPlayingState) {
+        viewModel.setPlayingState(isPlayingState)
+    }
+
     var currentPos by remember { mutableLongStateOf(0L) }
     var totalDuration by remember { mutableLongStateOf(0L) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
