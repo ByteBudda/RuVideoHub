@@ -44,6 +44,8 @@ import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.focusGroup
@@ -185,6 +187,21 @@ fun HomeTabScreen(
                 }
             }
             
+            // 3.5. Channel header
+            if (isChannelView) {
+                item {
+                    val activeChannel by viewModel.currentChannelVideo.collectAsStateWithLifecycle()
+                    ChannelHeader(
+                        channel = activeChannel,
+                        onFavoriteToggle = { channelVideo -> 
+                            viewModel.toggleBookmark(channelVideo)
+                        },
+                        isDark = isDarkTheme,
+                        isTvOptimized = isTvOptimized
+                    )
+                }
+            }
+
             // 4. Channel view tabs
             if (isChannelView) {
                 item {
@@ -231,6 +248,198 @@ fun HomeTabScreen(
                 item {
                     EmptySearchState(query = searchQuery)
                 }
+            } else if (searchQuery.isNotEmpty()) {
+                // Highly optimized search results display!
+                val searchChannels = currentVideos.filter { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
+                val searchVideos = currentVideos.filter { !it.id.startsWith("channel_") && it.duration != "КАНАЛ" }
+
+                // 2. Render Channels Row at the top if present
+                if (searchChannels.isNotEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Каналы",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(searchChannels, key = { it.id }) { channel ->
+                                    SleekSearchChannelItem(
+                                        channel = channel,
+                                        onClick = {
+                                            viewModel.selectVideo(channel)
+                                        },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                            )
+                        }
+                    }
+                }
+
+                // 3. Render Search Videos
+                if (searchVideos.isNotEmpty()) {
+                    val firstItem = searchVideos.first()
+                    val isFolderList = firstItem.duration == "ПАПКА" || 
+                                       firstItem.duration == "КАТАЛОГ" ||
+                                       firstItem.duration == "СЕРИАЛ" ||
+                                       firstItem.duration == "ПЛЕЙЛИСТ"
+                    
+                    if (!isFolderList) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                HeroVideoCard(
+                                    video = firstItem,
+                                    onVideoClick = { viewModel.selectVideo(firstItem) },
+                                    onDownloadToggle = { viewModel.toggleDownload(firstItem) },
+                                    isDark = isDarkTheme,
+                                    onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
+                                        {
+                                            val channelDummy = Video(
+                                                id = "channel_${firstItem.authorId}__${firstItem.authorActionUrl ?: ""}",
+                                                title = firstItem.channel,
+                                                channel = firstItem.channel,
+                                                views = "",
+                                                timeAgo = "",
+                                                duration = "КАНАЛ",
+                                                category = firstItem.category,
+                                                description = "",
+                                                thumbnailUrl = firstItem.authorAvatarUrl,
+                                                authorAvatarUrl = firstItem.authorAvatarUrl
+                                            )
+                                            viewModel.selectVideo(channelDummy)
+                                        }
+                                    } else null,
+                                    isTvOptimized = isTvOptimized
+                                )
+                            }
+                        }
+
+                        if (searchVideos.size > 1) {
+                            items(searchVideos.subList(1, searchVideos.size), key = { it.id }) { video ->
+                                SecondaryVideoItemRow(
+                                    video = video,
+                                    onVideoClick = { viewModel.selectVideo(video) },
+                                    onDownloadToggle = { viewModel.toggleDownload(video) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                    isDark = isDarkTheme,
+                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                        {
+                                            val channelDummy = Video(
+                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                title = video.channel,
+                                                channel = video.channel,
+                                                views = "",
+                                                timeAgo = "",
+                                                duration = "КАНАЛ",
+                                                category = video.category,
+                                                description = "",
+                                                thumbnailUrl = video.authorAvatarUrl,
+                                                authorAvatarUrl = video.authorAvatarUrl
+                                            )
+                                            viewModel.selectVideo(channelDummy)
+                                        }
+                                    } else null,
+                                    isTvOptimized = isTvOptimized
+                                )
+                            }
+                        }
+                    } else {
+                        val searchFolderItemsToRender = mutableListOf<List<Video>>()
+                        val currentPair = mutableListOf<Video>()
+                        for (video in searchVideos) {
+                            val hasPreview = !video.thumbnailUrl.isNullOrBlank()
+                            if (hasPreview) {
+                                if (currentPair.isNotEmpty()) {
+                                    searchFolderItemsToRender.add(currentPair.toList())
+                                    currentPair.clear()
+                                }
+                                searchFolderItemsToRender.add(listOf(video))
+                            } else {
+                                currentPair.add(video)
+                                if (currentPair.size == 2) {
+                                    searchFolderItemsToRender.add(currentPair.toList())
+                                    currentPair.clear()
+                                }
+                            }
+                        }
+                        if (currentPair.isNotEmpty()) {
+                            searchFolderItemsToRender.add(currentPair.toList())
+                        }
+
+                        items(searchFolderItemsToRender) { rowItems ->
+                            if (rowItems.size == 1) {
+                                val video = rowItems.first()
+                                if (!video.thumbnailUrl.isNullOrBlank()) {
+                                    SleekFolderGridItem(
+                                        video = video,
+                                        onFolderClick = { viewModel.selectVideo(video) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 2.dp)
+                                    )
+                                } else {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        SleekFolderGridItem(
+                                            video = video,
+                                            onFolderClick = { viewModel.selectVideo(video) },
+                                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                            isDark = isDarkTheme,
+                                            isTvOptimized = isTvOptimized,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowItems.forEach { video ->
+                                        SleekFolderGridItem(
+                                            video = video,
+                                            onFolderClick = { viewModel.selectVideo(video) },
+                                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                            isDark = isDarkTheme,
+                                            isTvOptimized = isTvOptimized,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
                 // Section recommended (hero card for videos, uniform list for folders)
                 val firstItem = currentVideos.first()
@@ -261,7 +470,9 @@ fun HomeTabScreen(
                                             timeAgo = "",
                                             duration = "КАНАЛ",
                                             category = firstItem.category,
-                                            description = ""
+                                            description = "",
+                                            thumbnailUrl = firstItem.authorAvatarUrl,
+                                            authorAvatarUrl = firstItem.authorAvatarUrl
                                         )
                                         viewModel.selectVideo(channelDummy)
                                     }
@@ -290,7 +501,9 @@ fun HomeTabScreen(
                                             timeAgo = "",
                                             duration = "КАНАЛ",
                                             category = video.category,
-                                            description = ""
+                                            description = "",
+                                            thumbnailUrl = video.authorAvatarUrl,
+                                            authorAvatarUrl = video.authorAvatarUrl
                                         )
                                         viewModel.selectVideo(channelDummy)
                                     }
@@ -307,6 +520,7 @@ fun HomeTabScreen(
                                 SleekFolderGridItem(
                                     video = video,
                                     onFolderClick = { viewModel.selectVideo(video) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
                                     isDark = isDarkTheme,
                                     isTvOptimized = isTvOptimized,
                                     modifier = Modifier
@@ -323,6 +537,7 @@ fun HomeTabScreen(
                                     SleekFolderGridItem(
                                         video = video,
                                         onFolderClick = { viewModel.selectVideo(video) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
                                         isDark = isDarkTheme,
                                         isTvOptimized = isTvOptimized,
                                         modifier = Modifier.weight(1f)
@@ -335,12 +550,13 @@ fun HomeTabScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 rowItems.forEach { video ->
                                     SleekFolderGridItem(
                                         video = video,
                                         onFolderClick = { viewModel.selectVideo(video) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
                                         isDark = isDarkTheme,
                                         isTvOptimized = isTvOptimized,
                                         modifier = Modifier.weight(1f)
@@ -721,6 +937,7 @@ fun HeroVideoCard(
 fun SleekFolderGridItem(
     video: Video,
     onFolderClick: () -> Unit,
+    onBookmarkToggle: () -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
@@ -794,6 +1011,22 @@ fun SleekFolderGridItem(
                 lineHeight = 17.sp,
                 modifier = Modifier.weight(1f)
             )
+
+            // Bookmark Button for Channel, Playlist, Folder or Serial
+            IconButton(
+                onClick = onBookmarkToggle,
+                modifier = Modifier
+                    .size(36.dp)
+                    .sleekTvFocus(CircleShape)
+                    .testTag("folder_bookmark_${video.id}")
+            ) {
+                Icon(
+                    imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                    contentDescription = "В избранное",
+                    tint = Primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,
@@ -1086,3 +1319,271 @@ fun VideoThumbnail(
         }
     }
 }
+
+@Composable
+fun ChannelHeader(
+    channel: Video?,
+    onFavoriteToggle: (Video) -> Unit,
+    isDark: Boolean,
+    isTvOptimized: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (channel == null) return
+
+    val context = LocalContext.current
+    
+    val avatarUrl = if (!channel.authorAvatarUrl.isNullOrBlank()) {
+        channel.authorAvatarUrl
+    } else if (!channel.thumbnailUrl.isNullOrBlank()) {
+        channel.thumbnailUrl
+    } else {
+        "https://pic.rtbcdn.ru/user/2025-09-09/99/2e/992e701a19f5b77709584468ba735cc2.jpg"
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .liquidGlass(
+                RoundedCornerShape(20.dp),
+                borderWidth = 1.2.dp,
+                isDark = isDark,
+                isTvOptimized = isTvOptimized
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Channel Avatar
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "Аватар канала",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
+
+            // Channel Title and details
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = channel.title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (channel.views.isNotBlank()) {
+                    Text(
+                        text = channel.views,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+
+                if (channel.timeAgo.isNotBlank() && channel.timeAgo != channel.views) {
+                    Text(
+                        text = channel.timeAgo,
+                        fontSize = 11.sp,
+                        color = GreyText
+                    )
+                }
+            }
+        }
+
+        // Description if available
+        if (channel.description.isNotBlank()) {
+            Text(
+                text = channel.description,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                lineHeight = 16.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Bottom Action buttons row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Favorite Button
+            Button(
+                onClick = { onFavoriteToggle(channel) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (channel.isBookmarked) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    contentColor = if (channel.isBookmarked) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onPrimary
+                    }
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (channel.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = "В избранное",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (channel.isBookmarked) "В избранном" else "В избранное",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            // Share Button
+            OutlinedButton(
+                onClick = {
+                    val rawChannelId = channel.id.substringAfter("channel_").substringBefore("__")
+                    val shareUrl = "https://rutube.ru/channel/$rawChannelId/"
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, "Смотрите авторский канал '${channel.title}' в RuVideoHub:\n$shareUrl")
+                        type = "text/plain"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, "Поделиться каналом")
+                    context.startActivity(shareIntent)
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Поделиться",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Поделиться",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SleekSearchChannelItem(
+    channel: Video,
+    onClick: () -> Unit,
+    isDark: Boolean,
+    isTvOptimized: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val avatarUrl = if (!channel.authorAvatarUrl.isNullOrBlank()) {
+        channel.authorAvatarUrl
+    } else if (!channel.thumbnailUrl.isNullOrBlank()) {
+        channel.thumbnailUrl
+    } else {
+        "https://pic.rtbcdn.ru/user/2025-09-09/99/2e/992e701a19f5b77709584468ba735cc2.jpg"
+    }
+
+    Column(
+        modifier = modifier
+            .width(96.dp)
+            .sleekTvFocus(shape = CircleShape, onEnter = onClick)
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Circle Avatar with Liquid Glass Border Effect
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .border(
+                    width = 2.dp,
+                    color = if (isDark) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.primary,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = avatarUrl,
+                contentDescription = channel.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(6.dp))
+        
+        // Title
+        Text(
+            text = channel.title,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
+        )
+        
+        // Subtitle (Subscriber or video count, etc.)
+        val originalText = channel.views.ifBlank { "Канал" }
+        val shortSubsText = originalText
+            .replace("подписчиков", "подп.")
+            .replace("подписчика", "подп.")
+            .replace("подписчик", "подп.")
+        Text(
+            text = shortSubsText,
+            color = GreyText,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
+        )
+    }
+}
+

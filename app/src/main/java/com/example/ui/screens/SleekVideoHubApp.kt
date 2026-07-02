@@ -85,8 +85,18 @@ fun SleekVideoHubApp(
 ) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val currentSelectedVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
+    val isTermsAgreed by viewModel.isTermsAgreed.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+
+    if (!isTermsAgreed) {
+        TermsAgreementScreen(
+            onAgree = { viewModel.agreeToTerms() },
+            onDecline = { context.findActivity()?.finish() }
+        )
+        return
+    }
+
     var lastBackPressTime by remember { mutableStateOf(0L) }
 
     androidx.activity.compose.BackHandler(enabled = currentSelectedVideo == null) {
@@ -136,6 +146,7 @@ fun SleekVideoHubApp(
                             "downloads" -> DownloadsTabScreen(viewModel = viewModel)
                             "library" -> LibraryTabScreen(viewModel = viewModel)
                             "tv_mini" -> TvMiniPlayerScreen(viewModel = viewModel)
+                            "settings" -> SettingsTabScreen(viewModel = viewModel)
                         }
                     }
                 }
@@ -171,6 +182,7 @@ fun SleekVideoHubApp(
                                     "recents" -> RecentsTabScreen(viewModel = viewModel)
                                     "downloads" -> DownloadsTabScreen(viewModel = viewModel)
                                     "library" -> LibraryTabScreen(viewModel = viewModel)
+                                    "settings" -> SettingsTabScreen(viewModel = viewModel)
                                 }
                             }
                         }
@@ -285,6 +297,13 @@ fun SleekBottomNavigation(
                 onClick = { onTabSelected("library") },
                 testTag = "tab_library"
             )
+            BottomTabItem(
+                label = "Настройки",
+                icon = Icons.Default.Settings,
+                isActive = selectedTab == "settings",
+                onClick = { onTabSelected("settings") },
+                testTag = "tab_settings"
+            )
         }
     }
 }
@@ -345,67 +364,79 @@ fun SleekTvNavigationRail(
             .fillMaxHeight()
             .width(88.dp)
             .background(if (isDark) Color(0xFF14131A) else Color(0xFFF0EDF5))
-            .padding(vertical = 16.dp, horizontal = 4.dp),
+            .padding(vertical = 12.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.Top
     ) {
         // App logo or accent
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Rutube Logo",
+                contentDescription = "Logo",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        listOf(
-            Triple("home", Icons.Default.Home, "Главная"),
-            Triple("explore", Icons.Default.Explore, "Обзор"),
-            Triple("tv_mini", Icons.Default.Tv, "ТВ Плеер"),
-            Triple("recents", Icons.Default.History, "Недавние"),
-            Triple("downloads", Icons.Default.Download, "Загрузки"),
-            Triple("library", Icons.Default.Favorite, "Избранное")
-        ).forEach { (tabId, icon, label) ->
-            val isActive = selectedTab == tabId
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { onTabSelected(tabId) })
-                    .clickable { onTabSelected(tabId) }
-                    .padding(vertical = 8.dp)
-            ) {
-                Box(
+        // Scrollable menu items
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                Triple("home", Icons.Default.Home, "Главная"),
+                Triple("explore", Icons.Default.Explore, "Обзор"),
+                Triple("tv_mini", Icons.Default.Tv, "ТВ Плеер"),
+                Triple("recents", Icons.Default.History, "Недавние"),
+                Triple("downloads", Icons.Default.Download, "Загрузки"),
+                Triple("library", Icons.Default.Favorite, "Избранное"),
+                Triple("settings", Icons.Default.Settings, "Настройки")
+            ).forEach { (tabId, icon, label) ->
+                val isActive = selectedTab == tabId
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isActive) PrimaryContainer else Color.Transparent),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .sleekTvFocus(shape = RoundedCornerShape(10.dp), onEnter = { onTabSelected(tabId) })
+                        .clickable { onTabSelected(tabId) }
+                        .padding(vertical = 4.dp)
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
-                        modifier = Modifier.size(20.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isActive) PrimaryContainer else Color.Transparent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = label,
+                        fontSize = 9.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText,
+                        maxLines = 1
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = label,
-                    fontSize = 10.sp,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText
-                )
             }
         }
     }

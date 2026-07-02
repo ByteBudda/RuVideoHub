@@ -170,7 +170,7 @@ fun ExploreTabScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(
+                                    	.background(
                                             Brush.verticalGradient(
                                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
                                                 startY = 50f

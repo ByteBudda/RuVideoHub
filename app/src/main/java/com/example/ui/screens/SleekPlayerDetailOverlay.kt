@@ -299,7 +299,9 @@ fun SleekPlayerDetailOverlay(
                                         timeAgo = "",
                                         duration = "КАНАЛ",
                                         category = video.category,
-                                        description = ""
+                                        description = "",
+                                        thumbnailUrl = video.authorAvatarUrl,
+                                        authorAvatarUrl = video.authorAvatarUrl
                                     )
                                     viewModel.selectVideo(channelDummy)
                                 }
@@ -774,7 +776,9 @@ fun SleekPlayerDetailOverlay(
                                         timeAgo = "",
                                         duration = "КАНАЛ",
                                         category = video.category,
-                                        description = ""
+                                        description = "",
+                                        thumbnailUrl = video.authorAvatarUrl,
+                                        authorAvatarUrl = video.authorAvatarUrl
                                     )
                                     viewModel.selectVideo(channelDummy)
                                 }

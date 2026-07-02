@@ -615,124 +615,6 @@ fun LibraryTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Quality Settings Panel
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "Настройки качества",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Player Default Quality
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Качество плеера", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
-                    Text(text = "Качество по умолчанию при запуске видео", fontSize = 10.sp, color = GreyText)
-                }
-
-                val playerQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
-                var dropdownExpanded by remember { mutableStateOf(false) }
-
-                Box {
-                    Button(
-                        onClick = { dropdownExpanded = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp).sleekTvFocus(RoundedCornerShape(8.dp))
-                    ) {
-                        Text(text = playerQuality, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-
-                    DropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                    ) {
-                        listOf("Авто", "2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
-                            DropdownMenuItem(
-                                text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setPlayerQuality(opt)
-                                    dropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Downloader Default Quality
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Качество загрузки", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
-                    Text(text = "Желаемое качество при скачивании", fontSize = 10.sp, color = GreyText)
-                }
-
-                val downloadQuality by viewModel.downloadQuality.collectAsStateWithLifecycle()
-                var dlDropdownExpanded by remember { mutableStateOf(false) }
-
-                Box {
-                    Button(
-                        onClick = { dlDropdownExpanded = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp).sleekTvFocus(RoundedCornerShape(8.dp))
-                    ) {
-                        Text(text = downloadQuality, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-
-                    DropdownMenu(
-                        expanded = dlDropdownExpanded,
-                        onDismissRequest = { dlDropdownExpanded = false },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                    ) {
-                        listOf("2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
-                            DropdownMenuItem(
-                                text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setDownloadQuality(opt)
-                                    dlDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -755,6 +637,155 @@ fun LibraryTabScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(bottom = 80.dp)
+            ) {
+                items(bookmarkedVideos, key = { it.id }) { saved ->
+                     val videoRuntime = Video(
+                        id = saved.id,
+                        title = saved.title,
+                        channel = saved.channel,
+                        views = saved.views,
+                        timeAgo = saved.timeAgo,
+                        duration = saved.duration,
+                        isPro = saved.isPro,
+                        category = saved.category,
+                        description = "Сохраненный элемент.",
+                        thumbnailUrl = saved.thumbnailUrl,
+                        isDownloaded = saved.isDownloaded,
+                        isBookmarked = true
+                    )
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+                            .clickable { viewModel.selectVideo(videoRuntime) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            VideoThumbnail(
+                                id = saved.id,
+                                duration = saved.duration,
+                                thumbnailUrl = saved.thumbnailUrl,
+                                modifier = Modifier
+                                    .width(80.dp)
+                                    .height(48.dp)
+                            )
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = saved.title,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = saved.channel,
+                                    fontSize = 10.sp,
+                                    color = GreyText
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.toggleBookmark(videoRuntime) },
+                                modifier = Modifier.size(32.dp)
+                                    .sleekTvFocus(CircleShape)
+                                    .testTag("delete_bookmark_${saved.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Bookmark,
+                                    contentDescription = "Удалить из закладок",
+                                    tint = Primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyStateContainer(
+    title: String,
+    hint: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Inbox,
+            contentDescription = null,
+            tint = GreyText.copy(alpha = 0.4f),
+            modifier = Modifier.size(56.dp)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = title,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = hint,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            color = GreyText,
+            lineHeight = 16.sp
+        )
+    }
+}
+
+@Composable
+fun EmptySearchState(query: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.SearchOff,
+            contentDescription = null,
+            tint = GreyText.copy(alpha = 0.5f),
+            modifier = Modifier.size(60.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Ничего не найдено",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "По запросу \"$query\" совпадений не обнаружено. Пожалуйста, измените запрос или смените вкладку фильтра.",
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            color = GreyText,
+            lineHeight = 16.sp
+        )
+    }
+}
+            verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 items(bookmarkedVideos, key = { it.id }) { saved ->
