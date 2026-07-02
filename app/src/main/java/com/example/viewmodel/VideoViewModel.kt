@@ -211,10 +211,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun canNavigateBack(): Boolean {
         if (_currentSelectedVideo.value != null) return true
-        if (_selectedSubfolderName.value != null) return true
         if (_searchQuery.value.isNotEmpty()) return true
-        if (_currentTab.value != "home") return true
-        if (_selectedCategory.value != "Фильмы") return true
         return !navHistory.isEmpty()
     }
 
@@ -224,24 +221,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             return true
         }
 
-        if (_selectedSubfolderName.value != null) {
-            resetSubfolder()
-            return true
-        }
-
         if (_searchQuery.value.isNotEmpty()) {
             setSearchQuery("")
-            return true
-        }
-
-        if (_currentTab.value != "home") {
-            _currentTab.value = "home"
-            return true
-        }
-
-        if (_selectedCategory.value != "Фильмы") {
-            _selectedCategory.value = "Фильмы"
-            fetchRealVideos(query = null, category = "Фильмы")
             return true
         }
 
@@ -389,6 +370,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         pushToHistory()
         _selectedFeedTab.value = tab
         _selectedSubfolderName.value = null
+        _isChannelView.value = false
+        _channelVideos.value = emptyList()
+        _channelPlaylists.value = emptyList()
+        _channelActiveTab.value = "Видео"
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
             _isLoading.value = true
@@ -447,6 +432,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         fetchJob?.cancel()
         val currentRequestId = ++requestId
         _selectedSubfolderName.value = null
+        _isChannelView.value = false
+        _channelVideos.value = emptyList()
+        _channelPlaylists.value = emptyList()
+        _channelActiveTab.value = "Видео"
         currentQuery = query
         val targetCategory = category ?: _selectedCategory.value
         currentCategory = targetCategory
@@ -715,11 +704,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectCategory(category: String) {
-        pushToHistory()
-        _selectedCategory.value = category
-        fetchRealVideos(query = _searchQuery.value, category = category)
-    }
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
@@ -868,6 +852,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             val rawActionUrl = idParts.getOrNull(1) ?: ""
 
             viewModelScope.launch {
+                _isChannelView.value = false
+                _channelVideos.value = emptyList()
+                _channelPlaylists.value = emptyList()
+                _channelActiveTab.value = "Видео"
                 _isLoading.value = true
                 try {
                     var loadedVideos: List<Video> = emptyList()
@@ -1034,6 +1022,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             val actionUrl = parts.getOrNull(1) ?: ""
             
             viewModelScope.launch {
+                _isChannelView.value = false
+                _channelVideos.value = emptyList()
+                _channelPlaylists.value = emptyList()
+                _channelActiveTab.value = "Видео"
                 _isLoading.value = true
                 try {
                     var loadedVideos: List<Video> = emptyList()
