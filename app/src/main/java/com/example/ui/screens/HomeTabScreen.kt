@@ -57,6 +57,7 @@ fun HomeTabScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
+    val dynamicChannels by viewModel.dynamicChannels.collectAsStateWithLifecycle()
 
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
@@ -115,21 +116,7 @@ fun HomeTabScreen(
         searchQuery.isNotEmpty() && selectedSubfolderName == null
     }
 
-    val searchChannels = remember(activeList, isSearchMode) {
-        if (isSearchMode) {
-            activeList.filter { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
-        } else {
-            emptyList()
-        }
-    }
-
-    val mainDisplayList = remember(activeList, isSearchMode) {
-        if (isSearchMode) {
-            activeList.filterNot { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
-        } else {
-            activeList
-        }
-    }
+    val mainDisplayList = activeList
 
     Column(modifier = modifier.fillMaxSize()) {
         // App search header
@@ -261,10 +248,10 @@ fun HomeTabScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
-                if (isSearchMode && searchChannels.isNotEmpty()) {
+                if (dynamicChannels.isNotEmpty()) {
                     item {
                         SearchChannelsRow(
-                            channels = searchChannels,
+                            channels = dynamicChannels,
                             onChannelClick = { viewModel.selectVideo(it) },
                             isDark = isDarkTheme,
                             isTvOptimized = isTvOptimized
@@ -294,17 +281,9 @@ fun HomeTabScreen(
                                     isDark = isDarkTheme,
                                     onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
                                         {
-                                            val channelDummy = Video(
-                                                id = "channel_${firstItem.authorId}__${firstItem.authorActionUrl ?: ""}",
-                                                title = firstItem.channel,
-                                                channel = firstItem.channel,
-                                                views = "",
-                                                timeAgo = "",
-                                                duration = "КАНАЛ",
-                                                category = firstItem.category,
-                                                description = ""
-                                            )
-                                            viewModel.selectVideo(channelDummy)
+                                            firstItem.createChannelDummy()?.let { channelDummy ->
+                                                viewModel.selectVideo(channelDummy)
+                                            }
                                         }
                                     } else null,
                                     isTvOptimized = isTvOptimized
@@ -323,17 +302,9 @@ fun HomeTabScreen(
                                     isDark = isDarkTheme,
                                     onChannelClick = if (!video.authorId.isNullOrBlank()) {
                                         {
-                                            val channelDummy = Video(
-                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                                title = video.channel,
-                                                channel = video.channel,
-                                                views = "",
-                                                timeAgo = "",
-                                                duration = "КАНАЛ",
-                                                category = video.category,
-                                                description = ""
-                                            )
-                                            viewModel.selectVideo(channelDummy)
+                                            video.createChannelDummy()?.let { channelDummy ->
+                                                viewModel.selectVideo(channelDummy)
+                                            }
                                         }
                                     } else null,
                                     isTvOptimized = isTvOptimized
@@ -776,23 +747,7 @@ fun HeroVideoCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                // Avatar symbol
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(PrimaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Movie,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Text labels
+                // Wrap Avatar and Text in a single column for the title, and a clickable row for the channel
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = video.title,
@@ -803,36 +758,51 @@ fun HeroVideoCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (onChannelClick != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = video.channel,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .let {
+                                if (onChannelClick != null) {
+                                    it.sleekTvFocus(shape = RoundedCornerShape(8.dp), onEnter = onChannelClick)
+                                      .clickable(onClick = onChannelClick)
+                                      .padding(vertical = 4.dp, horizontal = 2.dp)
+                                } else it
+                            }
+                    ) {
+                        // Avatar
+                        if (!video.authorId.isNullOrBlank() || video.duration == "КАНАЛ") {
+                            Box(
                                 modifier = Modifier
-                                    .sleekTvFocus(shape = RoundedCornerShape(4.dp), onEnter = onChannelClick)
-                                    .clickable(onClick = onChannelClick ?: {})
-                                    .weight(1f, fill = false)
-                            )
-                            Text(
-                                text = " • ${video.views} • ${video.timeAgo}",
-                                color = GreyText,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(PrimaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Movie,
+                                    contentDescription = null,
+                                    tint = Primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
-                    } else {
+                        
+                        // Text labels
                         Text(
-                            text = "${video.channel} • ${video.views} • ${video.timeAgo}",
+                            text = video.channel,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Text(
+                            text = " • ${video.views} • ${video.timeAgo}",
                             color = GreyText,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Normal,
@@ -998,28 +968,48 @@ fun SecondaryVideoItemRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let {
+                        if (onChannelClick != null) {
+                            it.sleekTvFocus(shape = RoundedCornerShape(8.dp), onEnter = onChannelClick)
+                              .clickable(onClick = onChannelClick)
+                              .padding(vertical = 4.dp, horizontal = 2.dp)
+                        } else it
+                    }
             ) {
-                if (onChannelClick != null) {
-                    Text(
-                        text = video.channel,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                // Avatar
+                if (!video.authorId.isNullOrBlank() || video.duration == "КАНАЛ") {
+                    Box(
                         modifier = Modifier
-                            .sleekTvFocus(shape = RoundedCornerShape(4.dp), onEnter = onChannelClick)
-                            .clickable(onClick = onChannelClick ?: {})
-                    )
-                } else {
-                    Text(
-                        text = video.channel,
-                        fontSize = 10.sp,
-                        color = GreyText
-                    )
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Movie,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(10.dp)
+                        )
+                    }
                 }
+                
+                Text(
+                    text = video.channel,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (onChannelClick != null) MaterialTheme.colorScheme.primary else GreyText,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
                 Box(
                     modifier = Modifier
                         .size(3.dp)
