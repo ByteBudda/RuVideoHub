@@ -1322,6 +1322,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setPlayingState(playing: Boolean) {
+        _isPlaying.value = playing
+        if (playing) {
+            startPlaybackTicker()
+        } else {
+            stopPlaybackTicker()
+        }
+    }
+
     fun seekProgress(progress: Float) {
         _playProgress.value = progress.coerceIn(0f, 1f)
     }
