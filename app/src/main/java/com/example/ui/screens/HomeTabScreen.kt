@@ -250,8 +250,28 @@ fun HomeTabScreen(
                 }
             } else if (searchQuery.isNotEmpty()) {
                 // Highly optimized search results display!
-                val searchChannels = currentVideos.filter { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
                 val searchVideos = currentVideos.filter { !it.id.startsWith("channel_") && it.duration != "КАНАЛ" }
+                val explicitChannels = currentVideos.filter { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
+                val extractedChannels = searchVideos
+                    .filter { !it.authorId.isNullOrBlank() && !it.channel.isNullOrBlank() }
+                    .map { video ->
+                        val chanId = video.authorId!!
+                        Video(
+                            id = "channel_${chanId}__${video.authorActionUrl ?: ""}",
+                            title = video.channel,
+                            channel = video.channel,
+                            views = "",
+                            timeAgo = "",
+                            duration = "КАНАЛ",
+                            category = video.category,
+                            description = "",
+                            thumbnailUrl = video.authorAvatarUrl ?: video.thumbnailUrl,
+                            authorAvatarUrl = video.authorAvatarUrl,
+                            authorId = chanId,
+                            authorActionUrl = video.authorActionUrl
+                        )
+                    }
+                val searchChannels = (explicitChannels + extractedChannels).distinctBy { it.authorId ?: it.id }
 
                 // 2. Render Channels Row at the top if present
                 if (searchChannels.isNotEmpty()) {
