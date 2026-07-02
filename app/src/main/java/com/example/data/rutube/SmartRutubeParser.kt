@@ -86,7 +86,8 @@ object SmartRutubeParser {
             "created" to listOf("created_ts", "publication_ts", "published_at", "upload_date"),
             "subscribers" to listOf("subscribers_count", "followers", "subs"),
             "videos" to listOf("video_count", "videos_count", "total_videos"),
-            "seasons" to listOf("seasons_count", "seasons")
+            "seasons" to listOf("seasons_count", "seasons"),
+            "avatar" to listOf("avatar_url", "avatar", "picture_url", "picture", "logo_url", "logo")
         )
         
         fun makeDeterministicId(prefix: String, title: String, url: String?): String {
