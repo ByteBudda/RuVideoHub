@@ -408,5 +408,3 @@ fun SleekTvNavigationRail(
         }
     }
 }
-
-}
