@@ -1,7 +1,7 @@
 package com.example.data.rutube
 
 data class HlsStream(
-    val resolution: String, // e.g., "1080p", "720p", "480p", "360p"
+    val resolution: String, // e.g., "2160p","1440p","1080p", "720p", "480p", "360p"
     val url: String,
     val bandwidth: Long
 )
