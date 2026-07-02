@@ -379,12 +379,20 @@ object SmartRutubeParser {
             }
             
             val hasContentType = json.has("content_type")
-            val isNested = hasContentType && json.has("object")
+            val isNested = json.has("object") && json.optJSONObject("object") != null
             val data = if (isNested) json.optJSONObject("object") ?: json else json
             
             var model = ""
             if (hasContentType) {
                 model = json.optJSONObject("content_type")?.optString("model") ?: ""
+            }
+            if (model.isBlank()) {
+                val outerTypeVal = json.opt("type")
+                model = when (outerTypeVal) {
+                    is String -> outerTypeVal
+                    is JSONObject -> outerTypeVal.optString("name", outerTypeVal.optString("code", ""))
+                    else -> ""
+                }
             }
             if (model.isBlank()) {
                 val typeVal = data.opt("type")
