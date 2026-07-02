@@ -268,13 +268,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
     val activeDownloads = _activeDownloads.asStateFlow()
 
-    private val downloadAndBookmarkHelper = DownloadAndBookmarkHelper(
-        application = getApplication(),
-        repository = repository,
-        activeDownloads = _activeDownloads
-    )
-
-    private val hlsStreamAndCommentHelper = HlsStreamAndCommentHelper()
+    private val _streamUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
@@ -1329,19 +1323,115 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleBookmark(video: Video) {
-        downloadAndBookmarkHelper.toggleBookmark(video, _currentSelectedVideo, viewModelScope)
+        viewModelScope.launch {
+            repository.toggleBookmark(video)
+            // Keep active player in-sync
+            if (_currentSelectedVideo.value?.id == video.id) {
+                _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isBookmarked = !video.isBookmarked)
+            }
+        }
     }
 
     fun toggleDownload(video: Video) {
-        downloadAndBookmarkHelper.toggleDownload(video, _currentSelectedVideo, viewModelScope)
+        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val targetFile = File(downloadFolder, "${video.id}.mp4")
+
+        viewModelScope.launch {
+            if (video.isDownloaded) {
+                // Revert download status and clean disk
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
+                repository.toggleDownload(video)
+                if (_currentSelectedVideo.value?.id == video.id) {
+                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
+                }
+            } else {
+                // Run live yt-dlp downloader coroutine
+                startYtDlpDownload(video)
+            }
+        }
     }
 
     fun deleteDownload(video: Video) {
-        downloadAndBookmarkHelper.deleteDownload(video, _currentSelectedVideo, viewModelScope)
+        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val targetFile = File(downloadFolder, "${video.id}.mp4")
+        viewModelScope.launch {
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            if (video.isDownloaded) {
+                repository.toggleDownload(video)
+                if (_currentSelectedVideo.value?.id == video.id) {
+                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
+                }
+            }
+        }
     }
 
     fun saveToDevice(video: Video, context: android.content.Context, onResult: (Boolean, String) -> Unit) {
-        downloadAndBookmarkHelper.saveToDevice(video, context, onResult)
+        val inputFolder = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val inputFile = File(inputFolder, "${video.id}.mp4")
+        if (!inputFile.exists()) {
+            onResult(false, "Сначала скачайте видео в приложение.")
+            return
+        }
+
+        try {
+            val resolver = context.contentResolver
+            val contentValues = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "${video.title}.mp4".replace("[\\\\/:*?\"<>|]".toRegex(), "_"))
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                }
+            }
+
+            var uri: android.net.Uri? = null
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            }
+
+            if (uri != null) {
+                resolver.openOutputStream(uri)?.use { outputStream ->
+                    inputFile.inputStream().use { inputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                onResult(true, "Файл успешно сохранен в папку 'Загрузки' устройства!")
+            } else {
+                // Fallback for older Android versions
+                val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                if (!publicDownloads.exists()) {
+                    publicDownloads.mkdirs()
+                }
+                val outputFile = File(publicDownloads, "${video.title}.mp4".replace("[\\\\/:*?\"<>|]".toRegex(), "_"))
+                inputFile.inputStream().use { inputStream ->
+                    outputFile.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                onResult(true, "Файл успешно сохранен в папку 'Загрузки': ${outputFile.name}")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("VideoViewModel", "Error saving file to public downloads", e)
+            onResult(false, "Ошибка сохранения: ${e.localizedMessage ?: e.message}")
+        }
+    }
+
+    private fun startYtDlpDownload(video: Video) {
+        viewModelScope.launch {
+            YtDlpDownloader.startYtDlpDownload(
+                getApplication(),
+                video,
+                repository,
+                _activeDownloads
+            ) { completedId ->
+                if (_currentSelectedVideo.value?.id == completedId) {
+                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
+                }
+            }
+        }
     }
 
     fun toggleMicrophone(status: Boolean) {
@@ -1440,118 +1530,111 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearHlsCache(videoId: String) {
-        hlsStreamAndCommentHelper.clearHlsCache(videoId)
+        _streamUrlCache.remove(videoId)
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String): String? {
-        return hlsStreamAndCommentHelper.fetchHlsStreamUrl(videoId)
+        val cachedUrl = _streamUrlCache[videoId]
+        if (cachedUrl != null) {
+            return cachedUrl
+        }
+        val resolvedUrl = withContext(Dispatchers.IO) {
+            try {
+                val tizenUas = listOf(
+                    "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/4.0 Chrome/108.0.5359.128",
+                    "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 5.5) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/4.0 Chrome/96.0.4664.45",
+                    "Mozilla/5.0 (SmartHub; SMART-TV; Tizen 7.0) AppleWebKit/537.36 (KHTML, like Gecko)  SamsungBrowser/5.0 Chrome/112.0.5615.204",
+                    "Mozilla/5.0 (Linux; Tizen 6.5) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 SamsungBrowser/4.0 Chrome/106.0.5249.65"
+                )
+                val randomUa = tizenUas.random()
+
+                val okHttpClient = OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .addInterceptor { chain ->
+                        val req = chain.request().newBuilder()
+                            .header("User-Agent", randomUa)
+                            .header("Referer", "https://rutube.ru/")
+                            .header("Accept", "application/json")
+                            .build()
+                        chain.proceed(req)
+                    }
+                    .build()
+
+                val req = Request.Builder()
+                    .url("https://rutube.ru/api/play/options/$videoId/?format=json")
+                    .build()
+
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@withContext null
+                    val bodyString = resp.body?.string() ?: return@withContext null
+                    val jsonObject = JSONObject(bodyString)
+
+                    var extractedStreamUrl: String? = null
+                    val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
+                    if (videoBalancerObj != null) {
+                        extractedStreamUrl = videoBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
+                            ?: videoBalancerObj.optString("default").takeIf { it.isNotBlank() }
+                    }
+
+                    if (extractedStreamUrl.isNullOrBlank()) {
+                        val liveBalancerObj = jsonObject.optJSONObject("live_balancer") ?: jsonObject.optJSONObject("live_streams")
+                        if (liveBalancerObj != null) {
+                            extractedStreamUrl = liveBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
+                                ?: liveBalancerObj.optString("default").takeIf { it.isNotBlank() }
+                        }
+                    }
+
+                    if (extractedStreamUrl.isNullOrBlank()) {
+                        val keys = jsonObject.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            val value = jsonObject.opt(key)
+                            if (value is String && value.contains(".m3u8")) {
+                                extractedStreamUrl = value
+                                break
+                            } else if (value is JSONObject) {
+                                val subKeys = value.keys()
+                                while (subKeys.hasNext()) {
+                                    val sk = subKeys.next()
+                                    val sv = value.opt(sk)
+                                    if (sv is String && sv.contains(".m3u8")) {
+                                        extractedStreamUrl = sv
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    extractedStreamUrl
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Error fetching direct stream URL", e)
+                null
+            }
+        }
+        if (resolvedUrl != null) {
+            _streamUrlCache[videoId] = resolvedUrl
+        }
+        return resolvedUrl
     }
 
     fun loadComments(videoId: String) {
         _isCommentsLoading.value = true
         _comments.value = emptyList()
         viewModelScope.launch {
-            _comments.value = hlsStreamAndCommentHelper.loadComments(videoId)
-            _isCommentsLoading.value = false
-        }
-    }
-
-    private fun mapResourceToVideo(resource: com.example.data.rutube.SmartRutubeParser.ResourceInfo, tabId: Int, categoryName: String): Video {
-        val url = resource.url ?: ""
-        val extractedId = "\\d+".toRegex().find(url)?.value ?: ""
-        
-        return when (resource.type) {
-            com.example.data.rutube.SmartRutubeParser.EntityType.CHANNEL -> {
-                Video(
-                    id = "channel_${extractedId}__$url",
-                    title = resource.name,
-                    channel = "Авторский канал",
-                    views = "Открыть канал",
-                    timeAgo = "Автор",
-                    duration = "КАНАЛ",
-                    isPro = false,
-                    category = categoryName,
-                    description = "Официальный канал: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-            com.example.data.rutube.SmartRutubeParser.EntityType.TV_SERIES -> {
-                Video(
-                    id = "tv_${extractedId}__$url",
-                    title = resource.name,
-                    channel = "Телешоу / Передача",
-                    views = "Смотреть выпуски",
-                    timeAgo = "Шоу",
-                    duration = "СЕРИАЛ",
-                    isPro = false,
-                    category = categoryName,
-                    description = "Смотрите оригинальные сезоны: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-            com.example.data.rutube.SmartRutubeParser.EntityType.PLAYLIST -> {
-                Video(
-                    id = "playlist_${extractedId}__$url",
-                    title = resource.name,
-                    channel = "Плейлист • Подборка",
-                    views = "Смотреть плейлист",
-                    timeAgo = "Плейлист",
-                    duration = "ПЛЕЙЛИСТ",
-                    isPro = false,
-                    category = categoryName,
-                    description = "Смотрите полную подборку видео из плейлиста: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-            else -> {
-                Video(
-                    id = "unknown_res_${tabId}_${resource.name.hashCode()}__$url",
-                    title = resource.name,
-                    channel = "Папка каталога",
-                    views = "Подраздел",
-                    timeAgo = "Открыть",
-                    duration = "ПАПКА",
-                    isPro = false,
-                    category = categoryName,
-                    description = "Коллекция контента из раздела: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-        }
-    }
-
-    // Factory helper in case we instantiate standard lifecycle
-    class Factory(private val application: Application) : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
-                @Suppress("UNCHECKED_CAST")
-                return VideoViewModel(application) as T
-            }
-            throw IllegalArgumentException("Unknown ViewModel class")
-        }
-    }
-}
-
-data class YtDlpDownload(
-    val id: String,
-    val title: String,
-    val channel: String,
-    val thumbnailUrl: String?,
-    val progress: Float,
-    val speed: String,
-    val eta: String,
-    val status: String,
-    val logs: List<String>
-)
-
-data class RutubeComment(
-    val id: String,
-    val author: String,
-    val text: String,
-    val date: String?,
-    val likes: Int
-)
-ring("name") ?: "Anonymous"
+            try {
+                val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                val commentsResponse = apiService.getDynamicUrl("https://rutube.ru/api/v2/comments/?video_id=$videoId&format=json")
+                val bodyStr = commentsResponse.string()
+                val jsonObject = JSONObject(bodyStr)
+                val resultsArr = jsonObject.optJSONArray("results")
+                val commentsList = mutableListOf<RutubeComment>()
+                if (resultsArr != null) {
+                    for (i in 0 until resultsArr.length()) {
+                        val cJson = resultsArr.optJSONObject(i) ?: continue
+                        val authorObj = cJson.optJSONObject("author")
+                        val authorName = authorObj?.optString("name") ?: "Anonymous"
                         commentsList.add(
                             RutubeComment(
                                 id = cJson.optString("id"),
