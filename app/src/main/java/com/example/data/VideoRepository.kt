@@ -118,7 +118,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     description = card.description,
                     thumbnailUrl = card.thumbnail,
                     authorId = card.channelId,
-                    authorActionUrl = card.channelId?.let { "https://rutube.ru/api/video/person/$it/" }
+                    authorActionUrl = card.channelId?.let { "https://rutube.ru/api/video/person/$it/" },
+                    authorAvatarUrl = card.channelAvatar
                 )
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
@@ -161,8 +162,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     duration = "КАНАЛ",
                     isPro = false,
                     category = defaultCategoryName,
-                    description = card.description ?: "Официальный канал в Sleek Video Hub.",
-                    thumbnailUrl = card.avatar
+                    description = card.description ?: "",
+                    thumbnailUrl = card.avatar,
+                    authorId = card.id,
+                    authorAvatarUrl = card.avatar
                 )
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
