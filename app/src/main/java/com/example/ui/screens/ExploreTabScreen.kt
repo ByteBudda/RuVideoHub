@@ -170,7 +170,7 @@ fun ExploreTabScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                    	.background(
+                                        .background(
                                             Brush.verticalGradient(
                                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
                                                 startY = 50f
@@ -185,18 +185,6 @@ fun ExploreTabScreen(
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
                                         .padding(horizontal = 12.dp, vertical = 10.dp)
-                                )
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-0.dp)
                                 )
                             }
                         } else {
