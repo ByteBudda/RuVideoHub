@@ -32,6 +32,7 @@ import com.example.data.Video
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.viewmodel.VideoViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
@@ -95,10 +96,13 @@ fun RutubeVideoPlayer(
     val downloadFolder = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
     val offlineFile = java.io.File(downloadFolder, "$videoId.mp4")
 
-    var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
-    var isLoading by remember(videoId) { mutableStateOf(true) }
-    var loadError by remember(videoId) { mutableStateOf<String?>(null) }
-    var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
+    val globalQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
+    var selectedQuality by remember(globalQuality) { mutableStateOf(globalQuality) }
+
+    var hlsUrl by remember(videoId, selectedQuality) { mutableStateOf<String?>(null) }
+    var isLoading by remember(videoId, selectedQuality) { mutableStateOf(true) }
+    var loadError by remember(videoId, selectedQuality) { mutableStateOf<String?>(null) }
+    var useEmbedPlayer by remember(videoId, selectedQuality) { mutableStateOf(false) }
 
     // Position & duration states for custom controls
     var isPlayingState by remember { mutableStateOf(true) }
@@ -133,7 +137,7 @@ fun RutubeVideoPlayer(
 
     var retryTrigger by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(videoId, retryTrigger) {
+    LaunchedEffect(videoId, selectedQuality, retryTrigger) {
         if (offlineFile.exists()) {
             hlsUrl = offlineFile.absolutePath
             isLoading = false
@@ -145,7 +149,7 @@ fun RutubeVideoPlayer(
             if (retryTrigger > 0) {
                 viewModel.clearHlsCache(videoId)
             }
-            val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId)
+            val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
             if (resolvedUrl != null) {
                 hlsUrl = resolvedUrl
                 isLoading = false
@@ -167,12 +171,7 @@ fun RutubeVideoPlayer(
                 .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
                 .build()
 
-            val playContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                context.createAttributionContext("mediaPlayer")
-            } else {
-                context
-            }
-            androidx.media3.exoplayer.ExoPlayer.Builder(playContext)
+            androidx.media3.exoplayer.ExoPlayer.Builder(context)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
                 .setLoadControl(loadControl)
@@ -547,6 +546,7 @@ fun RutubeVideoPlayer(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -574,16 +574,68 @@ fun RutubeVideoPlayer(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
-                        // Right actions (Aspect ratio & Share)
+                        // Right actions (Aspect ratio, Quality & Share)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            if (!offlineFile.exists()) {
+                                var qualityMenuExpanded by remember { mutableStateOf(false) }
+                                val availableQualities by viewModel.currentAvailableQualities.collectAsStateWithLifecycle()
+
+                                Box {
+                                    Button(
+                                        onClick = {
+                                            lastInteractionTime = System.currentTimeMillis()
+                                            qualityMenuExpanded = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Hd,
+                                            contentDescription = "Выбор качества",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(selectedQuality, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = qualityMenuExpanded,
+                                        onDismissRequest = { qualityMenuExpanded = false },
+                                        modifier = Modifier.background(Color(0xFF0F0F1A))
+                                    ) {
+                                        availableQualities.forEach { q ->
+                                            DropdownMenuItem(
+                                                text = { 
+                                                    Text(
+                                                        text = q, 
+                                                        color = if (selectedQuality == q) Primary else Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = if (selectedQuality == q) FontWeight.Bold else FontWeight.Normal
+                                                    ) 
+                                                },
+                                                onClick = {
+                                                    selectedQuality = q
+                                                    qualityMenuExpanded = false
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    hudMessage = "Качество: $q"
+                                                },
+                                                modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             // Cycle Aspect Ratio option like VLC
                             Button(
                                 onClick = {

@@ -326,12 +326,28 @@ fun DownloadsTabScreen(
                                             color = GreyText
                                         )
                                     }
-                                    CircularProgressIndicator(
-                                        progress = { active.progress },
-                                        modifier = Modifier.size(20.dp),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        strokeWidth = 2.dp
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CircularProgressIndicator(
+                                            progress = { active.progress },
+                                            modifier = Modifier.size(16.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            strokeWidth = 2.dp
+                                        )
+                                        IconButton(
+                                            onClick = { viewModel.cancelDownload(active.id) },
+                                            modifier = Modifier.size(32.dp).sleekTvFocus(CircleShape)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Отменить загрузку",
+                                                tint = Color.Red.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 LinearProgressIndicator(
@@ -594,6 +610,124 @@ fun LibraryTabScreen(
                     color = Primary
                 )
                 Text(text = "Время просмотра", fontSize = 10.sp, color = GreyText)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Quality Settings Panel
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Настройки качества",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            // Player Default Quality
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Качество плеера", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
+                    Text(text = "Качество по умолчанию при запуске видео", fontSize = 10.sp, color = GreyText)
+                }
+
+                val playerQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
+                var dropdownExpanded by remember { mutableStateOf(false) }
+
+                Box {
+                    Button(
+                        onClick = { dropdownExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(32.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                    ) {
+                        Text(text = playerQuality, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        listOf("Авто", "1080p", "720p", "480p", "360p").forEach { opt ->
+                            DropdownMenuItem(
+                                text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setPlayerQuality(opt)
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Downloader Default Quality
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Качество загрузки", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
+                    Text(text = "Желаемое качество при скачивании", fontSize = 10.sp, color = GreyText)
+                }
+
+                val downloadQuality by viewModel.downloadQuality.collectAsStateWithLifecycle()
+                var dlDropdownExpanded by remember { mutableStateOf(false) }
+
+                Box {
+                    Button(
+                        onClick = { dlDropdownExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(32.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                    ) {
+                        Text(text = downloadQuality, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+
+                    DropdownMenu(
+                        expanded = dlDropdownExpanded,
+                        onDismissRequest = { dlDropdownExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        listOf("1080p", "720p", "480p", "360p").forEach { opt ->
+                            DropdownMenuItem(
+                                text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setDownloadQuality(opt)
+                                    dlDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
 

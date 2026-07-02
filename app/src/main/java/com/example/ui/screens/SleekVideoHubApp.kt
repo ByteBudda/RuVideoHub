@@ -135,6 +135,7 @@ fun SleekVideoHubApp(
                             "recents" -> RecentsTabScreen(viewModel = viewModel)
                             "downloads" -> DownloadsTabScreen(viewModel = viewModel)
                             "library" -> LibraryTabScreen(viewModel = viewModel)
+                            "tv_mini" -> TvMiniPlayerScreen(viewModel = viewModel)
                         }
                     }
                 }
@@ -191,7 +192,7 @@ fun SleekVideoHubApp(
 
         // Expanded video player detail overlay - slides from bottom
         AnimatedVisibility(
-            visible = currentSelectedVideo != null,
+            visible = currentSelectedVideo != null && currentTab != "tv_mini",
             enter = slideInVertically(
                 initialOffsetY = { it },
                 animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)
@@ -205,7 +206,7 @@ fun SleekVideoHubApp(
                 SleekPlayerDetailOverlay(
                     video = video,
                     viewModel = viewModel,
-                    onDismiss = { viewModel.navigateBack() }
+                    onDismiss = { viewModel.selectVideo(null) }
                 )
             }
         }
@@ -369,6 +370,7 @@ fun SleekTvNavigationRail(
         listOf(
             Triple("home", Icons.Default.Home, "Главная"),
             Triple("explore", Icons.Default.Explore, "Обзор"),
+            Triple("tv_mini", Icons.Default.Tv, "ТВ Плеер"),
             Triple("recents", Icons.Default.History, "Недавние"),
             Triple("downloads", Icons.Default.Download, "Загрузки"),
             Triple("library", Icons.Default.Favorite, "Избранное")

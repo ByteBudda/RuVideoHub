@@ -327,7 +327,8 @@ fun SleekPlayerDetailOverlay(
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = {
@@ -336,6 +337,8 @@ fun SleekPlayerDetailOverlay(
                             } else {
                                 if (activeDownload == null) {
                                     viewModel.toggleDownload(video)
+                                } else {
+                                    viewModel.cancelDownload(video.id)
                                 }
                             }
                         },
@@ -343,28 +346,28 @@ fun SleekPlayerDetailOverlay(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when {
                                 video.isDownloaded -> Color(0xFF10B981)
-                                activeDownload != null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                activeDownload != null -> Color.Red.copy(alpha = 0.2f)
                                 else -> PrimaryContainer
                             },
                             contentColor = when {
                                 video.isDownloaded -> Color.White
-                                activeDownload != null -> MaterialTheme.colorScheme.primary
+                                activeDownload != null -> Color.Red
                                 else -> MaterialTheme.colorScheme.onPrimaryContainer
                             }
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(1.2f)
                             .height(40.dp)
                             .testTag("player_action_download_land")
                             .sleekTvFocus(RoundedCornerShape(20.dp))
                     ) {
                         if (activeDownload != null) {
-                            CircularProgressIndicator(
-                                progress = { activeDownload.progress },
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Отмена",
                                 modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.dp
+                                tint = Color.Red
                             )
                         } else {
                             Icon(
@@ -377,7 +380,7 @@ fun SleekPlayerDetailOverlay(
                         Text(
                             text = when {
                                 video.isDownloaded -> "Скачано"
-                                activeDownload != null -> "${(activeDownload.progress * 100).toInt()}%"
+                                activeDownload != null -> "Отмена (${(activeDownload.progress * 100).toInt()}%)"
                                 else -> "Скачать"
                             },
                             fontSize = 11.sp,
@@ -413,6 +416,86 @@ fun SleekPlayerDetailOverlay(
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // Quality Selection Pill in Landscape Mode
+                    if (!video.isDownloaded) {
+                        var qualityMenuExpanded by remember { mutableStateOf(false) }
+                        val currentQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
+                        val availableQualities by viewModel.currentAvailableQualities.collectAsStateWithLifecycle()
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            Button(
+                                onClick = { qualityMenuExpanded = true },
+                                shape = RoundedCornerShape(20.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SurfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .testTag("player_action_quality_land")
+                                    .sleekTvFocus(RoundedCornerShape(20.dp))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Hd,
+                                    contentDescription = "Качество",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = currentQuality,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = qualityMenuExpanded,
+                                onDismissRequest = { qualityMenuExpanded = false },
+                                modifier = Modifier.background(Color(0xFF0F0F1A))
+                            ) {
+                                availableQualities.forEach { q ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = q,
+                                                color = if (currentQuality == q) Primary else Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (currentQuality == q) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.setPlayerQuality(q)
+                                            qualityMenuExpanded = false
+                                        },
+                                        modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Share button in Landscape Mode
+                    IconButton(
+                        onClick = { shareVideo(context, video) },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(SurfaceVariant, CircleShape)
+                            .testTag("player_action_share_land")
+                            .sleekTvFocus(CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Поделиться",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -722,7 +805,8 @@ fun SleekPlayerDetailOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Download action state button
                     Button(
@@ -732,6 +816,8 @@ fun SleekPlayerDetailOverlay(
                             } else {
                                 if (activeDownload == null) {
                                     viewModel.toggleDownload(video)
+                                } else {
+                                    viewModel.cancelDownload(video.id)
                                 }
                             }
                         },
@@ -739,28 +825,28 @@ fun SleekPlayerDetailOverlay(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when {
                                 video.isDownloaded -> Color(0xFF10B981)
-                                activeDownload != null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                activeDownload != null -> Color.Red.copy(alpha = 0.2f)
                                 else -> PrimaryContainer
                             },
                             contentColor = when {
                                 video.isDownloaded -> Color.White
-                                activeDownload != null -> MaterialTheme.colorScheme.primary
+                                activeDownload != null -> Color.Red
                                 else -> MaterialTheme.colorScheme.onPrimaryContainer
                             }
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(1.2f)
                             .height(40.dp)
                             .testTag("player_action_download")
                             .sleekTvFocus(RoundedCornerShape(20.dp))
                     ) {
                         if (activeDownload != null) {
-                            CircularProgressIndicator(
-                                progress = { activeDownload.progress },
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Отмена",
                                 modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.dp
+                                tint = Color.Red
                             )
                         } else {
                             Icon(
@@ -773,7 +859,7 @@ fun SleekPlayerDetailOverlay(
                         Text(
                             text = when {
                                 video.isDownloaded -> "Скачано"
-                                activeDownload != null -> "${(activeDownload.progress * 100).toInt()}%"
+                                activeDownload != null -> "Отмена (${(activeDownload.progress * 100).toInt()}%)"
                                 else -> "Скачать"
                             },
                             fontSize = 11.sp,
@@ -813,33 +899,83 @@ fun SleekPlayerDetailOverlay(
                         )
                     }
 
-                    // Share action state button
-                    Button(
+                    // Quality Selection Pill in Portrait Mode
+                    if (!video.isDownloaded) {
+                        var qualityMenuExpanded by remember { mutableStateOf(false) }
+                        val currentQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
+                        val availableQualities by viewModel.currentAvailableQualities.collectAsStateWithLifecycle()
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            Button(
+                                onClick = { qualityMenuExpanded = true },
+                                shape = RoundedCornerShape(20.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SurfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .testTag("player_action_quality")
+                                    .sleekTvFocus(RoundedCornerShape(20.dp))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Hd,
+                                    contentDescription = "Качество",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = currentQuality,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = qualityMenuExpanded,
+                                onDismissRequest = { qualityMenuExpanded = false },
+                                modifier = Modifier.background(Color(0xFF0F0F1A))
+                            ) {
+                                availableQualities.forEach { q ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = q,
+                                                color = if (currentQuality == q) Primary else Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (currentQuality == q) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.setPlayerQuality(q)
+                                            qualityMenuExpanded = false
+                                        },
+                                        modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Share action state button (as compact circular icon button)
+                    IconButton(
                         onClick = { shareVideo(context, video) },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
                         modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp)
+                            .size(40.dp)
+                            .background(SurfaceVariant, CircleShape)
                             .testTag("player_action_share")
-                            .sleekTvFocus(RoundedCornerShape(20.dp))
+                            .sleekTvFocus(CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Поделиться",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Поделиться",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

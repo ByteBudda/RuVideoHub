@@ -1,0 +1,385 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.Video
+import com.example.ui.theme.GreyText
+import com.example.ui.theme.Primary
+import com.example.ui.theme.SurfaceVariant
+import com.example.ui.theme.PrimaryContainer
+import com.example.viewmodel.VideoViewModel
+
+@Composable
+fun TvMiniPlayerScreen(
+    viewModel: VideoViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val currentVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val dynamicVideos by viewModel.dynamicVideos.collectAsStateWithLifecycle()
+    
+    // Filter out non-playable items like folders/channels/playlists
+    val playableVideos = remember(dynamicVideos) {
+        dynamicVideos.filter {
+            it.duration != "ПАПКА" && it.duration != "СЕРИАЛ" && 
+            it.duration != "КАНАЛ" && it.duration != "ПЛЕЙЛИСТ" && 
+            it.duration != "ПРОМО" && it.duration != "КАТАЛОГ"
+        }
+    }
+    
+    // Auto-select first video if none is selected
+    LaunchedEffect(playableVideos) {
+        if (currentVideo == null && playableVideos.isNotEmpty()) {
+            viewModel.selectVideo(playableVideos.first())
+        }
+    }
+
+    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
+    var localIsFullscreen by remember { mutableStateOf(false) }
+
+    // D-pad back handler
+    androidx.activity.compose.BackHandler(enabled = currentVideo != null) {
+        if (localIsFullscreen) {
+            localIsFullscreen = false
+        } else {
+            viewModel.selectVideo(null)
+        }
+    }
+
+    if (localIsFullscreen && currentVideo != null) {
+        // Full screen view
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            RutubeVideoPlayer(
+                videoId = currentVideo!!.id,
+                viewModel = viewModel,
+                videoTitle = currentVideo!!.title,
+                aspectMode = selectedAspectRatio,
+                isFullscreen = true,
+                onToggleFullscreen = { localIsFullscreen = false },
+                onChangeAspectRatio = { selectedAspectRatio = it },
+                onShare = { shareVideo(context, currentVideo!!) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    } else {
+        // Split screen: Left is Video List, Right is Mini Player & Info
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color(0xFF0F0F1A))
+                .padding(16.dp)
+        ) {
+            // Left Column: Video feed list (D-pad focusable)
+            Column(
+                modifier = Modifier
+                    .weight(1.2f)
+                    .fillMaxHeight()
+                    .padding(end = 16.dp)
+            ) {
+                Text(
+                    text = "ТВ Плейлист",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                if (playableVideos.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Нет доступных видео",
+                            color = GreyText,
+                            fontSize = 14.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(playableVideos.size) { index ->
+                            val video = playableVideos[index]
+                            val isCurrent = currentVideo?.id == video.id
+                            
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .sleekTvFocus(
+                                        shape = RoundedCornerShape(12.dp),
+                                        focusColor = Primary,
+                                        onEnter = { viewModel.selectVideo(video) }
+                                    )
+                                    .clickable { viewModel.selectVideo(video) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isCurrent) Primary.copy(alpha = 0.15f) else Color(0xFF1E1C29)
+                                ),
+                                border = BorderStroke(
+                                    width = 1.5.dp,
+                                    color = if (isCurrent) Primary else Color.Transparent
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Thumbnail or placeholder
+                                    Box(
+                                        modifier = Modifier
+                                            .width(100.dp)
+                                            .height(56.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.Black),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        VideoThumbnail(
+                                            id = video.id,
+                                            duration = video.duration,
+                                            thumbnailUrl = video.thumbnailUrl,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = video.title,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = video.channel,
+                                            fontSize = 10.sp,
+                                            color = GreyText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Right Column: Mini Player box & Controls
+            Column(
+                modifier = Modifier
+                    .weight(1.8f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (currentVideo != null) {
+                    Text(
+                        text = "ТВ Мини-плеер (Управление пультом)",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Primary,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    
+                    // Mini Player container (16:9 Aspect Ratio)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.Black)
+                            .border(2.dp, Primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        RutubeVideoPlayer(
+                            videoId = currentVideo!!.id,
+                            viewModel = viewModel,
+                            videoTitle = currentVideo!!.title,
+                            aspectMode = selectedAspectRatio,
+                            isFullscreen = false,
+                            onToggleFullscreen = { localIsFullscreen = true },
+                            onChangeAspectRatio = { selectedAspectRatio = it },
+                            onShare = { shareVideo(context, currentVideo!!) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    
+                    // TV Optimized Control Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Play / Pause Button
+                        Button(
+                            onClick = { viewModel.togglePlayPause() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPlaying) Color.DarkGray else Primary
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .sleekTvFocus(RoundedCornerShape(20.dp))
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Пауза" else "Старт",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (isPlaying) "Пауза" else "Старт", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        
+                        // Full Screen Button
+                        Button(
+                            onClick = { localIsFullscreen = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2C2A3A),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .height(44.dp)
+                                .sleekTvFocus(RoundedCornerShape(20.dp))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Fullscreen,
+                                contentDescription = "Во весь экран",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Во весь экран", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Close Player Button
+                        Button(
+                            onClick = { viewModel.selectVideo(null) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Red.copy(alpha = 0.2f),
+                                contentColor = Color.Red
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .weight(0.9f)
+                                .height(44.dp)
+                                .sleekTvFocus(RoundedCornerShape(20.dp))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Закрыть",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Закрыть", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    
+                    // Metadata Box
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .background(Color(0xFF14131F), RoundedCornerShape(16.dp))
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = currentVideo!!.title,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${currentVideo!!.channel} • ${currentVideo!!.views} • ${currentVideo!!.timeAgo}",
+                            fontSize = 11.sp,
+                            color = GreyText
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = currentVideo!!.description.ifBlank { "Описание отсутствует" },
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.8f),
+                            lineHeight = 16.sp
+                        )
+                    }
+                } else {
+                    // Placeholder card when no video is selected/playing
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF14131F), RoundedCornerShape(16.dp))
+                            .border(1.dp, Color(0xFF2C2A3A), RoundedCornerShape(16.dp))
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tv,
+                                contentDescription = "ТВ плеер",
+                                tint = Primary.copy(alpha = 0.4f),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "ТВ Мини-плеер готов к работе",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Выберите любое видео из списка слева, чтобы запустить его воспроизведение в мини-плеере. Все элементы управления оптимизированы для пульта управления Android TV.",
+                                fontSize = 12.sp,
+                                color = GreyText,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                lineHeight = 18.sp,
+                                modifier = Modifier.widthIn(max = 360.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
