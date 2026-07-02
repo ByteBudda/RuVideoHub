@@ -99,6 +99,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putBoolean("is_tv_optimized", newValue).apply()
     }
 
+    // User Agreement State
+    private val _isTermsAgreed = MutableStateFlow(false)
+    val isTermsAgreed = _isTermsAgreed.asStateFlow()
+
+    fun agreeToTerms() {
+        _isTermsAgreed.value = true
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("rutube_auth_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("terms_agreed", true).apply()
+    }
+
     // Navigation Category chips state: "Фильмы", "Сериалы" etc.
     private val _selectedCategory = MutableStateFlow("Фильмы")
     val selectedCategory = _selectedCategory.asStateFlow()
@@ -160,11 +170,39 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isChannelView = MutableStateFlow(false)
     val isChannelView = _isChannelView.asStateFlow()
 
+    private val _currentChannelVideo = MutableStateFlow<Video?>(null)
+    val currentChannelVideo: StateFlow<Video?> = combine(_currentChannelVideo, repository.getSavedVideosOnly()) { activeChannel, savedList ->
+        if (activeChannel == null) return@combine null
+        val saved = savedList.firstOrNull { it.id == activeChannel.id }
+        activeChannel.copy(
+            isDownloaded = saved?.isDownloaded ?: false,
+            isBookmarked = saved?.isBookmarked ?: false
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     private val _channelVideos = MutableStateFlow<List<Video>>(emptyList())
-    val channelVideos = _channelVideos.asStateFlow()
+    val channelVideos: StateFlow<List<Video>> = combine(_channelVideos, repository.getSavedVideosOnly()) { videos, savedList ->
+        val savedMap = savedList.associateBy { it.id }
+        videos.map { vid ->
+            val saved = savedMap[vid.id]
+            vid.copy(
+                isDownloaded = saved?.isDownloaded ?: false,
+                isBookmarked = saved?.isBookmarked ?: false
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _channelPlaylists = MutableStateFlow<List<Video>>(emptyList())
-    val channelPlaylists = _channelPlaylists.asStateFlow()
+    val channelPlaylists: StateFlow<List<Video>> = combine(_channelPlaylists, repository.getSavedVideosOnly()) { playlists, savedList ->
+        val savedMap = savedList.associateBy { it.id }
+        playlists.map { pl ->
+            val saved = savedMap[pl.id]
+            pl.copy(
+                isDownloaded = saved?.isDownloaded ?: false,
+                isBookmarked = saved?.isBookmarked ?: false
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _channelActiveTab = MutableStateFlow("Видео")
     val channelActiveTab = _channelActiveTab.asStateFlow()
@@ -184,6 +222,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val searchQuery: String,
         val selectedVideo: Video?,
         val isChannelView: Boolean = false,
+        val currentChannelVideo: Video? = null,
         val channelVideos: List<Video> = emptyList(),
         val channelPlaylists: List<Video> = emptyList(),
         val channelActiveTab: String = "Видео",
@@ -201,6 +240,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             searchQuery = _searchQuery.value,
             selectedVideo = _currentSelectedVideo.value,
             isChannelView = _isChannelView.value,
+            currentChannelVideo = _currentChannelVideo.value,
             channelVideos = _channelVideos.value,
             channelPlaylists = _channelPlaylists.value,
             channelActiveTab = _channelActiveTab.value,
@@ -237,6 +277,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _searchQuery.value = last.searchQuery
             _currentSelectedVideo.value = last.selectedVideo
             _isChannelView.value = last.isChannelView
+            _currentChannelVideo.value = last.currentChannelVideo
             _channelVideos.value = last.channelVideos
             _channelPlaylists.value = last.channelPlaylists
             _channelActiveTab.value = last.channelActiveTab
@@ -320,6 +361,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val savedIsDarkTheme = sharedPrefs.getBoolean("is_dark_theme", true)
         _isDarkTheme.value = savedIsDarkTheme
 
+        val savedTermsAgreed = sharedPrefs.getBoolean("terms_agreed", false)
+        _isTermsAgreed.value = savedTermsAgreed
+
         // Auto-detect Android TV if UI mode or leanback is active, otherwise default to user preference
         val uiModeManager = getApplication<Application>().getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
         val isDeviceTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
@@ -364,6 +408,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         _selectedFeedTab.value = tab
         _selectedSubfolderName.value = null
         _isChannelView.value = false
+        _currentChannelVideo.value = null
         _channelVideos.value = emptyList()
         _channelPlaylists.value = emptyList()
         _channelActiveTab.value = "Видео"
@@ -426,6 +471,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val currentRequestId = ++requestId
         _selectedSubfolderName.value = null
         _isChannelView.value = false
+        _currentChannelVideo.value = null
         _channelVideos.value = emptyList()
         _channelPlaylists.value = emptyList()
         _channelActiveTab.value = "Видео"
@@ -861,6 +907,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
             viewModelScope.launch {
                 _isChannelView.value = false
+                _currentChannelVideo.value = null
                 _channelVideos.value = emptyList()
                 _channelPlaylists.value = emptyList()
                 _channelActiveTab.value = "Видео"
@@ -944,6 +991,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
             viewModelScope.launch {
                 _isChannelView.value = true
+                _currentChannelVideo.value = video
                 _selectedSubfolderName.value = video.title
                 _searchQuery.value = ""
                 _channelVideos.value = emptyList()
@@ -996,6 +1044,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         
                         _channelVideos.value = loadedVideos
+
+                        val firstVideo = loadedVideos.firstOrNull { !it.authorAvatarUrl.isNullOrBlank() }
+                        if (firstVideo != null) {
+                            val cur = _currentChannelVideo.value
+                            if (cur != null && (cur.thumbnailUrl.isNullOrBlank() || cur.authorAvatarUrl.isNullOrBlank())) {
+                                _currentChannelVideo.value = cur.copy(
+                                    thumbnailUrl = firstVideo.authorAvatarUrl,
+                                    authorAvatarUrl = firstVideo.authorAvatarUrl
+                                )
+                            }
+                        }
                     } catch (e: Exception) {
                         android.util.Log.e("VideoViewModel", "Error resolving channel videos", e)
                     } finally {
@@ -1032,6 +1091,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             
             viewModelScope.launch {
                 _isChannelView.value = false
+                _currentChannelVideo.value = null
                 _channelVideos.value = emptyList()
                 _channelPlaylists.value = emptyList()
                 _channelActiveTab.value = "Видео"
