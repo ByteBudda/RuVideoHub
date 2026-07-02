@@ -205,7 +205,7 @@ fun SleekVideoHubApp(
                 SleekPlayerDetailOverlay(
                     video = video,
                     viewModel = viewModel,
-                    onDismiss = { viewModel.selectVideo(null) }
+                    onDismiss = { viewModel.navigateBack() }
                 )
             }
         }
@@ -407,5 +407,7 @@ fun SleekTvNavigationRail(
             }
         }
     }
+}
+
 }
 
