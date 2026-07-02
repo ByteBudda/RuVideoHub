@@ -14,7 +14,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         private set
 
     val dynamicCategoryTargets = java.util.concurrent.ConcurrentHashMap<String, String>()
-    private val queryCache = java.util.concurrent.ConcurrentHashMap<String, List<Video>>()
+    private val queryCache = java.util.concurrent.ConcurrentHashMap<String, CatalogResponse>()
     private var cachedCategories: List<RutubeCategory>? = null
 
     private val categoriesLoadedMutex = kotlinx.coroutines.sync.Mutex()
@@ -73,18 +73,26 @@ class VideoRepository(private val dao: SavedVideoDao) {
         }
     }
 
-    fun parseVideoListJson(bodyString: String, defaultCategoryName: String, url: String? = null): List<Video> {
-        val mapped = mutableListOf<Video>()
+    fun parseVideoListJson(bodyString: String, defaultCategoryName: String, url: String? = null): CatalogResponse {
+        val videos = mutableListOf<Video>()
+        val channels = mutableListOf<Video>()
+        val playlists = mutableListOf<Video>()
+        val tvSeries = mutableListOf<Video>()
+        
         val trimmed = bodyString.trim()
         if (!trimmed.startsWith("{")) {
             android.util.Log.w("VideoRepository", "Response body for category '$defaultCategoryName' is not a JSON object, search query might be blocked or HTML error was returned.")
-            return mapped
+            return CatalogResponse()
         }
         try {
             val jsonObj = JSONObject(trimmed)
             val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, isPromoGroup = false, url = url)
-            for (card in parsed.items) {
-                val video = mapNormalizedCardToVideo(card, defaultCategoryName)
+            
+            // Process all items and categorize them
+            val allCards = parsed.items + parsed.relatedPersons + parsed.relatedTv
+            
+            val mappedVideos = allCards.map { mapNormalizedCardToVideo(it, defaultCategoryName) }
+            for (video in mappedVideos.distinctBy { it.id }) {
                 val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
                 val isBlocked = checkText.contains("premier") || 
                                 checkText.contains("start") || 
@@ -92,13 +100,23 @@ class VideoRepository(private val dao: SavedVideoDao) {
                                 checkText.contains("премьер") || 
                                 checkText.contains("вижу")
                 if (!isBlocked) {
-                    mapped.add(video)
+                    when {
+                        video.id.startsWith("channel_") || video.duration == "КАНАЛ" -> channels.add(video)
+                        video.id.startsWith("playlist_") -> playlists.add(video)
+                        video.id.startsWith("tv_") -> tvSeries.add(video)
+                        else -> videos.add(video)
+                    }
                 }
             }
         } catch (ex: Exception) {
             android.util.Log.e("VideoRepository", "Error parsing results JSON list via SmartRutubeParser", ex)
         }
-        return mapped
+        return CatalogResponse(
+            videos = videos,
+            channels = channels,
+            playlists = playlists,
+            tvSeries = tvSeries
+        )
     }
 
     private fun mapNormalizedCardToVideo(card: com.example.data.rutube.SmartRutubeParser.NormalizedCard, defaultCategoryName: String): Video {
@@ -205,28 +223,30 @@ class VideoRepository(private val dao: SavedVideoDao) {
         }
     }
 
-    suspend fun fetchRealVideos(query: String?, category: String?, page: Int = 1, forceRefresh: Boolean = false): List<Video> {
+    suspend fun fetchRealVideos(query: String?, category: String?, page: Int = 1, forceRefresh: Boolean = false): CatalogResponse {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             ensureCategoriesLoaded()
             
             val cacheKey = "q=${query.orEmpty()}&cat=${category.orEmpty()}&p=$page"
             if (!forceRefresh) {
                 val cached = queryCache[cacheKey]
-                if (cached != null && cached.isNotEmpty()) {
+                if (cached != null) {
                     lastFetchSource = "Rutube LIVE (микрокэш)"
                     return@withContext cached
                 }
             }
             
             val result = fetchRealVideosSuspend(query, category, page)
-            if (result.isNotEmpty() && lastFetchSource == "Rutube LIVE") {
-                queryCache[cacheKey] = result
+            if (result.videos.isNotEmpty() || result.channels.isNotEmpty() || result.playlists.isNotEmpty()) {
+                if (lastFetchSource == "Rutube LIVE") {
+                    queryCache[cacheKey] = result
+                }
             }
             result
         }
     }
 
-    private suspend fun fetchRealVideosSuspend(query: String?, category: String?, page: Int = 1): List<Video> {
+    private suspend fun fetchRealVideosSuspend(query: String?, category: String?, page: Int = 1): CatalogResponse {
         var isNetworkError = false
         try {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
@@ -234,14 +254,19 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val selectedCategoryName = category ?: "Фильмы"
             
             if (q.isNotEmpty()) {
-                val resultsList = mutableListOf<Video>()
+                val videos = mutableListOf<Video>()
+                val channels = mutableListOf<Video>()
+                val playlists = mutableListOf<Video>()
+                val tvSeries = mutableListOf<Video>()
                 
                 // Try fetching videos search results
                 try {
                     val responseBody = apiService.searchVideos(q, page = page)
-                    val bodyString = responseBody.string()
-                    val parsed = parseVideoListJson(bodyString, "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&page=$page")
-                    resultsList.addAll(parsed)
+                    val parsed = parseVideoListJson(responseBody.string(), "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&page=$page")
+                    videos.addAll(parsed.videos)
+                    channels.addAll(parsed.channels)
+                    playlists.addAll(parsed.playlists)
+                    tvSeries.addAll(parsed.tvSeries)
                 } catch (ioEx: java.io.IOException) {
                     isNetworkError = true
                     android.util.Log.e("VideoRepository", "Network error searching videos", ioEx)
@@ -252,20 +277,17 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 // Try fetching channels search results
                 try {
                     val searchResponse = apiService.searchChannels(q, page = page)
-                    val bodyString = searchResponse.string()
-                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&content_type=channel&page=$page")
-                    val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
-                    if (channelsOnly.isNotEmpty()) {
-                        resultsList.addAll(0, channelsOnly)
+                    val parsedChannels = parseVideoListJson(searchResponse.string(), "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&content_type=channel&page=$page")
+                    
+                    if (parsedChannels.channels.isNotEmpty()) {
+                        channels.addAll(0, parsedChannels.channels)
                     } else {
                         // Fallback to search/person if empty
                         val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
                         val url = "https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json"
                         val personResponse = apiService.getDynamicUrl(url)
-                        val personBody = personResponse.string()
-                        val parsedPersonChannels = parseVideoListJson(personBody, "Поиск: $q", url)
-                        val personChannelsOnly = parsedPersonChannels.filter { it.id.startsWith("channel_") }
-                        resultsList.addAll(0, personChannelsOnly)
+                        val parsedPersonChannels = parseVideoListJson(personResponse.string(), "Поиск: $q", url)
+                        channels.addAll(0, parsedPersonChannels.channels)
                     }
                 } catch (ioEx: java.io.IOException) {
                     isNetworkError = true
@@ -274,14 +296,19 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     android.util.Log.e("VideoRepository", "Error searching channels via new content_type=channel and fallback person endpoint", e)
                 }
 
-                if (resultsList.isNotEmpty()) {
+                if (videos.isNotEmpty() || channels.isNotEmpty() || playlists.isNotEmpty()) {
                     lastFetchSource = "Rutube LIVE"
-                    return resultsList.distinctBy { it.id }
+                    return CatalogResponse(
+                        videos = videos.distinctBy { it.id },
+                        channels = channels.distinctBy { it.id },
+                        playlists = playlists.distinctBy { it.id },
+                        tvSeries = tvSeries.distinctBy { it.id }
+                    )
                 }
                 
                 if (!isNetworkError) {
                     lastFetchSource = "Rutube LIVE (Пусто)"
-                    return emptyList()
+                    return CatalogResponse()
                 }
             } else {
                 var categorySlug = dynamicCategoryTargets[selectedCategoryName]
@@ -311,7 +338,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
                             }
                         }
                         
-                        val parsedResults = mutableListOf<Video>()
+                        val parsedVideos = mutableListOf<Video>()
+                        val parsedChannels = mutableListOf<Video>()
+                        val parsedPlaylists = mutableListOf<Video>()
+                        val parsedTvSeries = mutableListOf<Video>()
                         // Load top 3 showcases to form a rich category feed list
                         val limit = minOf(resourceUrls.size, 3)
                         for (idx in 0 until limit) {
@@ -330,7 +360,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
                                 val resourceResponseBody = apiService.getDynamicUrl(paginatedResourceUrl)
                                 val resourceJsonStr = resourceResponseBody.string()
                                 val categoryVideos = parseVideoListJson(resourceJsonStr, selectedCategoryName, paginatedResourceUrl)
-                                parsedResults.addAll(categoryVideos)
+                                parsedVideos.addAll(categoryVideos.videos)
+                                parsedChannels.addAll(categoryVideos.channels)
+                                parsedPlaylists.addAll(categoryVideos.playlists)
+                                parsedTvSeries.addAll(categoryVideos.tvSeries)
                             } catch (ioEx: java.io.IOException) {
                                 isNetworkError = true
                                 android.util.Log.e("VideoRepository", "Network error fetching tab resource $paginatedResourceUrl", ioEx)
@@ -339,9 +372,14 @@ class VideoRepository(private val dao: SavedVideoDao) {
                             }
                         }
                         
-                        if (parsedResults.isNotEmpty()) {
+                        if (parsedVideos.isNotEmpty() || parsedChannels.isNotEmpty() || parsedPlaylists.isNotEmpty()) {
                             lastFetchSource = "Rutube LIVE"
-                            return parsedResults.distinctBy { it.id }
+                            return CatalogResponse(
+                                videos = parsedVideos.distinctBy { it.id },
+                                channels = parsedChannels.distinctBy { it.id },
+                                playlists = parsedPlaylists.distinctBy { it.id },
+                                tvSeries = parsedTvSeries.distinctBy { it.id }
+                            )
                         }
                     } catch (ioEx: java.io.IOException) {
                         isNetworkError = true
@@ -355,7 +393,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                         val fallbackSearchResponse = apiService.searchVideos(selectedCategoryName, page = page)
                         val fallbackSearchBody = fallbackSearchResponse.string()
                         val searchVideos = parseVideoListJson(fallbackSearchBody, selectedCategoryName, "https://rutube.ru/api/search/video/?query=${selectedCategoryName}&page=$page")
-                        if (searchVideos.isNotEmpty()) {
+                        if (searchVideos.videos.isNotEmpty() || searchVideos.channels.isNotEmpty()) {
                             lastFetchSource = "Rutube LIVE"
                             return searchVideos
                         }
@@ -368,7 +406,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     
                     if (!isNetworkError) {
                         lastFetchSource = "Rutube LIVE (Пусто)"
-                        return emptyList()
+                        return CatalogResponse()
                     }
                 } else {
                     // Default to popular videos if "Все" or mapping not found
@@ -376,7 +414,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                         val responseBody = apiService.getPopularVideos(page = page)
                         val bodyString = responseBody.string()
                         val results = parseVideoListJson(bodyString, "Популярное", "https://rutube.ru/api/video/popular/?page=$page")
-                        if (results.isNotEmpty()) {
+                        if (results.videos.isNotEmpty() || results.channels.isNotEmpty()) {
                             lastFetchSource = "Rutube LIVE"
                             return results
                         }
@@ -389,7 +427,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     
                     if (!isNetworkError) {
                         lastFetchSource = "Rutube LIVE (Пусто)"
-                        return emptyList()
+                        return CatalogResponse()
                     }
                 }
             }
@@ -412,14 +450,14 @@ class VideoRepository(private val dao: SavedVideoDao) {
                             video.channel.contains(query, ignoreCase = true)
                     matchCat && matchQuery
                 }
-                return filteredSaved
+                return CatalogResponse(videos = filteredSaved)
             } catch (dbEx: Exception) {
                 android.util.Log.e("VideoRepository", "Error reading fallback room db", dbEx)
-                return emptyList()
+                return CatalogResponse()
             }
         }
         
-        return emptyList()
+        return CatalogResponse()
     }
 
     fun getSavedVideosOnly(): Flow<List<SavedVideo>> {
