@@ -186,7 +186,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val isChannelView: Boolean = false,
         val channelVideos: List<Video> = emptyList(),
         val channelPlaylists: List<Video> = emptyList(),
-        val channelActiveTab: String = "Видео"
+        val channelActiveTab: String = "Видео",
+        val dynamicVideos: List<Video> = emptyList()
     )
 
     private val navHistory = java.util.Stack<NavigationSnapshot>()
@@ -202,7 +203,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             isChannelView = _isChannelView.value,
             channelVideos = _channelVideos.value,
             channelPlaylists = _channelPlaylists.value,
-            channelActiveTab = _channelActiveTab.value
+            channelActiveTab = _channelActiveTab.value,
+            dynamicVideos = _dynamicVideos.value
         )
         if (navHistory.isEmpty() || navHistory.peek() != currentSnapshot) {
             navHistory.push(currentSnapshot)
@@ -238,29 +240,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _channelVideos.value = last.channelVideos
             _channelPlaylists.value = last.channelPlaylists
             _channelActiveTab.value = last.channelActiveTab
+            _dynamicVideos.value = last.dynamicVideos
 
-            if (last.subfolderName == null && !last.isChannelView) {
-                if (last.feedTab != null) {
-                    selectFeedTab(last.feedTab)
-                } else {
-                    fetchRealVideos(query = if (last.searchQuery.isEmpty()) null else last.searchQuery, category = last.category)
-                }
-            }
+            return true
+        }
+
+        if (_currentTab.value != "home") {
+            _currentTab.value = "home"
             return true
         }
 
         return false
     }
 
-    fun resetSubfolder() {
-        pushToHistory()
-        _selectedSubfolderName.value = null
-        _isChannelView.value = false
-        _channelVideos.value = emptyList()
-        _channelPlaylists.value = emptyList()
-        _channelActiveTab.value = "Видео"
-        _selectedFeedTab.value?.let { selectFeedTab(it) }
-    }
+
 
     // yt-dlp downloading state parameters
     private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
@@ -699,7 +692,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: String) {
         if (_currentTab.value != tab) {
-            pushToHistory()
             _currentTab.value = tab
         }
     }
@@ -795,9 +787,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val apiPath = when {
             path.startsWith("plst/") -> {
                 val plId = path.substringAfter("plst/")
-                "api/video/playlist/$plId/"
+                "api/playlist/custom/$plId/videos/"
             }
-            path.startsWith("api/video/playlist/") -> path
+            path.startsWith("api/video/playlist/") -> {
+                val plId = path.substringAfter("api/video/playlist/")
+                "api/playlist/custom/$plId/videos/"
+            }
+            path.startsWith("playlist/") -> {
+                val plId = path.substringAfter("playlist/")
+                "api/playlist/custom/$plId/videos/"
+            }
             path.startsWith("tv/") -> {
                 val tvId = path.substringAfter("tv/")
                 if (tvId.contains("video")) "api/metainfo/$path" else "api/metainfo/tv/$tvId/video/"
@@ -844,7 +843,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectVideo(video: Video?) {
-        pushToHistory()
+        if (video != null && (
+            video.id.startsWith("tv_") || 
+            video.id.startsWith("channel_") ||
+            video.id.startsWith("playlist_") ||
+            video.id.startsWith("promo_") ||
+            video.id.startsWith("unknown_")
+        )) {
+            pushToHistory()
+        }
+        
         if (video != null && video.id.startsWith("tv_")) {
             val fullTvId = video.id.substringAfter("tv_")
             val idParts = fullTvId.split("__")
@@ -876,7 +884,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         fallbackUrls.add("https://rutube.ru/api/metainfo/tv/$tvId/video/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/tv/$tvId/video/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$tvId/video/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/video/playlist/$tvId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/playlist/custom/$tvId/?format=json")
+                        fallbackUrls.add("https://rutube.ru/api/playlist/custom/$tvId/videos/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$tvId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/person/$tvId/video/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/video/person/$tvId/?format=json")
@@ -1048,7 +1057,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/video/playlist/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
                         fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/?format=json")
                     }
@@ -1164,14 +1172,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // 2.5 Is it a Playlist? E.g., .../video/playlist/([a-zA-Z0-9_-]+)... or .../playlist/([a-zA-Z0-9_-]+)...
-                val playlistPattern = java.util.regex.Pattern.compile("/(?:video/playlist|playlist)/([0-9a-zA-Z_-]+)")
+                // 2.5 Is it a Playlist? E.g., .../video/playlist/([a-zA-Z0-9_-]+)... or .../playlist/([a-zA-Z0-9_-]+)... or .../plst/([a-zA-Z0-9_-]+)...
+                val playlistPattern = java.util.regex.Pattern.compile("/(?:video/playlist|playlist|plst)/([0-9a-zA-Z_-]+)")
                 val playlistMatcher = playlistPattern.matcher(trimmedUrl)
                 if (playlistMatcher.find()) {
                     val playlistId = playlistMatcher.group(1) ?: ""
                     if (playlistId.isNotBlank()) {
                         val dummyPlaylistVideo = Video(
-                            id = "playlist_${playlistId}__https://rutube.ru/api/video/playlist/$playlistId/",
+                            id = "playlist_${playlistId}__https://rutube.ru/api/playlist/custom/$playlistId/",
                             title = "Плейлист Rutube ($playlistId)",
                             channel = "Плейлист • Загрузка...",
                             views = "",
