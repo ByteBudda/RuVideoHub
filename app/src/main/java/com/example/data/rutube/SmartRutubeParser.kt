@@ -581,14 +581,29 @@ object SmartRutubeParser {
             val url = AdaptiveExtractor.getString(data, "url")
             val id = AdaptiveExtractor.getString(data, "id")
                 .takeIf { it.isNotBlank() }
+                ?: AdaptiveExtractor.getString(data, "playlist_id")
+                .takeIf { it.isNotBlank() }
+                ?: AdaptiveExtractor.getString(data, "playlist_id_string")
+                .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.makeDeterministicId("playlist", AdaptiveExtractor.getString(data, "title"), url)
             
+            val finalUrl = url.takeIf { it.isNotBlank() } ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
+            val vCount = if (data.has("videos_count")) {
+                data.optInt("videos_count")
+            } else if (data.has("video_count")) {
+                data.optInt("video_count")
+            } else {
+                AdaptiveExtractor.getInt(data, "videos", 0)
+            }
+
             return NormalizedCard.PlaylistCard(
                 id = id,
                 title = AdaptiveExtractor.getString(data, "title", "Untitled"),
-                thumbnail = AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() },
-                videosCount = AdaptiveExtractor.getInt(data, "videos", 0),
-                actionUrl = normalizeUrl(url)
+                thumbnail = (AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "picture").takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "image").takeIf { it.isNotBlank() }),
+                videosCount = vCount,
+                actionUrl = normalizeUrl(finalUrl)
             )
         }
         
@@ -650,9 +665,18 @@ object SmartRutubeParser {
                 return parseCatalogFeed(jsonObj)
             }
             
-            // Пагинированный ответ
-            if (jsonObj.has("results")) {
+            // Пагинированный ответ или список видео/элементов
+            if (jsonObj.has("results") || jsonObj.has("videos") || jsonObj.has("items")) {
                 return parsePaginatedResponse(jsonObj, actualPromoGroup)
+            }
+            
+            // Одиночный плейлист
+            if (jsonObj.has("title") && (jsonObj.has("playlist_id") || jsonObj.has("playlist_id_string") || jsonObj.has("videos_count") || jsonObj.has("video_count"))) {
+                val playlist = CardNormalizer.normalizeOrNull(jsonObj)
+                return ParsedResponse(
+                    type = if (playlist != null) EntityType.PLAYLIST else EntityType.EMPTY,
+                    items = playlist?.let { listOf(it) } ?: emptyList()
+                )
             }
             
             // Одиночное видео
@@ -804,7 +828,10 @@ object SmartRutubeParser {
         }
         
         private fun parsePaginatedResponse(jsonObj: JSONObject, isPromoGroup: Boolean): ParsedResponse {
-            val resultsArray = jsonObj.optJSONArray("results") ?: JSONArray()
+            val resultsArray = jsonObj.optJSONArray("results") 
+                ?: jsonObj.optJSONArray("videos")
+                ?: jsonObj.optJSONArray("items")
+                ?: JSONArray()
             val pagination = PaginationExtractor.extract(jsonObj)
             
             if (resultsArray.length() == 0) {

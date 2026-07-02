@@ -13,6 +13,14 @@ interface RutubeApiService {
         @Query("format") format: String = "json"
     ): ResponseBody
 
+    @GET("api/search/video/")
+    suspend fun searchChannels(
+        @Query("query") query: String,
+        @Query("content_type") contentType: String = "channel",
+        @Query("page") page: Int = 1,
+        @Query("format") format: String = "json"
+    ): ResponseBody
+
     @GET("api/video/")
     suspend fun getPopularVideos(
         @Query("page") page: Int = 1,
