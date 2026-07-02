@@ -251,19 +251,27 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
                 // Try fetching channels search results
                 try {
-                    val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
-                    val url = "https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json"
-                    val personResponse = apiService.getDynamicUrl(url)
-                    val bodyString = personResponse.string()
-                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", url)
-                    
-                    val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") }
-                    resultsList.addAll(0, channelsOnly)
+                    val searchResponse = apiService.searchChannels(q, page = page)
+                    val bodyString = searchResponse.string()
+                    val parsedChannels = parseVideoListJson(bodyString, "Поиск: $q", "https://rutube.ru/api/search/video/?query=$q&content_type=channel&page=$page")
+                    val channelsOnly = parsedChannels.filter { it.id.startsWith("channel_") || it.duration == "КАНАЛ" }
+                    if (channelsOnly.isNotEmpty()) {
+                        resultsList.addAll(0, channelsOnly)
+                    } else {
+                        // Fallback to search/person if empty
+                        val encodedQ = java.net.URLEncoder.encode(q, "UTF-8")
+                        val url = "https://rutube.ru/api/search/person/?query=$encodedQ&page=$page&format=json"
+                        val personResponse = apiService.getDynamicUrl(url)
+                        val personBody = personResponse.string()
+                        val parsedPersonChannels = parseVideoListJson(personBody, "Поиск: $q", url)
+                        val personChannelsOnly = parsedPersonChannels.filter { it.id.startsWith("channel_") }
+                        resultsList.addAll(0, personChannelsOnly)
+                    }
                 } catch (ioEx: java.io.IOException) {
                     isNetworkError = true
                     android.util.Log.e("VideoRepository", "Network error searching channels", ioEx)
                 } catch (e: Exception) {
-                    android.util.Log.e("VideoRepository", "Error searching channels via person endpoint", e)
+                    android.util.Log.e("VideoRepository", "Error searching channels via new content_type=channel and fallback person endpoint", e)
                 }
 
                 if (resultsList.isNotEmpty()) {
