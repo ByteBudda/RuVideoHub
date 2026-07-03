@@ -597,63 +597,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         val jsonObj = org.json.JSONObject(bodyStr)
                         val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, isPromoGroup = finalUrl.contains("promogroup"))
                         
-                        if (parsed.type == com.example.data.rutube.SmartRutubeParser.EntityType.FEED_CATALOG && parsed.tabs.isNotEmpty()) {
-                            if (currentRequestId != requestId) return@launch
-                            _feedTabs.value = parsed.tabs
-                            val firstTab = parsed.tabs.first()
-                            _selectedFeedTab.value = firstTab
-                            
-                            val isFolderTab = firstTab.resources.size > 1
-                            if (isFolderTab) {
-                                val folderVideos = firstTab.resources.map { resource ->
-                                    mapResourceToVideo(resource, firstTab.id, targetCategory)
-                                }
-                                if (currentRequestId != requestId) return@launch
-                                _dynamicVideos.value = folderVideos
-                                currentPage = 1
-                                isEndReached = true
-                                currentActiveApiEndpoint = null
-                            } else {
-                                val combined = mutableListOf<Video>()
-                                for (resource in firstTab.resources.take(3)) {
-                                    val rawUrl = resource.url ?: continue
-                                    val cleanSubUrl = toRutubeApiUrl(rawUrl)
-                                    val subFinalUrl = if (cleanSubUrl.contains("?")) {
-                                        if (cleanSubUrl.contains("format=json")) cleanSubUrl else "$cleanSubUrl&format=json"
-                                    } else {
-                                        "$cleanSubUrl?format=json"
-                                    }
-                                    try {
-                                        val subResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(subFinalUrl)
-                                        if (currentRequestId != requestId) return@launch
-                                        val subVideos = repository.parseVideoListJson(subResponse.string(), targetCategory)
-                                        combined.addAll(subVideos)
-                                        currentActiveApiEndpoint = toRutubeApiUrl(rawUrl)
-                                    } catch (resEx: Exception) {
-                                        android.util.Log.e("VideoViewModel", "First tab resource load failed: $rawUrl", resEx)
-                                    }
-                                }
-                                if (currentRequestId != requestId) return@launch
-                                if (combined.isNotEmpty()) {
-                                    _dynamicVideos.value = combined.distinctBy { it.id }
-                                    currentPage = 1
-                                    isEndReached = false
-                                } else {
-                                    _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
-                                }
-                            }
+                        if (currentRequestId != requestId) return@launch
+                        _feedTabs.value = emptyList()
+                        _selectedFeedTab.value = null
+                        
+                        val parsedVideos = repository.parseVideoListJson(bodyStr, targetCategory)
+                        if (parsedVideos.isNotEmpty()) {
+                            _dynamicVideos.value = parsedVideos
+                            currentActiveApiEndpoint = toRutubeApiUrl(urlToFetch)
                         } else {
-                            if (currentRequestId != requestId) return@launch
-                            _feedTabs.value = emptyList()
-                            _selectedFeedTab.value = null
-                            
-                            val parsedVideos = repository.parseVideoListJson(bodyStr, targetCategory)
-                            if (parsedVideos.isNotEmpty()) {
-                                _dynamicVideos.value = parsedVideos
-                                currentActiveApiEndpoint = toRutubeApiUrl(urlToFetch)
-                            } else {
-                                _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
-                            }
+                            _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
                         }
                     } else {
                         if (currentRequestId != requestId) return@launch
@@ -1053,11 +1006,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         if (candidates.isNotEmpty()) {
                             if (hasPlayableVideos) {
                                 loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                                currentActiveApiEndpoint = toRutubeApiUrl(url)
                                 break
                             } else if (loadedVideos.isEmpty()) {
                                 loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                                currentActiveApiEndpoint = toRutubeApiUrl(url)
                             }
                         }
                     }
@@ -1133,11 +1086,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             if (candidates.isNotEmpty()) {
                                 if (hasPlayableVideos) {
                                     loadedVideos = candidates
-                                    currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                                    currentActiveApiEndpoint = toRutubeApiUrl(url)
                                     break
                                 } else if (loadedVideos.isEmpty()) {
                                     loadedVideos = candidates
-                                    currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                                    currentActiveApiEndpoint = toRutubeApiUrl(url)
                                 }
                             }
                         }
@@ -1230,11 +1183,11 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         if (candidates.isNotEmpty()) {
                             if (hasPlayableVideos) {
                                 loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                                currentActiveApiEndpoint = toRutubeApiUrl(url)
                                 break
                             } else if (loadedVideos.isEmpty()) {
                                 loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url.substringBefore("?"))
+                                currentActiveApiEndpoint = toRutubeApiUrl(url)
                             }
                         }
                     }
