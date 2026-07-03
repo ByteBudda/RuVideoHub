@@ -104,6 +104,39 @@ fun HomeTabScreen(
             }
         }
 
+        val catalogExpandedState = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+
+        val groupedCatalogItems = remember(currentVideos) {
+            if (currentVideos.firstOrNull()?.duration == "КАТАЛОГ") {
+                currentVideos.groupBy { it.channel }.mapValues { (_, items) ->
+                    val list = mutableListOf<List<Video>>()
+                    val currentPair = mutableListOf<Video>()
+                    for (video in items) {
+                        val hasPreview = !video.thumbnailUrl.isNullOrBlank()
+                        if (hasPreview) {
+                            if (currentPair.isNotEmpty()) {
+                                list.add(currentPair.toList())
+                                currentPair.clear()
+                            }
+                            list.add(listOf(video))
+                        } else {
+                            currentPair.add(video)
+                            if (currentPair.size == 2) {
+                                list.add(currentPair.toList())
+                                currentPair.clear()
+                            }
+                        }
+                    }
+                    if (currentPair.isNotEmpty()) {
+                        list.add(currentPair.toList())
+                    }
+                    list
+                }
+            } else {
+                emptyMap()
+            }
+        }
+
         val folderItemsToRender = remember(currentVideos) {
             val list = mutableListOf<List<Video>>()
             val currentPair = mutableListOf<Video>()
@@ -533,54 +566,123 @@ fun HomeTabScreen(
                         }
                     }
                 } else {
-                    items(folderItemsToRender) { rowItems ->
-                        if (rowItems.size == 1) {
-                            val video = rowItems.first()
-                            if (!video.thumbnailUrl.isNullOrBlank()) {
-                                SleekFolderGridItem(
-                                    video = video,
-                                    onFolderClick = { viewModel.selectVideo(video) },
-                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                    isDark = isDarkTheme,
-                                    isTvOptimized = isTvOptimized,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                    val isCatalog = firstItem.duration == "КАТАЛОГ"
+                    if (isCatalog) {
+                        groupedCatalogItems.forEach { (groupName, rowItemsList) ->
+                            val isExpanded = catalogExpandedState[groupName] ?: false
+                            item(key = "header_$groupName") {
+                                CatalogGroupHeader(
+                                    groupName = groupName,
+                                    isExpanded = isExpanded,
+                                    onClick = { catalogExpandedState[groupName] = !isExpanded },
+                                    isDark = isDarkTheme
                                 )
+                            }
+                            if (isExpanded) {
+                                items(rowItemsList, key = { "group_${groupName}_${it.hashCode()}" }) { rowItems ->
+                                    if (rowItems.size == 1) {
+                                        val video = rowItems.first()
+                                        if (!video.thumbnailUrl.isNullOrBlank()) {
+                                            SleekFolderGridItem(
+                                                video = video,
+                                                onFolderClick = { viewModel.selectVideo(video) },
+                                                onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                                isDark = isDarkTheme,
+                                                isTvOptimized = isTvOptimized,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                                            )
+                                        } else {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                SleekFolderGridItem(
+                                                    video = video,
+                                                    onFolderClick = { viewModel.selectVideo(video) },
+                                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                                    isDark = isDarkTheme,
+                                                    isTvOptimized = isTvOptimized,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+                                        }
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 2.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            rowItems.forEach { video ->
+                                                SleekFolderGridItem(
+                                                    video = video,
+                                                    onFolderClick = { viewModel.selectVideo(video) },
+                                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                                    isDark = isDarkTheme,
+                                                    isTvOptimized = isTvOptimized,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        items(folderItemsToRender) { rowItems ->
+                            if (rowItems.size == 1) {
+                                val video = rowItems.first()
+                                if (!video.thumbnailUrl.isNullOrBlank()) {
+                                    SleekFolderGridItem(
+                                        video = video,
+                                        onFolderClick = { viewModel.selectVideo(video) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 2.dp)
+                                    )
+                                } else {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        SleekFolderGridItem(
+                                            video = video,
+                                            onFolderClick = { viewModel.selectVideo(video) },
+                                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                            isDark = isDarkTheme,
+                                            isTvOptimized = isTvOptimized,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
                             } else {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 2.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    SleekFolderGridItem(
-                                        video = video,
-                                        onFolderClick = { viewModel.selectVideo(video) },
-                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                        isDark = isDarkTheme,
-                                        isTvOptimized = isTvOptimized,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowItems.forEach { video ->
-                                    SleekFolderGridItem(
-                                        video = video,
-                                        onFolderClick = { viewModel.selectVideo(video) },
-                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                        isDark = isDarkTheme,
-                                        isTvOptimized = isTvOptimized,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    rowItems.forEach { video ->
+                                        SleekFolderGridItem(
+                                            video = video,
+                                            onFolderClick = { viewModel.selectVideo(video) },
+                                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                            isDark = isDarkTheme,
+                                            isTvOptimized = isTvOptimized,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1607,7 +1709,42 @@ fun SleekSearchChannelItem(
     }
 }
 
-       )
+@Composable
+fun CatalogGroupHeader(
+    groupName: String,
+    isExpanded: Boolean,
+    onClick: () -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = groupName,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Icon(
+                imageVector = if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
+                contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            )
+        }
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            color = if (isDark) Color(0xFF333333) else Color(0xFFE0E0E0),
+            thickness = 0.5.dp
+        )
     }
 }
-
