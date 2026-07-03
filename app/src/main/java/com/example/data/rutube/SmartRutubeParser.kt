@@ -532,7 +532,7 @@ object SmartRutubeParser {
             var id = AdaptiveExtractor.getString(data, "id")
             val url = AdaptiveExtractor.getString(data, "url")
             if (id.isBlank()) {
-                val match = Regex("/(?:person|channel)/(\d+)").find(url)
+                val match = Regex("/(?:person|channel)/(\\d+)").find(url)
                 id = match?.groupValues?.get(1) ?: AdaptiveExtractor.makeDeterministicId("ch", AdaptiveExtractor.getString(data, "title"), url)
             }
 
