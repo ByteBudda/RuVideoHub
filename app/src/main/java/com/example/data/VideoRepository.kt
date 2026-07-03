@@ -11,7 +11,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 
 /**
- * VideoRepository V2 — универсальный репозиторий с AI-парсером
+ * VideoRepository — универсальный репозиторий с AI-парсером
  *
  * Особенности:
  *  - Автоопределение типа ответа по URL + структуре JSON
@@ -86,10 +86,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
         try {
             val jsonObj = JSONObject(trimmed)
-            // Используем V2 парсер с endpointHint для самообучения
-            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzerV2.parse(jsonObj, url)
+            // Используем парсер с endpointHint для самообучения
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, url)
 
-            android.util.Log.d("VideoRepository", "Parsed ${parsed.items.size} items from $url (type=${parsed.type}, confidence avg=${parsed.items.map { it.confidence }.average()})")
+            android.util.Log.d("VideoRepository", "Parsed ${parsed.items.size} items from $url (type=${parsed.type})")
 
             for (card in parsed.items) {
                 val video = mapNormalizedCardToVideo(card, defaultCategoryName)
@@ -209,8 +209,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     duration = "КАТАЛОГ",
                     isPro = false,
                     category = defaultCategoryName,
-                    description = card.extractedFields.entries.joinToString(" • ") { "${it.key}=${it.value}" }
-                        .takeIf { it.isNotBlank() } ?: "Элемент каталога • Нажмите для открытия",
+                    description = "Элемент каталога • Нажмите для открытия",
                     thumbnailUrl = card.thumbnail
                 )
             }
@@ -280,9 +279,9 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
         try {
             if (q.isNotEmpty()) {
-                return fetchSearchResults(q, page, selectedCategoryName).also { isNetworkError = it.second; return it.first }
+                return fetchSearchResults(q, page, selectedCategoryName)
             } else {
-                return fetchCategoryFeed(selectedCategoryName, page).also { isNetworkError = it.second; return it.first }
+                return fetchCategoryFeed(selectedCategoryName, page)
             }
         } catch (ioEx: java.io.IOException) {
             isNetworkError = true
@@ -306,7 +305,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         q: String,
         page: Int,
         categoryName: String
-    ): Pair<List<Video>, Boolean> {
+    ): List<Video> {
         var isNetworkError = false
         val resultsList = mutableListOf<Video>()
 
@@ -363,13 +362,13 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
         if (resultsList.isNotEmpty()) {
             lastFetchSource = "Rutube LIVE"
-            return resultsList.distinctBy { it.id } to isNetworkError
+            return resultsList.distinctBy { it.id }
         }
 
         if (!isNetworkError) {
             lastFetchSource = "Rutube LIVE (Пусто)"
         }
-        return emptyList<Video>() to isNetworkError
+        return emptyList()
     }
 
     // ==================== CATEGORY FEED ====================
@@ -377,7 +376,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
     private suspend fun fetchCategoryFeed(
         selectedCategoryName: String,
         page: Int
-    ): Pair<List<Video>, Boolean> {
+    ): List<Video> {
         var isNetworkError = false
         val categorySlug = dynamicCategoryTargets[selectedCategoryName]
 
@@ -426,7 +425,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
                 if (parsedResults.isNotEmpty()) {
                     lastFetchSource = "Rutube LIVE"
-                    return parsedResults.distinctBy { it.id } to isNetworkError
+                    return parsedResults.distinctBy { it.id }
                 }
             } catch (ioEx: java.io.IOException) {
                 isNetworkError = true
@@ -443,7 +442,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     val searchVideos = parseAnyResponse(fallbackBody, selectedCategoryName, searchUrl)
                     if (searchVideos.isNotEmpty()) {
                         lastFetchSource = "Rutube LIVE"
-                        return searchVideos to isNetworkError
+                        return searchVideos
                     }
                 } catch (ioEx: java.io.IOException) {
                     isNetworkError = true
@@ -455,7 +454,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
 
             if (!isNetworkError) {
                 lastFetchSource = "Rutube LIVE (Пусто)"
-                return emptyList<Video>() to false
+                return emptyList()
             }
         }
 
@@ -466,7 +465,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val results = parseAnyResponse(popularBody, "Популярное", popularUrl)
             if (results.isNotEmpty()) {
                 lastFetchSource = "Rutube LIVE"
-                return results to false
+                return results
             }
         } catch (ioEx: java.io.IOException) {
             isNetworkError = true
@@ -478,7 +477,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         if (!isNetworkError) {
             lastFetchSource = "Rutube LIVE (Пусто)"
         }
-        return emptyList<Video>() to isNetworkError
+        return emptyList()
     }
 
     // ==================== LOCAL FALLBACK ====================
@@ -539,7 +538,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val url = "https://rutube.ru/api/v1/feeds/promogroup/382/?format=json&limit=100"
             val bodyStr = apiService.getDynamicUrl(url).string()
             val jsonObj = JSONObject(bodyStr)
-            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzerV2.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, url)
 
             for (card in parsed.items) {
                 var title = ""
@@ -641,4 +640,18 @@ class VideoRepository(private val dao: SavedVideoDao) {
     }
 
     suspend fun deleteVideoById(id: String) = dao.deleteById(id)
+
+    // ==================== СОВМЕСТИМОСТЬ ====================
+
+    fun parseVideoListJson(bodyString: String, defaultCategoryName: String, url: String? = null): List<Video> {
+        return parseAnyResponse(bodyString, defaultCategoryName, url)
+    }
+
+    private fun isBlockedText(text: String): Boolean {
+        return text.contains("premier") ||
+               text.contains("start") ||
+               text.contains("viju") ||
+               text.contains("премьер") ||
+               text.contains("вижу")
+    }
 }
