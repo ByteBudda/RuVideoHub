@@ -435,3 +435,87 @@ data class VideoInfo(
     val ownerId: String,
     val videoId: String
 )
+            val segmentUrl = resolveUrl(fullPlaylistUrl, segment)
+                    
+                    val segmentRequest = Request.Builder()
+                        .url(segmentUrl)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Referer", "https://vk.com/")
+                        .build()
+                    
+                    var success = false
+                    var attempts = 0
+                    while (!success && attempts < 3) {
+                        attempts++
+                        try {
+                            httpClient.newCall(segmentRequest).execute().use { response ->
+                                if (response.isSuccessful) {
+                                    val body = response.body
+                                    if (body != null) {
+                                        val inputStream = body.byteStream()
+                                        val buffer = ByteArray(8192)
+                                        var bytesRead: Int
+                                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                            outputStream.write(buffer, 0, bytesRead)
+                                            totalDownloadedBytes += bytesRead
+                                        }
+                                    }
+                                    success = true
+                                } else {
+                                    Log.e(TAG, "Failed to download segment, code: ${response.code}, attempt: $attempts")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Segment download exception: ${e.message}, attempt: $attempts")
+                        }
+                    }
+                    
+                    downloaded++
+                    val progress = downloaded.toFloat() / total
+                    val speed = String.format("%.1f MB (%.1f%%)", totalDownloadedBytes / 1024.0 / 1024.0, progress * 100)
+                    onProgress(progress, speed)
+
+                    try {
+                        resumeFile.writeText(downloaded.toString())
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+            }
+            
+            try {
+                if (resumeFile.exists()) {
+                    resumeFile.delete()
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+
+            Log.d(TAG, "HLS stream downloaded successfully, size: $totalDownloadedBytes bytes")
+            return@withContext true
+        } catch (e: Exception) {
+            Log.e(TAG, "HLS download error: ${e.message}")
+            false
+        }
+    }
+
+    private fun formatViews(views: Int): String {
+        return when {
+            views >= 1_000_000 -> String.format("%.1fM", views / 1_000_000.0)
+            views >= 1_000 -> String.format("%.1fK", views / 1000.0)
+            else -> views.toString()
+        }
+    }
+}
+
+// --- МОДЕЛЬ ДАННЫХ ---
+data class VideoInfo(
+    val id: String,
+    val title: String,
+    val thumbnail: String,
+    val duration: String,
+    val videoUrl: String,
+    val views: String,
+    val ownerId: String,
+    val videoId: String
+)
