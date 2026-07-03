@@ -1310,6 +1310,47 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val trimmedUrl = urlOrId.trim()
         if (trimmedUrl.isBlank()) return
 
+        // Check if VK url first
+        val parsedVk = com.example.data.vk.VkVideoLoader.parseVideoUrl(trimmedUrl)
+        if (parsedVk != null) {
+            viewModelScope.launch {
+                _isLoading.value = true
+                try {
+                    val info = com.example.data.vk.VkVideoLoader.getVideoInfo(trimmedUrl)
+                    if (info != null) {
+                        val vkVideoId = "vk_${info.ownerId}_${info.videoId}"
+                        _masterUrlCache[vkVideoId] = info.videoUrl
+                        
+                        val vkVideo = Video(
+                            id = vkVideoId,
+                            title = info.title,
+                            channel = "VK Видео (id: ${info.ownerId})",
+                            views = "${info.views} просмотров",
+                            timeAgo = "Только что",
+                            duration = info.duration,
+                            category = "VK",
+                            description = "Видео из VK. Воспроизведение и скачивание.",
+                            thumbnailUrl = info.thumbnail,
+                            isDownloaded = false,
+                            isBookmarked = false
+                        )
+                        val savedMap = repository.getSavedVideosOnly().first().associateBy { it.id }
+                        val saved = savedMap[vkVideoId]
+                        val finalVideo = vkVideo.copy(
+                            isDownloaded = saved?.isDownloaded ?: false,
+                            isBookmarked = saved?.isBookmarked ?: false
+                        )
+                        selectVideo(finalVideo)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoViewModel", "Error resolving VK deep link: $trimmedUrl", e)
+                } finally {
+                    _isLoading.value = false
+                }
+            }
+            return
+        }
+
         viewModelScope.launch {
             _isLoading.value = true
             try {
@@ -1591,7 +1632,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun downloadVkVideoDirect(video: Video) {
         val id = video.id
-        val logs = mutableListOf("[VK Загрузчик] Начат прямой сбор потока VK...")
+        val logs = java.util.concurrent.CopyOnWriteArrayList<String>().apply {
+            add("[VK Загрузчик] Начат прямой сбор потока VK...")
+        }
         
         fun updateDl(progress: Float, speed: String, status: String, completed: Boolean) {
             val currentDl = YtDlpDownload(
@@ -1637,8 +1680,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         logs.add("[VK Загрузчик] Начинается скачивание...")
         updateDl(0.01f, "0 B/s", "Downloading", false)
 
-        val data = com.example.data.vk.VkVideoLoader.downloadVideo(
+        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val targetFile = File(downloadFolder, "$id.mp4")
+
+        val success = com.example.data.vk.VkVideoLoader.downloadVideo(
             videoUrl = videoUrl,
+            targetFile = targetFile,
             onProgress = { progress, speed ->
                 if ((progress * 100).toInt() % 10 == 0) {
                     logs.add("[VK Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed)")
@@ -1647,12 +1694,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
         )
 
-        if (data != null) {
+        if (success) {
             try {
-                val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                val targetFile = File(downloadFolder, "$id.mp4")
-                targetFile.writeBytes(data)
-                
                 logs.add("[VK Загрузчик] Файл сохранен в ${targetFile.absolutePath}")
                 updateDl(1f, "0 B/s", "Finished", true)
                 
