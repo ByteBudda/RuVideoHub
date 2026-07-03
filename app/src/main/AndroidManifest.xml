@@ -2,11 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <attribution
+        android:tag="default"
+        android:label="@string/app_name" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-
-    <attribution android:tag="mediaPlayer" android:label="@string/app_name" />
 
     <application
         android:allowBackup="true"
@@ -40,6 +42,22 @@
                 <data android:scheme="https" />
                 <data android:host="rutube.ru" />
                 <data android:host="www.rutube.ru" />
+
+                <data android:pathPattern=".*" />
+            </intent-filter>
+
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="vk.com" />
+                <data android:host="www.vk.com" />
+                <data android:host="vkvideo.ru" />
+                <data android:host="www.vkvideo.ru" />
+                <data android:host="m.vk.com" />
 
                 <data android:pathPattern=".*" />
             </intent-filter>
