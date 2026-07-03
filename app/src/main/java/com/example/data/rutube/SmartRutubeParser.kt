@@ -819,11 +819,50 @@ object SmartRutubeParser {
                 }
             }
             
+            val items = mutableListOf<NormalizedCard>()
+            
+            // Сначала вытащим все результаты (если они есть вместе с табами)
+            val resultsArray = jsonObj.optJSONArray("results")
+            if (resultsArray != null && resultsArray.length() > 0) {
+                for (i in 0 until resultsArray.length()) {
+                    val item = resultsArray.optJSONObject(i) ?: continue
+                    val nestedCards = item.optJSONArray("cards") ?: item.optJSONArray("items") ?: item.optJSONArray("results")
+                    if (nestedCards != null && nestedCards.length() > 0) {
+                        for (j in 0 until nestedCards.length()) {
+                            val nestedItem = nestedCards.optJSONObject(j) ?: continue
+                            CardNormalizer.normalizeOrNull(nestedItem)?.let { items.add(it) }
+                        }
+                    } else {
+                        CardNormalizer.normalizeOrNull(item)?.let { items.add(it) }
+                    }
+                }
+            }
+            
+            // Затем превратим табы в папки, если пользователь хочет их видеть как часть выдачи
+            for (tab in tabList) {
+                // Если внутри таба только 1 ресурс, и это ссылка, можем попытаться показать её, но обычно это просто папки
+                for (res in tab.resources) {
+                    items.add(
+                        NormalizedCard.UnknownCard(
+                            id = "res_${tab.id}_${res.name.hashCode()}",
+                            title = res.name,
+                            thumbnail = null,
+                            rawType = tab.name, // имя таба (например "По годам")
+                            actionUrl = res.url
+                        )
+                    )
+                }
+            }
+            
+            val pagination = PaginationExtractor.extract(jsonObj)
+
             return ParsedResponse(
                 type = EntityType.FEED_CATALOG,
                 title = AdaptiveExtractor.getString(jsonObj, "title", "Каталог"),
                 description = AdaptiveExtractor.getString(jsonObj, "description").takeIf { it.isNotBlank() },
                 tabs = tabList,
+                items = items,
+                pagination = pagination,
                 relatedTv = relatedTv,
                 relatedPersons = relatedPersons,
                 metadata = ResponseMetadata(totalResources = totalResources)
