@@ -445,13 +445,3 @@ fun SleekTvNavigationRail(
         }
     }
 }
-
- else GreyText,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
