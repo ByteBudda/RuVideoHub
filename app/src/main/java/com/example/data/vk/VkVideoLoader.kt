@@ -4,6 +4,8 @@ package com.example.data.vk
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.currentCoroutineContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -194,31 +196,69 @@ object VkVideoLoader {
         targetFile: java.io.File,
         onProgress: (Float, String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
+        val resumeFile = java.io.File(targetFile.absolutePath + ".resume")
+        val append = targetFile.exists() && resumeFile.exists()
+        val existingSize = if (append) targetFile.length() else 0L
+
+        val requestBuilder = Request.Builder()
             .url(url)
             .header("User-Agent", USER_AGENT)
             .header("Referer", "https://vk.com/")
-            .build()
+
+        if (append && existingSize > 0) {
+            requestBuilder.header("Range", "bytes=$existingSize-")
+        }
+
+        val request = requestBuilder.build()
 
         try {
-            targetFile.parentFile?.mkdirs()
-            if (targetFile.exists()) {
-                targetFile.delete()
+            if (!append) {
+                targetFile.parentFile?.mkdirs()
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
             }
 
             httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext false
+                val actualResponse = if (append && response.code == 416) {
+                    val freshReq = Request.Builder()
+                        .url(url)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Referer", "https://vk.com/")
+                        .build()
+                    httpClient.newCall(freshReq).execute()
+                } else {
+                    response
+                }
+
+                val isAppendResult = append && actualResponse.code == 206
+                val startBytes = if (isAppendResult) existingSize else 0L
+                if (!isAppendResult && !append) {
+                    targetFile.parentFile?.mkdirs()
+                    if (targetFile.exists()) {
+                        targetFile.delete()
+                    }
+                }
+
+                if (!actualResponse.isSuccessful) return@withContext false
                 
-                val body = response.body ?: return@withContext false
-                val totalBytes = body.contentLength()
+                val body = actualResponse.body ?: return@withContext false
+                val responseLength = body.contentLength()
+                val totalBytes = if (isAppendResult) startBytes + responseLength else responseLength
                 val inputStream = body.byteStream()
                 
-                targetFile.outputStream().use { outputStream ->
+                resumeFile.writeText("MP4_RESUMABLE")
+
+                java.io.FileOutputStream(targetFile, isAppendResult).use { outputStream ->
                     val buffer = ByteArray(8192)
                     var bytesRead: Int
-                    var downloaded = 0L
+                    var downloaded = startBytes
                     
                     while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        if (!isActive) {
+                            Log.d(TAG, "MP4 download cancelled, saving state at $downloaded bytes")
+                            return@withContext false
+                        }
                         outputStream.write(buffer, 0, bytesRead)
                         downloaded += bytesRead
                         
@@ -231,6 +271,14 @@ object VkVideoLoader {
                             onProgress(0.5f, speed)
                         }
                     }
+                }
+                
+                try {
+                    if (resumeFile.exists()) {
+                        resumeFile.delete()
+                    }
+                } catch (e: Exception) {
+                    // ignore
                 }
                 return@withContext true
             }
@@ -354,17 +402,37 @@ object VkVideoLoader {
             Log.d(TAG, "Found ${segments.size} segments to download")
             
             // 5. Скачиваем сегменты
-            targetFile.parentFile?.mkdirs()
-            if (targetFile.exists()) {
-                targetFile.delete()
+            val resumeFile = java.io.File(targetFile.absolutePath + ".resume")
+            var startFromSegment = 0
+            if (targetFile.exists() && resumeFile.exists()) {
+                try {
+                    val content = resumeFile.readText().trim()
+                    startFromSegment = content.toIntOrNull() ?: 0
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading resume file: ${e.message}")
+                }
             }
 
-            var downloaded = 0
-            val total = segments.size
-            var totalDownloadedBytes = 0L
+            val append = startFromSegment > 0
+            if (!append) {
+                targetFile.parentFile?.mkdirs()
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
+            }
 
-            targetFile.outputStream().use { outputStream ->
-                for (segment in segments) {
+            var downloaded = startFromSegment
+            val total = segments.size
+            var totalDownloadedBytes = if (append) targetFile.length() else 0L
+
+            java.io.FileOutputStream(targetFile, append).use { outputStream ->
+                for (index in startFromSegment until total) {
+                    if (!isActive) {
+                        Log.d(TAG, "Download cancelled, saving state at segment: $index")
+                        resumeFile.writeText(index.toString())
+                        return@withContext false
+                    }
+                    val segment = segments[index]
                     val segmentUrl = resolveUrl(fullPlaylistUrl, segment)
                     
                     val segmentRequest = Request.Builder()
@@ -404,9 +472,23 @@ object VkVideoLoader {
                     val progress = downloaded.toFloat() / total
                     val speed = String.format("%.1f MB (%.1f%%)", totalDownloadedBytes / 1024.0 / 1024.0, progress * 100)
                     onProgress(progress, speed)
+
+                    try {
+                        resumeFile.writeText(downloaded.toString())
+                    } catch (e: Exception) {
+                        // ignore
+                    }
                 }
             }
             
+            try {
+                if (resumeFile.exists()) {
+                    resumeFile.delete()
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+
             Log.d(TAG, "HLS stream downloaded successfully, size: $totalDownloadedBytes bytes")
             return@withContext true
         } catch (e: Exception) {
