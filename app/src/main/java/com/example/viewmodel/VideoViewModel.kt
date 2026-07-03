@@ -304,9 +304,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
 
 
-    // yt-dlp downloading state parameters
-    private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
-    val activeDownloads = _activeDownloads.asStateFlow()
+    // WorkManager background downloading state parameters
+    val activeDownloads = DownloadProgressTracker.activeDownloads
 
     private val _streamUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val _masterUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -1527,20 +1526,61 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelDownload(videoId: String) {
         downloadJobs[videoId]?.cancel()
         downloadJobs.remove(videoId)
-        
-        _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-            remove(videoId)
-        }
+        androidx.work.WorkManager.getInstance(getApplication()).cancelUniqueWork("download_$videoId")
+        DownloadProgressTracker.removeDownload(videoId)
         
         val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         val targetFile = File(downloadFolder, "$videoId.mp4")
         if (targetFile.exists()) {
             targetFile.delete()
         }
+        val resumeFile = File(downloadFolder, "$videoId.mp4.resume")
+        if (resumeFile.exists()) {
+            resumeFile.delete()
+        }
         
         if (_currentSelectedVideo.value?.id == videoId) {
             _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
         }
+    }
+
+    fun pauseDownload(videoId: String) {
+        androidx.work.WorkManager.getInstance(getApplication()).cancelUniqueWork("download_$videoId")
+        DownloadProgressTracker.activeDownloads.value[videoId]?.let { currentDl ->
+            DownloadProgressTracker.updateDownload(videoId, currentDl.copy(status = "Paused", speed = "0 B/s"))
+        }
+    }
+
+    fun resumeDownload(video: Video) {
+        val inputData = androidx.work.workDataOf(
+            "videoId" to video.id,
+            "title" to video.title,
+            "channel" to video.channel,
+            "thumbnailUrl" to video.thumbnailUrl,
+            "category" to video.category,
+            "description" to video.description
+        )
+
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+            .build()
+
+        val downloadRequest = androidx.work.OneTimeWorkRequestBuilder<DownloadWorker>()
+            .setInputData(inputData)
+            .setConstraints(constraints)
+            .addTag("download_${video.id}")
+            .setBackoffCriteria(
+                androidx.work.BackoffPolicy.EXPONENTIAL,
+                androidx.work.WorkRequest.MIN_BACKOFF_MILLIS,
+                java.util.concurrent.TimeUnit.MILLISECONDS
+            )
+            .build()
+
+        androidx.work.WorkManager.getInstance(getApplication()).enqueueUniqueWork(
+            "download_${video.id}",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            downloadRequest
+        )
     }
 
     fun toggleDownload(video: Video) {
@@ -1553,24 +1593,28 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 if (targetFile.exists()) {
                     targetFile.delete()
                 }
+                val resumeFile = File(downloadFolder, "${video.id}.mp4.resume")
+                if (resumeFile.exists()) {
+                    resumeFile.delete()
+                }
                 repository.toggleDownload(video)
                 if (_currentSelectedVideo.value?.id == video.id) {
                     _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = false)
                 }
             } else {
-                // Run live yt-dlp downloader coroutine
-                startYtDlpDownload(video)
+                val currentDl = DownloadProgressTracker.activeDownloads.value[video.id]
+                if (currentDl != null && (currentDl.status == "Downloading" || currentDl.status == "Extracting" || currentDl.status == "Merging")) {
+                    pauseDownload(video.id)
+                } else {
+                    resumeDownload(video)
+                }
             }
         }
     }
 
     fun deleteDownload(video: Video) {
-        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "${video.id}.mp4")
+        cancelDownload(video.id)
         viewModelScope.launch {
-            if (targetFile.exists()) {
-                targetFile.delete()
-            }
             if (video.isDownloaded) {
                 repository.toggleDownload(video)
                 if (_currentSelectedVideo.value?.id == video.id) {
@@ -1630,113 +1674,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun downloadVkVideoDirect(video: Video) {
-        val id = video.id
-        val logs = java.util.concurrent.CopyOnWriteArrayList<String>().apply {
-            add("[VK Загрузчик] Начат прямой сбор потока VK...")
-        }
-        
-        fun updateDl(progress: Float, speed: String, status: String, completed: Boolean) {
-            val currentDl = YtDlpDownload(
-                id = id,
-                title = video.title,
-                channel = video.channel,
-                thumbnailUrl = video.thumbnailUrl,
-                progress = progress,
-                speed = speed,
-                eta = if (completed) "00:00" else "--:--",
-                status = status,
-                logs = logs.toList()
-            )
-            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                this[id] = currentDl
-            }
-        }
 
-        updateDl(0f, "0 B/s", "Downloading", false)
-        
-        val cachedStreamUrl = _masterUrlCache[id] ?: _streamUrlCache[id] ?: ""
-        val videoUrl = if (cachedStreamUrl.isNotBlank()) {
-            cachedStreamUrl
-        } else {
-            // Try resolving on the fly
-            logs.add("[VK Загрузчик] Разрешение URL трансляции для $id...")
-            val vkId = id.substringAfter("vk_")
-            val info = com.example.data.vk.VkVideoLoader.getVideoInfo("https://vk.com/video$vkId")
-            if (info != null) {
-                _masterUrlCache[id] = info.videoUrl
-                info.videoUrl
-            } else {
-                ""
-            }
-        }
-
-        if (videoUrl.isBlank()) {
-            logs.add("[VK Загрузчик] Ошибка: ссылка на поток не найдена!")
-            updateDl(0f, "0 B/s", "Error", false)
-            return
-        }
-
-        logs.add("[VK Загрузчик] Начинается скачивание...")
-        updateDl(0.01f, "0 B/s", "Downloading", false)
-
-        val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "$id.mp4")
-
-        val success = com.example.data.vk.VkVideoLoader.downloadVideo(
-            videoUrl = videoUrl,
-            targetFile = targetFile,
-            onProgress = { progress, speed ->
-                if ((progress * 100).toInt() % 10 == 0) {
-                    logs.add("[VK Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed)")
-                }
-                updateDl(progress, speed, "Downloading", false)
-            }
-        )
-
-        if (success) {
-            try {
-                logs.add("[VK Загрузчик] Файл сохранен в ${targetFile.absolutePath}")
-                updateDl(1f, "0 B/s", "Finished", true)
-                
-                repository.toggleDownload(video)
-                if (_currentSelectedVideo.value?.id == id) {
-                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
-                }
-            } catch (e: Exception) {
-                logs.add("[VK Загрузчик] Ошибка сохранения файла: ${e.message}")
-                updateDl(0f, "0 B/s", "Error", false)
-            }
-        } else {
-            logs.add("[VK Загрузчик] Ошибка скачивания видео!")
-            updateDl(0f, "0 B/s", "Error", false)
-        }
-    }
-
-    private fun startYtDlpDownload(video: Video) {
-        val job = viewModelScope.launch {
-            try {
-                if (video.id.startsWith("vk_")) {
-                    downloadVkVideoDirect(video)
-                } else {
-                    YtDlpDownloader.startYtDlpDownload(
-                        getApplication(),
-                        video,
-                        repository,
-                        _activeDownloads,
-                        _downloadQuality.value
-                    ) { completedId ->
-                        if (_currentSelectedVideo.value?.id == completedId) {
-                            _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
-                        }
-                    }
-                }
-            } finally {
-                downloadJobs.remove(video.id)
-            }
-        }
-        downloadJobs[video.id] = job
-    }
 
     fun toggleMicrophone(status: Boolean) {
         _isMicrophoneActive.value = status
@@ -2077,6 +2015,75 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     views = "Смотреть выпуски",
                     timeAgo = "Шоу",
                     duration = "СЕРИАЛ",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Смотрите оригинальные сезоны: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+            com.example.data.rutube.SmartRutubeParser.EntityType.PLAYLIST -> {
+                Video(
+                    id = "playlist_${extractedId}__$url",
+                    title = resource.name,
+                    channel = "Плейлист • Подборка",
+                    views = "Смотреть плейлист",
+                    timeAgo = "Плейлист",
+                    duration = "ПЛЕЙЛИСТ",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Смотрите полную подборку видео из плейлиста: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+            else -> {
+                Video(
+                    id = "unknown_res_${tabId}_${resource.name.hashCode()}__$url",
+                    title = resource.name,
+                    channel = "Папка каталога",
+                    views = "Подраздел",
+                    timeAgo = "Открыть",
+                    duration = "ПАПКА",
+                    isPro = false,
+                    category = categoryName,
+                    description = "Коллекция контента из раздела: ${resource.name}",
+                    thumbnailUrl = null
+                )
+            }
+        }
+    }
+
+    // Factory helper in case we instantiate standard lifecycle
+    class Factory(private val application: Application) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return VideoViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
+}
+
+data class YtDlpDownload(
+    val id: String,
+    val title: String,
+    val channel: String,
+    val thumbnailUrl: String?,
+    val progress: Float,
+    val speed: String,
+    val eta: String,
+    val status: String,
+    val logs: List<String>
+)
+
+data class RutubeComment(
+    val id: String,
+    val author: String,
+    val text: String,
+    val date: String?,
+    val likes: Int
+)
+ion = "СЕРИАЛ",
                     isPro = false,
                     category = categoryName,
                     description = "Смотрите оригинальные сезоны: ${resource.name}",

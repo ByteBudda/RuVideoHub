@@ -296,12 +296,37 @@ object YtDlpDownloader {
                 
                 if (segments.isNotEmpty()) {
                     log("[download] Found ${segments.size} stream fragments. Starting progressive download sequence...")
-                    var totalBytesDownloaded = 0L
+                    
+                    val resumeFile = File(targetFile.absolutePath + ".resume")
+                    var startFromSegment = 0
+                    if (targetFile.exists() && resumeFile.exists()) {
+                        try {
+                            val content = resumeFile.readText().trim()
+                            startFromSegment = content.toIntOrNull() ?: 0
+                        } catch (e: Exception) {
+                            log("[download] Warning: Error reading resume file: ${e.message}")
+                        }
+                    }
+
+                    val append = startFromSegment > 0
+                    if (!append) {
+                        if (targetFile.exists()) {
+                            targetFile.delete()
+                        }
+                    }
+
+                    var totalBytesDownloaded = if (append) targetFile.length() else 0L
                     val startMs = System.currentTimeMillis()
                     
-                    FileOutputStream(targetFile).use { outputStream ->
-                        for (index in segments.indices) {
+                    FileOutputStream(targetFile, append).use { outputStream ->
+                        for (index in startFromSegment until segments.size) {
                             if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                log("[download] Download paused. Saving state at fragment: $index")
+                                try {
+                                    resumeFile.writeText(index.toString())
+                                } catch (e: Exception) {
+                                    // ignore
+                                }
                                 throw kotlinx.coroutines.CancellationException("Cancelled by user")
                             }
                             val segmentUrl = segments[index]
@@ -388,18 +413,36 @@ object YtDlpDownloader {
                                     )
                                 }
                             }
+
+                            try {
+                                resumeFile.writeText((index + 1).toString())
+                            } catch (e: Exception) {
+                                // ignore
+                            }
                         }
                     }
+                    
+                    try {
+                        if (resumeFile.exists()) {
+                            resumeFile.delete()
+                        }
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+
                     isFetchSuccess = true
                 } else {
                     log("[error] No video streams segments found in Rutube playlist.")
                 }
             } catch (err: Exception) {
+                if (err is kotlinx.coroutines.CancellationException) {
+                    throw err
+                }
                 log("[error] Progressive fragment stream write failed: ${err.localizedMessage}")
                 android.util.Log.e("VideoViewModel", "Download connection error", err)
-                if (targetFile.exists()) {
-                    targetFile.delete()
-                }
+                
+                // Do not delete target file on simple error so we can retry/resume!
+                // We only log the issue. If it was fully aborted without being resumable, we could delete, but let's keep it resumable!
 
                 // --- ROBUST SECURE MIRROR FALLBACK ---
                 log("[backup] Initializing secure backup mirror downloader pipeline...")
