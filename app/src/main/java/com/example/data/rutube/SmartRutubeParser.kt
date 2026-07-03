@@ -21,13 +21,13 @@ import java.util.concurrent.ConcurrentHashMap
 object SmartRutubeParser {
 
     // ==================== CONFIGURATION ====================
-    
+
     private const val API_BASE = "https://rutube.ru"
     private const val MAX_RECURSION_DEPTH = 3
     private const val PAID_CONFIDENCE_THRESHOLD = 0.7
-    
+
     // ==================== ENUMS ====================
-    
+
     enum class EntityType {
         FEED_CATALOG,      // Каталог с вкладками
         CATEGORY_FEED,     // Простой фид
@@ -43,16 +43,16 @@ object SmartRutubeParser {
         UNKNOWN,           // Неизвестный тип
         EMPTY              // Пустой ответ
     }
-    
+
     // ==================== PAID CONTENT DETECTION ====================
-    
+
     /**
      * Платные партнеры (даже если is_paid = false)
      */
     private val PAID_PARTNERS = setOf(
         "PREMIER", "START", "IVI", "KION", "MORE.TV", "OKKO", "WINK", "AMEDIATEKA"
     )
-    
+
     /**
      * Платные коды подписки (из common_subscription_product_codes)
      */
@@ -60,7 +60,7 @@ object SmartRutubeParser {
         "PREMIER_RUTUBE_YAPPY", "PREMIER_RUTUBE_START", "PREMIER_RUTUBE_GAZPROM_BONUS",
         "premier-rutube-gazprom-bonus-lite", "START_RUTUBE", "IVI_RUTUBE", "KION_RUTUBE"
     )
-    
+
     /**
      * Результат проверки платности
      */
@@ -71,9 +71,9 @@ object SmartRutubeParser {
         val partner: String? = null,
         val requiresSubscription: Boolean = false
     )
-    
+
     // ==================== ADAPTIVE FIELD EXTRACTOR ====================
-    
+
     object AdaptiveExtractor {
         private val fieldAliases = mapOf(
             "id" to listOf("id", "code", "video_id", "content_id", "uuid", "person_id"),
@@ -89,13 +89,13 @@ object SmartRutubeParser {
             "seasons" to listOf("seasons_count", "seasons"),
             "avatar" to listOf("avatar_url", "avatar", "picture_url", "picture", "logo_url", "logo")
         )
-        
+
         fun makeDeterministicId(prefix: String, title: String, url: String?): String {
             val base = url ?: title
             val hash = base.hashCode().toString().replace("-", "n")
             return "${prefix}_$hash"
         }
-        
+
         fun getString(obj: JSONObject, fieldType: String, default: String = ""): String {
             val aliases = fieldAliases[fieldType] ?: listOf(fieldType)
             for (alias in aliases) {
@@ -130,7 +130,7 @@ object SmartRutubeParser {
             }
             return default
         }
-        
+
         fun getInt(obj: JSONObject, fieldType: String, default: Int = 0): Int {
             val aliases = fieldAliases[fieldType] ?: listOf(fieldType)
             for (alias in aliases) {
@@ -145,7 +145,7 @@ object SmartRutubeParser {
             }
             return default
         }
-        
+
         fun getLong(obj: JSONObject, fieldType: String, default: Long = 0L): Long {
             val aliases = fieldAliases[fieldType] ?: listOf(fieldType)
             for (alias in aliases) {
@@ -160,7 +160,7 @@ object SmartRutubeParser {
             }
             return default
         }
-        
+
         fun getDouble(obj: JSONObject, fieldType: String, default: Double = 0.0): Double {
             val aliases = fieldAliases[fieldType] ?: listOf(fieldType)
             for (alias in aliases) {
@@ -175,7 +175,7 @@ object SmartRutubeParser {
             }
             return default
         }
-        
+
         fun getBoolean(obj: JSONObject, fieldType: String, default: Boolean = false): Boolean {
             val str = getString(obj, fieldType).lowercase()
             return when (str) {
@@ -184,7 +184,7 @@ object SmartRutubeParser {
                 else -> default
             }
         }
-        
+
         fun getObject(obj: JSONObject, fieldType: String): JSONObject? {
             val aliases = fieldAliases[fieldType] ?: listOf(fieldType)
             for (alias in aliases) {
@@ -193,7 +193,7 @@ object SmartRutubeParser {
             }
             return null
         }
-        
+
         fun getArray(obj: JSONObject, fieldType: String): JSONArray? {
             val aliases = fieldAliases[fieldType] ?: listOf(fieldType)
             for (alias in aliases) {
@@ -202,7 +202,7 @@ object SmartRutubeParser {
             }
             return null
         }
-        
+
         fun getStringList(obj: JSONObject, fieldType: String): List<String> {
             val arr = getArray(obj, fieldType) ?: return emptyList()
             return (0 until arr.length()).mapNotNull { index ->
@@ -215,11 +215,11 @@ object SmartRutubeParser {
             }.filter { it != null && it != "null" }
         }
     }
-    
+
     // ==================== PAID CONTENT DETECTOR ====================
-    
+
     object PaidContentDetector {
-        
+
         fun check(json: JSONObject): PaidCheck {
             // 1. Проверка кодов подписки (САМЫЙ ВАЖНЫЙ ПРИЗНАК!)
             val subscriptionCodes = json.optJSONArray("common_subscription_product_codes")
@@ -238,29 +238,29 @@ object SmartRutubeParser {
                     return PaidCheck(true, "Subscription codes: ${codes.joinToString()}", 0.99, partner, true)
                 }
             }
-            
+
             // 2. Проверка партнера по имени канала
             val author = AdaptiveExtractor.getObject(json, "author")
             val authorName = AdaptiveExtractor.getString(author ?: json, "name", "")
             val feedName = AdaptiveExtractor.getString(json, "feed_name", "")
-            
+
             for (partner in PAID_PARTNERS) {
                 if (authorName.contains(partner, ignoreCase = true) || 
                     feedName.contains(partner, ignoreCase = true)) {
                     return PaidCheck(true, "Paid partner: $partner", 0.95, partner, true)
                 }
             }
-            
+
             // 3. Прямой флаг is_paid
             if (json.optBoolean("is_paid", false)) {
                 return PaidCheck(true, "Direct is_paid flag", 0.9)
             }
-            
+
             // 4. Проверка origin_type (uma часто платный)
             if (json.optString("origin_type") == "uma") {
                 return PaidCheck(true, "UMA content", 0.55)
             }
-            
+
             // 5. Лицензионный контент (может быть платным)
             if (json.optBoolean("is_licensed", false) && json.optBoolean("is_official", false)) {
                 return PaidCheck(true, "Licensed official content", 0.6)
@@ -269,30 +269,30 @@ object SmartRutubeParser {
             // 6. Дополнительная проверка по ключевым словам в описании/титлах
             val title = AdaptiveExtractor.getString(json, "title").lowercase()
             val desc = AdaptiveExtractor.getString(json, "description").lowercase()
-            
+
             val paidKeywords = listOf("оформить подписку", "только по подписке", "доступно в подписке", "трейлер сериала")
             if (paidKeywords.any { title.contains(it) || desc.contains(it) }) {
                 return PaidCheck(true, "Paid keywords matched in text", 0.85)
             }
-        
+
             // 7. Если длительность видео слишком маленькая для фильма/сериала (заглушки-трейлеры)
             val duration = AdaptiveExtractor.getDouble(json, "duration", 0.0)
             val isTvShow = json.has("seasons_count") || json.optJSONObject("content_type")?.optString("model") == "tv"
             if (isTvShow && duration > 0 && duration < 180) { // Меньше 3 минут — явно рекламный трейлер платного сериала
                 return PaidCheck(true, "Short trailer duration for TV-show", 0.8)
             }
-            
+
             return PaidCheck(false, "Free content", 0.9)
         }
-        
+
         fun shouldExclude(json: JSONObject): Boolean {
             val check = check(json)
             return check.isPaid && check.confidence > PAID_CONFIDENCE_THRESHOLD
         }
     }
-    
+
     // ==================== NORMALIZED CARDS ====================
-    
+
     sealed class NormalizedCard {
         data class VideoCard(
             val id: String,
@@ -315,7 +315,7 @@ object SmartRutubeParser {
             val description: String,
             val tags: List<String> = emptyList()
         ) : NormalizedCard()
-        
+
         data class TvSeriesCard(
             val id: String,
             val title: String,
@@ -331,7 +331,7 @@ object SmartRutubeParser {
             val partner: String? = null,
             val actionUrl: String? = null
         ) : NormalizedCard()
-        
+
         data class ChannelCard(
             val id: String,
             val name: String,
@@ -342,7 +342,7 @@ object SmartRutubeParser {
             val videosCount: Int,
             val actionUrl: String? = null
         ) : NormalizedCard()
-        
+
         data class PromoCard(
             val id: String,
             val title: String,
@@ -350,7 +350,7 @@ object SmartRutubeParser {
             val description: String?,
             val actionUrl: String?
         ) : NormalizedCard()
-        
+
         data class PlaylistCard(
             val id: String,
             val title: String,
@@ -358,7 +358,7 @@ object SmartRutubeParser {
             val videosCount: Int,
             val actionUrl: String?
         ) : NormalizedCard()
-        
+
         data class UnknownCard(
             val id: String,
             val title: String,
@@ -367,21 +367,21 @@ object SmartRutubeParser {
             val actionUrl: String? = null
         ) : NormalizedCard()
     }
-    
+
     // ==================== CARD NORMALIZER ====================
-    
+
     object CardNormalizer {
-        
+
         fun normalizeOrNull(json: JSONObject): NormalizedCard? {
             // Фильтрация платного контента
             if (PaidContentDetector.shouldExclude(json)) {
                 return null
             }
-            
+
             val hasContentType = json.has("content_type")
             val isNested = json.has("object") && json.optJSONObject("object") != null
             val data = if (isNested) json.optJSONObject("object") ?: json else json
-            
+
             var model = ""
             if (hasContentType) {
                 model = json.optJSONObject("content_type")?.optString("model") ?: ""
@@ -405,7 +405,7 @@ object SmartRutubeParser {
             if (model.isBlank()) {
                 model = data.optString("model", "")
             }
-            
+
             val urlVal = data.optString("absolute_url", data.optString("url", "")).lowercase()
             if (model.isBlank() && urlVal.isNotBlank()) {
                 when {
@@ -414,63 +414,63 @@ object SmartRutubeParser {
                     urlVal.contains("/playlist/") -> model = "playlist"
                 }
             }
-            
+
             val typeObj = data.optJSONObject("type")
             val typeId = typeObj?.optInt("id") ?: data.optInt("type_id", 0)
             val isLive = typeId == 12 || model == "live" || data.optBoolean("is_live", false)
-            
+
             return when {
                 // Video / Broadcast / Live Check (Highest priority for playable objects)
                 (isLive || data.has("duration") || data.has("video_url") || data.has("video_length") || model == "video") 
                     && !data.has("seasons_count") && !data.has("videos_count") && model != "tv" && model != "serial" -> normalizeVideo(data, isLive)
-                
+
                 // Playlist Check
                 data.has("videos_count") && !data.has("subscribers_count") && !data.has("duration") -> normalizePlaylist(data)
-                
+
                 // TV Show / Series Check
                 model == "tv" || model == "show" || model == "serial" || model == "tvshow" || model == "movie" 
                         || data.has("seasons_count") || data.has("seasons") || data.has("genres") -> normalizeTvShow(data)
-                
+
                 // Channel / Author/ User / Person Check
                 model in listOf("userchannel", "person", "channel", "author", "user") 
                         || data.has("subscribers_count") 
                         || (data.has("avatar") && !data.has("duration") && !data.has("video_url") && !data.has("code")) -> normalizeChannel(data)
-                
+
                 // Promo / Landing / Button Check
                 json.has("button") || json.has("target") || model == "promo" -> normalizePromo(json)
-                
+
                 // Fallback Playlist Check
                 data.has("playlist_id") || model == "playlist" -> normalizePlaylist(data)
-                
+
                 // Fallback Video Check if it has code / identifier
                 data.has("code") || data.has("video_id") -> normalizeVideo(data, isLive)
-                
+
                 // Default fallback
                 else -> normalizeUnknown(data, model.ifBlank { "unknown" })
             }
         }
-        
+
         private fun normalizeVideo(data: JSONObject, isLiveInput: Boolean = false): NormalizedCard.VideoCard {
             val id = AdaptiveExtractor.getString(data, "code")
                 .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.getString(data, "video_id")
                 .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.getString(data, "id", "")
-            
+
             val author = AdaptiveExtractor.getObject(data, "author")
             val authorName = AdaptiveExtractor.getString(author ?: data, "name")
                 .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.getString(data, "feed_name")
                 .takeIf { it.isNotBlank() }
                 ?: "Rutube"
-            
+
             val viewsCount = AdaptiveExtractor.getLong(data, "views")
             val durationSeconds = AdaptiveExtractor.getDouble(data, "duration", -1.0)
             val paidCheck = PaidContentDetector.check(data)
-            
+
             val typeObj = data.optJSONObject("type")
             val isLive = isLiveInput || typeObj?.optInt("id") == 12 || data.optString("type") == "live"
-            
+
             val ageObj = data.optJSONObject("pg_rating")
             val ageVal = ageObj?.opt("age")?.toString() ?: ""
             val rawRating = AdaptiveExtractor.getString(data, "rating").takeIf { it.isNotBlank() }
@@ -479,7 +479,7 @@ object SmartRutubeParser {
             } else {
                 rawRating
             }
-            
+
             return NormalizedCard.VideoCard(
                 id = id,
                 title = AdaptiveExtractor.getString(data, "title", "Untitled"),
@@ -502,7 +502,7 @@ object SmartRutubeParser {
                 tags = AdaptiveExtractor.getStringList(data, "tags")
             )
         }
-        
+
         private fun normalizeTvShow(data: JSONObject): NormalizedCard.TvSeriesCard {
             var id = AdaptiveExtractor.getString(data, "id", "")
             val actionUrl = normalizeUrl(data.optString("absolute_url", data.optString("url", null)))
@@ -510,7 +510,7 @@ object SmartRutubeParser {
                 id = AdaptiveExtractor.makeDeterministicId("tv", AdaptiveExtractor.getString(data, "title"), actionUrl)
             }
             val paidCheck = PaidContentDetector.check(data)
-            
+
             return NormalizedCard.TvSeriesCard(
                 id = id,
                 title = AdaptiveExtractor.getString(data, "title", "Untitled"),
@@ -527,17 +527,17 @@ object SmartRutubeParser {
                 actionUrl = actionUrl
             )
         }
-        
+
         private fun normalizeChannel(data: JSONObject): NormalizedCard.ChannelCard {
             var id = AdaptiveExtractor.getString(data, "id")
             val url = AdaptiveExtractor.getString(data, "url")
             if (id.isBlank()) {
-                val match = Regex("/(?:person|channel)/(\\d+)").find(url)
+                val match = Regex("/(?:person|channel)/(\d+)").find(url)
                 id = match?.groupValues?.get(1) ?: AdaptiveExtractor.makeDeterministicId("ch", AdaptiveExtractor.getString(data, "title"), url)
             }
-            
+
             val subsCount = AdaptiveExtractor.getLong(data, "subscribers")
-            
+
             return NormalizedCard.ChannelCard(
                 id = id,
                 name = AdaptiveExtractor.getString(data, "title", "Untitled"),
@@ -549,7 +549,7 @@ object SmartRutubeParser {
                 actionUrl = normalizeUrl(url)
             )
         }
-        
+
         fun normalizePromo(data: JSONObject): NormalizedCard.PromoCard? {
             val button = data.optJSONObject("button")
             val actionUrlCheck = button?.optString("button_url")
@@ -561,7 +561,7 @@ object SmartRutubeParser {
             val actionUrl = normalizeUrl(actionUrlCheck)
             val title = AdaptiveExtractor.getString(data, "title", "Untitled")
             val description = AdaptiveExtractor.getString(data, "description")
-            
+
             val checkText = (title + " " + description + " " + actionUrl).lowercase()
             val isBlocked = checkText.contains("premier") || 
                             checkText.contains("start") || 
@@ -571,11 +571,11 @@ object SmartRutubeParser {
             if (isBlocked) {
                 return null
             }
-            
+
             val id = AdaptiveExtractor.getString(data, "id")
                 .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.makeDeterministicId("promo", title, actionUrl)
-            
+
             return NormalizedCard.PromoCard(
                 id = id,
                 title = title,
@@ -585,28 +585,43 @@ object SmartRutubeParser {
                 actionUrl = actionUrl
             )
         }
-        
+
         private fun normalizePlaylist(data: JSONObject): NormalizedCard.PlaylistCard {
             val url = AdaptiveExtractor.getString(data, "url")
             val id = AdaptiveExtractor.getString(data, "id")
                 .takeIf { it.isNotBlank() }
+                ?: AdaptiveExtractor.getString(data, "playlist_id")
+                .takeIf { it.isNotBlank() }
+                ?: AdaptiveExtractor.getString(data, "playlist_id_string")
+                .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.makeDeterministicId("playlist", AdaptiveExtractor.getString(data, "title"), url)
-            
+
+            val finalUrl = url.takeIf { it.isNotBlank() } ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
+            val vCount = if (data.has("videos_count")) {
+                data.optInt("videos_count")
+            } else if (data.has("video_count")) {
+                data.optInt("video_count")
+            } else {
+                AdaptiveExtractor.getInt(data, "videos", 0)
+            }
+
             return NormalizedCard.PlaylistCard(
                 id = id,
                 title = AdaptiveExtractor.getString(data, "title", "Untitled"),
-                thumbnail = AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() },
-                videosCount = AdaptiveExtractor.getInt(data, "videos", 0),
-                actionUrl = normalizeUrl(url)
+                thumbnail = (AdaptiveExtractor.getString(data, "thumbnail").takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "picture").takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "image").takeIf { it.isNotBlank() }),
+                videosCount = vCount,
+                actionUrl = normalizeUrl(finalUrl)
             )
         }
-        
+
         private fun normalizeUnknown(data: JSONObject, model: String): NormalizedCard.UnknownCard {
             val url = AdaptiveExtractor.getString(data, "url")
             val id = AdaptiveExtractor.getString(data, "id")
                 .takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.makeDeterministicId("unknown", AdaptiveExtractor.getString(data, "title"), url)
-            
+
             return NormalizedCard.UnknownCard(
                 id = id,
                 title = AdaptiveExtractor.getString(data, "title", "Unknown"),
@@ -616,9 +631,9 @@ object SmartRutubeParser {
             )
         }
     }
-    
+
     // ==================== PAGINATION EXTRACTOR ====================
-    
+
     object PaginationExtractor {
         fun extract(json: JSONObject): PaginationInfo {
             // Паттерн 1: Стандартный
@@ -631,7 +646,7 @@ object SmartRutubeParser {
                     total = if (json.has("total")) json.getInt("total") else null
                 )
             }
-            
+
             // Паттерн 2: pagination объект
             val pagination = json.optJSONObject("pagination")
             if (pagination != null) {
@@ -643,27 +658,28 @@ object SmartRutubeParser {
                     total = if (pagination.has("total")) pagination.getInt("total") else null
                 )
             }
-            
+
             return PaginationInfo()
         }
     }
-    
+
     // ==================== RESPONSE ANALYZER ====================
-    
+
     object ResponseAnalyzer {
-        
+
         fun parse(jsonObj: JSONObject, isPromoGroup: Boolean = false, url: String? = null): ParsedResponse {
             val actualPromoGroup = isPromoGroup || (url?.contains("/promogroup/") == true)
-            // Каталог с вкладками
+
+            // Каталог с вкладками (включая промо-группы)
             if (jsonObj.has("tabs")) {
-                return parseCatalogFeed(jsonObj)
+                return parseCatalogFeed(jsonObj, actualPromoGroup)
             }
-            
+
             // Пагинированный ответ
             if (jsonObj.has("results")) {
                 return parsePaginatedResponse(jsonObj, actualPromoGroup)
             }
-            
+
             // Одиночное видео
             if (jsonObj.has("id") && (jsonObj.has("video_url") || jsonObj.has("duration"))) {
                 val video = CardNormalizer.normalizeOrNull(jsonObj)
@@ -672,7 +688,7 @@ object SmartRutubeParser {
                     items = video?.let { listOf(it) } ?: emptyList()
                 )
             }
-            
+
             // Сериал
             if (jsonObj.has("id") && jsonObj.has("seasons_count")) {
                 val series = CardNormalizer.normalizeOrNull(jsonObj)
@@ -690,7 +706,7 @@ object SmartRutubeParser {
                     items = playlist?.let { listOf(it) } ?: emptyList()
                 )
             }
-            
+
             // Канал
             if (jsonObj.has("id") && jsonObj.has("subscribers_count")) {
                 val channel = CardNormalizer.normalizeOrNull(jsonObj)
@@ -699,29 +715,29 @@ object SmartRutubeParser {
                     items = channel?.let { listOf(it) } ?: emptyList()
                 )
             }
-            
+
             return ParsedResponse(
                 type = EntityType.UNKNOWN,
                 error = "Unrecognized response structure"
             )
         }
-        
-        private fun parseCatalogFeed(jsonObj: JSONObject): ParsedResponse {
+
+        private fun parseCatalogFeed(jsonObj: JSONObject, isPromoGroup: Boolean): ParsedResponse {
             val tabsArray = jsonObj.optJSONArray("tabs") ?: JSONArray()
             val tabList = mutableListOf<TabInfo>()
             var totalResources = 0
-            
+
             for (i in 0 until tabsArray.length()) {
                 val tabObj = tabsArray.optJSONObject(i) ?: continue
                 val resourcesArray = tabObj.optJSONArray("resources") ?: JSONArray()
                 val resourceList = mutableListOf<ResourceInfo>()
-                
+
                 for (j in 0 until resourcesArray.length()) {
                     val resObj = resourcesArray.optJSONObject(j) ?: continue
                     val contentType = resObj.optJSONObject("content_type")
                     val model = contentType?.optString("model") ?: "unknown"
                     val url = resObj.optString("url", "").lowercase()
-                    
+
                     var detectedType = when (model) {
                         "tag", "playlist" -> EntityType.VIDEO_LIST
                         "tv" -> EntityType.TV_SERIES
@@ -729,7 +745,7 @@ object SmartRutubeParser {
                         "userchannel", "person", "channel", "author" -> EntityType.CHANNEL
                         else -> EntityType.UNKNOWN
                     }
-                    
+
                     if (detectedType == EntityType.UNKNOWN && url.isNotBlank()) {
                         detectedType = when {
                             url.contains("/person/") || url.contains("/channel/") || url.contains("/userchannel/") -> EntityType.CHANNEL
@@ -738,7 +754,7 @@ object SmartRutubeParser {
                             else -> EntityType.UNKNOWN
                         }
                     }
-                    
+
                     val nameVal = resObj.optString("name", "Раздел")
                     val normUrl = normalizeUrl(resObj.optString("url"))
                     val checkText = (nameVal + " " + normUrl).lowercase()
@@ -747,7 +763,7 @@ object SmartRutubeParser {
                                     checkText.contains("viju") || 
                                     checkText.contains("премьер") || 
                                     checkText.contains("вижу")
-                    
+
                     if (!isBlocked) {
                         resourceList.add(
                             ResourceInfo(
@@ -760,7 +776,7 @@ object SmartRutubeParser {
                         totalResources++
                     }
                 }
-                
+
                 val tabName = tabObj.optString("name", "Вкладка")
                 val tabNameLower = tabName.lowercase()
                 val isBlockedTab = tabNameLower.contains("premier") || 
@@ -768,7 +784,7 @@ object SmartRutubeParser {
                                    tabNameLower.contains("viju") || 
                                    tabNameLower.contains("премьер") || 
                                    tabNameLower.contains("вижу")
-                
+
                 if (!isBlockedTab) {
                     tabList.add(
                         TabInfo(
@@ -779,7 +795,7 @@ object SmartRutubeParser {
                     )
                 }
             }
-            
+
             // Извлечение связанного контента
             val relatedTv = mutableListOf<NormalizedCard.TvSeriesCard>()
             val relatedTvArray = jsonObj.optJSONArray("related_tv")
@@ -799,7 +815,7 @@ object SmartRutubeParser {
                     }
                 }
             }
-            
+
             val relatedPersons = mutableListOf<NormalizedCard.ChannelCard>()
             val relatedPersonsArray = jsonObj.optJSONArray("related_person")
             if (relatedPersonsArray != null) {
@@ -818,9 +834,9 @@ object SmartRutubeParser {
                     }
                 }
             }
-            
+
             val items = mutableListOf<NormalizedCard>()
-            
+
             // Сначала вытащим все результаты (если они есть вместе с табами)
             val resultsArray = jsonObj.optJSONArray("results")
             if (resultsArray != null && resultsArray.length() > 0) {
@@ -830,30 +846,39 @@ object SmartRutubeParser {
                     if (nestedCards != null && nestedCards.length() > 0) {
                         for (j in 0 until nestedCards.length()) {
                             val nestedItem = nestedCards.optJSONObject(j) ?: continue
-                            CardNormalizer.normalizeOrNull(nestedItem)?.let { items.add(it) }
+                            val normalized = if (isPromoGroup) {
+                                CardNormalizer.normalizePromo(nestedItem)
+                            } else {
+                                CardNormalizer.normalizeOrNull(nestedItem)
+                            }
+                            normalized?.let { items.add(it) }
                         }
                     } else {
-                        CardNormalizer.normalizeOrNull(item)?.let { items.add(it) }
+                        val normalized = if (isPromoGroup) {
+                            CardNormalizer.normalizePromo(item)
+                        } else {
+                            CardNormalizer.normalizeOrNull(item)
+                        }
+                        normalized?.let { items.add(it) }
                     }
                 }
             }
-            
+
             // Затем превратим табы в папки, если пользователь хочет их видеть как часть выдачи
             for (tab in tabList) {
-                // Если внутри таба только 1 ресурс, и это ссылка, можем попытаться показать её, но обычно это просто папки
                 for (res in tab.resources) {
                     items.add(
                         NormalizedCard.UnknownCard(
                             id = "res_${tab.id}_${res.name.hashCode()}",
                             title = res.name,
                             thumbnail = null,
-                            rawType = tab.name, // имя таба (например "По годам")
+                            rawType = tab.name,
                             actionUrl = res.url
                         )
                     )
                 }
             }
-            
+
             val pagination = PaginationExtractor.extract(jsonObj)
 
             return ParsedResponse(
@@ -868,27 +893,27 @@ object SmartRutubeParser {
                 metadata = ResponseMetadata(totalResources = totalResources)
             )
         }
-        
+
         private fun parsePaginatedResponse(jsonObj: JSONObject, isPromoGroup: Boolean): ParsedResponse {
             val resultsArray = jsonObj.optJSONArray("results") ?: JSONArray()
             val pagination = PaginationExtractor.extract(jsonObj)
-            
+
             if (resultsArray.length() == 0) {
                 return ParsedResponse(type = EntityType.EMPTY, pagination = pagination)
             }
-            
+
             val items = mutableListOf<NormalizedCard>()
             var filteredCount = 0
-            
+
             for (i in 0 until resultsArray.length()) {
                 val item = resultsArray.optJSONObject(i) ?: continue
-                
+
                 // Unpack widget structures (e.g. widget_type: "tv_channel_cards")
                 val nestedCards = item.optJSONArray("cards") 
                     ?: item.optJSONArray("items") 
                     ?: item.optJSONArray("results") 
                     ?: item.optJSONArray("videos")
-                
+
                 if (nestedCards != null && nestedCards.length() > 0) {
                     for (j in 0 until nestedCards.length()) {
                         val nestedItem = nestedCards.optJSONObject(j) ?: continue
@@ -916,7 +941,7 @@ object SmartRutubeParser {
                     }
                 }
             }
-            
+
             val firstCard = items.firstOrNull()
             val overallType = when (firstCard) {
                 is NormalizedCard.PromoCard -> EntityType.PROMO_GROUP
@@ -925,7 +950,7 @@ object SmartRutubeParser {
                 is NormalizedCard.PlaylistCard -> EntityType.PLAYLIST
                 else -> EntityType.VIDEO_LIST
             }
-            
+
             return ParsedResponse(
                 type = overallType,
                 items = items,
@@ -937,9 +962,9 @@ object SmartRutubeParser {
             )
         }
     }
-    
+
     // ==================== DATA CLASSES ====================
-    
+
     data class ParsedResponse(
         val type: EntityType,
         val items: List<NormalizedCard> = emptyList(),
@@ -952,20 +977,20 @@ object SmartRutubeParser {
         val metadata: ResponseMetadata = ResponseMetadata(),
         val error: String? = null
     )
-    
+
     data class TabInfo(
         val id: Int,
         val name: String,
         val resources: List<ResourceInfo>
     )
-    
+
     data class ResourceInfo(
         val name: String,
         val url: String?,
         val type: EntityType,
         val extraParams: JSONObject?
     )
-    
+
     data class PaginationInfo(
         val hasNext: Boolean = false,
         val nextUrl: String? = null,
@@ -973,15 +998,15 @@ object SmartRutubeParser {
         val perPage: Int = 20,
         val total: Int? = null
     )
-    
+
     data class ResponseMetadata(
         val filteredPaidCount: Int = 0,
         val totalOriginalCount: Int = 0,
         val totalResources: Int = 0
     )
-    
+
     // ==================== HELPER FUNCTIONS ====================
-    
+
     private fun formatDuration(seconds: Double): String {
         val totalSeconds = seconds.toInt()
         val hours = totalSeconds / 3600
@@ -993,7 +1018,7 @@ object SmartRutubeParser {
             String.format("%02d:%02d", minutes, secs)
         }
     }
-    
+
     private fun formatCount(count: Long): String {
         return when {
             count >= 1_000_000 -> String.format(Locale.US, "%.1fM", count / 1_000_000.0)
@@ -1002,7 +1027,7 @@ object SmartRutubeParser {
             else -> "0"
         }
     }
-    
+
     private fun formatDate(dateString: String?): String {
         if (dateString.isNullOrBlank()) return "Недавно"
         return try {
@@ -1015,7 +1040,7 @@ object SmartRutubeParser {
             "Недавно"
         }
     }
-    
+
     private fun parseTimestamp(dateString: String?): Long {
         if (dateString.isNullOrBlank()) return 0L
         return try {
@@ -1026,7 +1051,7 @@ object SmartRutubeParser {
             0L
         }
     }
-    
+
     private fun normalizeUrl(url: String?): String? {
         if (url.isNullOrBlank()) return null
         val trimmed = url.trim()
