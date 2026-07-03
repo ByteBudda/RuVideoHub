@@ -120,7 +120,8 @@ fun SleekVideoHubApp(
         if (isTvOptimized) {
             Row(modifier = Modifier.fillMaxSize()) {
                 val isTvMiniFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
-                if (currentSelectedVideo == null && !isTvMiniFullscreen) {
+                val shouldShowSidebar = (currentSelectedVideo == null || currentTab == "tv_mini") && !isTvMiniFullscreen
+                if (shouldShowSidebar) {
                     SleekTvNavigationRail(
                         selectedTab = currentTab,
                         onTabSelected = { viewModel.selectTab(it) },
@@ -445,3 +446,4 @@ fun SleekTvNavigationRail(
         }
     }
 }
+
