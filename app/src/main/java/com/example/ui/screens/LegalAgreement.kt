@@ -33,7 +33,7 @@ import com.example.ui.theme.Primary
 /**
  * ПОЛЬЗОВАТЕЛЬСКОЕ СОГЛАШЕНИЕ
  * 
- * Версия: 1.0.0
+ * Версия: 3.4.55
  * Дата: 01.07.2026
  */
 
@@ -54,7 +54,7 @@ object LegalContent {
     const val APP_NAME = "RuVideoHub"
     const val GITHUB_URL = "https://github.com/ByteBudda/RuVideoHub"
     const val LICENSE = "GNU General Public License v3.0"
-    const val VERSION = "3.4.54"
+    const val VERSION = "3.4.55"
     const val CONTACT_EMAIL = "anonymous"
     const val COPYRIGHT_YEAR = "2026"
 
