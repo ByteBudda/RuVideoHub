@@ -218,6 +218,9 @@ object VkVideoLoader {
                     val progress = downloaded.toFloat() / totalBytes
                     val speed = String.format("%.1f MB/s", downloaded / 1024.0 / 1024.0)
                     onProgress(progress, speed)
+                } else {
+                    val speed = String.format("%.1f MB", downloaded / 1024.0 / 1024.0)
+                    onProgress(0.5f, speed)
                 }
             }
             
@@ -225,11 +228,35 @@ object VkVideoLoader {
         }
     }
 
+    private fun resolveUrl(base: String, relative: String): String {
+        val trimmedRel = relative.trim()
+        if (trimmedRel.startsWith("http://") || trimmedRel.startsWith("https://")) {
+            return trimmedRel
+        }
+        if (trimmedRel.startsWith("//")) {
+            return "https:$trimmedRel"
+        }
+        if (trimmedRel.startsWith("/")) {
+            try {
+                val uri = java.net.URI(base)
+                val hostUrl = "${uri.scheme}://${uri.host}${if (uri.port != -1) ":${uri.port}" else ""}"
+                return "$hostUrl$trimmedRel"
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resolving domain absolute URL: ${e.message}")
+            }
+        }
+        // Relative to base directory path
+        val lastSlash = base.lastIndexOf('/')
+        val basePath = if (lastSlash != -1) base.substring(0, lastSlash) else base
+        return "$basePath/$trimmedRel"
+    }
+
     private suspend fun downloadHlsVideo(
         masterUrl: String,
         onProgress: (Float, String) -> Unit
     ): ByteArray? = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "Starting HLS download from masterUrl: $masterUrl")
             // 1. Получаем мастер плейлист
             val masterRequest = Request.Builder()
                 .url(masterUrl)
@@ -237,35 +264,54 @@ object VkVideoLoader {
                 .header("Referer", "https://vk.com/")
                 .build()
             
-            val masterText = httpClient.newCall(masterRequest).execute().use {
-                it.body?.string() ?: return@withContext null
-            }
-            
-            // 2. Ищем плейлист с качеством
-            val qualityPattern = Regex("""RESOLUTION=\d+x(\d+).*\n(.*\.m3u8)""")
-            val qualityMatch = qualityPattern.find(masterText)
-            val playlistUrl = if (qualityMatch != null) {
-                val resolution = qualityMatch.groupValues[1].toIntOrNull() ?: 720
-                // Выбираем качество: 1080p > 720p > 480p
-                val targetRes = when {
-                    resolution >= 1080 -> "1080"
-                    resolution >= 720 -> "720"
-                    else -> "480"
+            val masterText = httpClient.newCall(masterRequest).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "Failed to fetch master playlist, code: ${response.code}")
+                    return@withContext null
                 }
-                val pattern = Regex("""RESOLUTION=\d+x($targetRes).*\n(.*\.m3u8)""")
-                pattern.find(masterText)?.groupValues?.get(2) 
-                    ?: qualityMatch.groupValues[2]
-            } else {
-                // Если нет RESOLUTION, берем первый плейлист
-                Regex("""\n(.*\.m3u8)""").find(masterText)?.groupValues?.get(1) ?: return@withContext null
+                response.body?.string() ?: return@withContext null
             }
             
-            val fullPlaylistUrl = if (playlistUrl.startsWith("http")) {
-                playlistUrl
-            } else {
-                val baseUrl = masterUrl.substringBeforeLast("/")
-                "$baseUrl/$playlistUrl"
+            // 2. Ищем плейлист с наилучшим качеством
+            var selectedUrl: String? = null
+            var bestResolution = 0
+            
+            val masterLines = masterText.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            var idx = 0
+            while (idx < masterLines.size) {
+                val line = masterLines[idx]
+                if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                    // Try to parse RESOLUTION
+                    val resolutionMatch = Regex("""RESOLUTION=\d+x(\d+)""").find(line)
+                    val res = resolutionMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    
+                    if (idx + 1 < masterLines.size) {
+                        val nextLine = masterLines[idx + 1]
+                        if (!nextLine.startsWith("#")) {
+                            // This is the playlist URL
+                            // Prefer resolutions up to 720p or 1080p for download
+                            if (selectedUrl == null || res > bestResolution) {
+                                bestResolution = res
+                                selectedUrl = nextLine
+                            }
+                        }
+                    }
+                }
+                idx++
             }
+
+            if (selectedUrl == null) {
+                // Fallback to find any .m3u8 line
+                selectedUrl = masterLines.firstOrNull { it.endsWith(".m3u8") && !it.startsWith("#") }
+            }
+
+            if (selectedUrl == null) {
+                Log.e(TAG, "Could not find any playlist stream URL in master playlist")
+                return@withContext null
+            }
+            
+            val fullPlaylistUrl = resolveUrl(masterUrl, selectedUrl)
+            Log.d(TAG, "Resolved playlist URL: $fullPlaylistUrl (best resolution: ${bestResolution}p)")
             
             // 3. Получаем плейлист сегментов
             val playlistRequest = Request.Builder()
@@ -274,8 +320,12 @@ object VkVideoLoader {
                 .header("Referer", "https://vk.com/")
                 .build()
             
-            val playlistText = httpClient.newCall(playlistRequest).execute().use {
-                it.body?.string() ?: return@withContext null
+            val playlistText = httpClient.newCall(playlistRequest).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "Failed to fetch stream playlist, code: ${response.code}")
+                    return@withContext null
+                }
+                response.body?.string() ?: return@withContext null
             }
             
             // 4. Получаем список сегментов
@@ -283,20 +333,20 @@ object VkVideoLoader {
                 .map { it.trim() }
                 .filter { it.isNotEmpty() && !it.startsWith("#") }
             
-            if (segments.isEmpty()) return@withContext null
+            if (segments.isEmpty()) {
+                Log.e(TAG, "Parsed segments list is empty")
+                return@withContext null
+            }
+            
+            Log.d(TAG, "Found ${segments.size} segments to download")
             
             // 5. Скачиваем сегменты
             val outputStream = java.io.ByteArrayOutputStream()
-            val baseUrl = fullPlaylistUrl.substringBeforeLast("/")
             var downloaded = 0
             val total = segments.size
             
             for (segment in segments) {
-                val segmentUrl = if (segment.startsWith("http")) {
-                    segment
-                } else {
-                    "$baseUrl/$segment"
-                }
+                val segmentUrl = resolveUrl(fullPlaylistUrl, segment)
                 
                 val segmentRequest = Request.Builder()
                     .url(segmentUrl)
@@ -304,15 +354,26 @@ object VkVideoLoader {
                     .header("Referer", "https://vk.com/")
                     .build()
                 
-                try {
-                    httpClient.newCall(segmentRequest).execute().use { response ->
-                        if (response.isSuccessful) {
-                            val data = response.body?.bytes() ?: byteArrayOf()
-                            outputStream.write(data)
+                var success = false
+                var attempts = 0
+                while (!success && attempts < 3) {
+                    attempts++
+                    try {
+                        httpClient.newCall(segmentRequest).execute().use { response ->
+                            if (response.isSuccessful) {
+                                val data = response.body?.bytes() ?: byteArrayOf()
+                                outputStream.write(data)
+                                success = true
+                            } else {
+                                Log.e(TAG, "Failed to download segment, code: ${response.code}, attempt: $attempts")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Segment download exception: ${e.message}, attempt: $attempts")
+                        if (attempts >= 3) {
+                            // Continue to next segment rather than failing entire download if possible
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Segment download error: ${e.message}")
                 }
                 
                 downloaded++
@@ -321,6 +382,7 @@ object VkVideoLoader {
                 onProgress(progress, speed)
             }
             
+            Log.d(TAG, "HLS stream downloaded successfully, size: ${outputStream.size()} bytes")
             return@withContext outputStream.toByteArray()
         } catch (e: Exception) {
             Log.e(TAG, "HLS download error: ${e.message}")
