@@ -1149,13 +1149,6 @@ fun SleekFolderGridItem(
                     modifier = Modifier.size(18.dp)
                 )
             }
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Open",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(16.dp)
-            )
         }
     }
 }
@@ -1717,34 +1710,25 @@ fun CatalogGroupHeader(
     isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = groupName,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Icon(
-                imageVector = if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
-                contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-            )
-        }
-        androidx.compose.material3.HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            color = if (isDark) Color(0xFF333333) else Color(0xFFE0E0E0),
-            thickness = 0.5.dp
+        Text(
+            text = groupName,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Icon(
+            imageVector = if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
+            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
         )
     }
 }
+
