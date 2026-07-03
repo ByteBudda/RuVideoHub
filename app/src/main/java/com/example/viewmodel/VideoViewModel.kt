@@ -495,6 +495,101 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val q = query?.trim() ?: ""
                 if (q.isNotEmpty()) {
+                    // Check if VK url
+                    val parsedVk = com.example.data.vk.VkVideoLoader.parseVideoUrl(q)
+                    if (parsedVk != null) {
+                        try {
+                            val info = com.example.data.vk.VkVideoLoader.getVideoInfo(q)
+                            if (info != null) {
+                                val vkVideoId = "vk_${info.ownerId}_${info.videoId}"
+                                _masterUrlCache[vkVideoId] = info.videoUrl
+                                
+                                val vkVideo = Video(
+                                    id = vkVideoId,
+                                    title = info.title,
+                                    channel = "VK Видео (id: ${info.ownerId})",
+                                    views = "${info.views} просмотров",
+                                    timeAgo = "Только что",
+                                    duration = info.duration,
+                                    category = "VK",
+                                    description = "Видео из VK. Воспроизведение и скачивание.",
+                                    thumbnailUrl = info.thumbnail,
+                                    isDownloaded = false,
+                                    isBookmarked = false
+                                )
+                                val savedMap = repository.getSavedVideosOnly().first().associateBy { it.id }
+                                val saved = savedMap[vkVideoId]
+                                val finalVideo = vkVideo.copy(
+                                    isDownloaded = saved?.isDownloaded ?: false,
+                                    isBookmarked = saved?.isBookmarked ?: false
+                                )
+                                if (currentRequestId == requestId) {
+                                    _feedTabs.value = emptyList()
+                                    _selectedFeedTab.value = null
+                                    _dynamicVideos.value = listOf(finalVideo)
+                                }
+                            } else {
+                                if (currentRequestId == requestId) {
+                                    _dynamicVideos.value = emptyList()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("VideoViewModel", "Error fetching VK video in search", e)
+                            if (currentRequestId == requestId) {
+                                _dynamicVideos.value = emptyList()
+                            }
+                        }
+                        return@launch
+                    }
+
+                    // Check if Rutube url
+                    if (q.contains("rutube.ru") || q.contains("rutube")) {
+                        val rtVideoId = parseVideoIdFromRutubeUrl(q)
+                        if (rtVideoId.isNotBlank()) {
+                            try {
+                                val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                                val apiUrl = "https://rutube.ru/api/video/$rtVideoId/?format=json"
+                                val response = apiService.getDynamicUrl(apiUrl)
+                                val bodyStr = response.string()
+                                val parsedVideoList = repository.parseVideoListJson(bodyStr, "Разное")
+                                
+                                val resolvedVideo = if (parsedVideoList.isNotEmpty()) {
+                                    parsedVideoList.first()
+                                } else {
+                                    Video(
+                                        id = rtVideoId,
+                                        title = "Видео Rutube ($rtVideoId)",
+                                        channel = "Rutube",
+                                        views = "",
+                                        timeAgo = "Только что",
+                                        duration = "00:00",
+                                        category = "Разное",
+                                        description = "Импортировано из внешнего приложения. Приятного просмотра!",
+                                        thumbnailUrl = ""
+                                    )
+                                }
+                                
+                                val savedMap = repository.getSavedVideosOnly().first().associateBy { it.id }
+                                val saved = savedMap[resolvedVideo.id]
+                                val finalVideo = resolvedVideo.copy(
+                                    isDownloaded = saved?.isDownloaded ?: false,
+                                    isBookmarked = saved?.isBookmarked ?: false
+                                )
+                                if (currentRequestId == requestId) {
+                                    _feedTabs.value = emptyList()
+                                    _selectedFeedTab.value = null
+                                    _dynamicVideos.value = listOf(finalVideo)
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("VideoViewModel", "Error fetching Rutube video in search", e)
+                                if (currentRequestId == requestId) {
+                                    _dynamicVideos.value = emptyList()
+                                }
+                            }
+                            return@launch
+                        }
+                    }
+
                     val fetched = repository.fetchRealVideos(q, targetCategory, page = 1)
                     if (currentRequestId == requestId) {
                         _feedTabs.value = emptyList()
@@ -1494,18 +1589,103 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private suspend fun downloadVkVideoDirect(video: Video) {
+        val id = video.id
+        val logs = mutableListOf("[VK Загрузчик] Начат прямой сбор потока VK...")
+        
+        fun updateDl(progress: Float, speed: String, status: String, completed: Boolean) {
+            val currentDl = YtDlpDownload(
+                id = id,
+                title = video.title,
+                channel = video.channel,
+                thumbnailUrl = video.thumbnailUrl,
+                progress = progress,
+                speed = speed,
+                eta = if (completed) "00:00" else "--:--",
+                status = status,
+                logs = logs.toList()
+            )
+            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
+                this[id] = currentDl
+            }
+        }
+
+        updateDl(0f, "0 B/s", "Downloading", false)
+        
+        val cachedStreamUrl = _masterUrlCache[id] ?: _streamUrlCache[id] ?: ""
+        val videoUrl = if (cachedStreamUrl.isNotBlank()) {
+            cachedStreamUrl
+        } else {
+            // Try resolving on the fly
+            logs.add("[VK Загрузчик] Разрешение URL трансляции для $id...")
+            val vkId = id.substringAfter("vk_")
+            val info = com.example.data.vk.VkVideoLoader.getVideoInfo("https://vk.com/video$vkId")
+            if (info != null) {
+                _masterUrlCache[id] = info.videoUrl
+                info.videoUrl
+            } else {
+                ""
+            }
+        }
+
+        if (videoUrl.isBlank()) {
+            logs.add("[VK Загрузчик] Ошибка: ссылка на поток не найдена!")
+            updateDl(0f, "0 B/s", "Error", false)
+            return
+        }
+
+        logs.add("[VK Загрузчик] Начинается скачивание...")
+        updateDl(0.01f, "0 B/s", "Downloading", false)
+
+        val data = com.example.data.vk.VkVideoLoader.downloadVideo(
+            videoUrl = videoUrl,
+            onProgress = { progress, speed ->
+                if ((progress * 100).toInt() % 10 == 0) {
+                    logs.add("[VK Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed)")
+                }
+                updateDl(progress, speed, "Downloading", false)
+            }
+        )
+
+        if (data != null) {
+            try {
+                val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                val targetFile = File(downloadFolder, "$id.mp4")
+                targetFile.writeBytes(data)
+                
+                logs.add("[VK Загрузчик] Файл сохранен в ${targetFile.absolutePath}")
+                updateDl(1f, "0 B/s", "Finished", true)
+                
+                repository.toggleDownload(video)
+                if (_currentSelectedVideo.value?.id == id) {
+                    _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
+                }
+            } catch (e: Exception) {
+                logs.add("[VK Загрузчик] Ошибка сохранения файла: ${e.message}")
+                updateDl(0f, "0 B/s", "Error", false)
+            }
+        } else {
+            logs.add("[VK Загрузчик] Ошибка скачивания видео!")
+            updateDl(0f, "0 B/s", "Error", false)
+        }
+    }
+
     private fun startYtDlpDownload(video: Video) {
         val job = viewModelScope.launch {
             try {
-                YtDlpDownloader.startYtDlpDownload(
-                    getApplication(),
-                    video,
-                    repository,
-                    _activeDownloads,
-                    _downloadQuality.value
-                ) { completedId ->
-                    if (_currentSelectedVideo.value?.id == completedId) {
-                        _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
+                if (video.id.startsWith("vk_")) {
+                    downloadVkVideoDirect(video)
+                } else {
+                    YtDlpDownloader.startYtDlpDownload(
+                        getApplication(),
+                        video,
+                        repository,
+                        _activeDownloads,
+                        _downloadQuality.value
+                    ) { completedId ->
+                        if (_currentSelectedVideo.value?.id == completedId) {
+                            _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
+                        }
                     }
                 }
             } finally {
@@ -1616,6 +1796,27 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String, quality: String = "Авто"): String? {
+        if (videoId.startsWith("vk_")) {
+            val cachedMaster = _masterUrlCache[videoId]
+            if (cachedMaster != null) {
+                return cachedMaster
+            }
+            return withContext(Dispatchers.IO) {
+                try {
+                    val vkId = videoId.substringAfter("vk_")
+                    val info = com.example.data.vk.VkVideoLoader.getVideoInfo("https://vk.com/video$vkId")
+                    if (info != null) {
+                        _masterUrlCache[videoId] = info.videoUrl
+                        info.videoUrl
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoViewModel", "Error fetching HLS for VK video: $videoId", e)
+                    null
+                }
+            }
+        }
         val masterUrl = withContext(Dispatchers.IO) {
             val cachedMaster = _masterUrlCache[videoId]
             if (cachedMaster != null) {
