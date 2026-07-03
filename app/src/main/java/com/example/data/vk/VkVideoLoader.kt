@@ -173,7 +173,7 @@ object VkVideoLoader {
     suspend fun downloadVideo(
         videoUrl: String,
         targetFile: java.io.File,
-        onProgress: (Float, String) -> Unit
+        onProgress: (Float, String, String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             // Если это HLS плейлист
@@ -192,7 +192,7 @@ object VkVideoLoader {
     private suspend fun downloadMp4Video(
         url: String,
         targetFile: java.io.File,
-        onProgress: (Float, String) -> Unit
+        onProgress: (Float, String, String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
@@ -217,18 +217,34 @@ object VkVideoLoader {
                     val buffer = ByteArray(8192)
                     var bytesRead: Int
                     var downloaded = 0L
+                    val startTimeMs = System.currentTimeMillis()
                     
                     while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                         outputStream.write(buffer, 0, bytesRead)
                         downloaded += bytesRead
                         
+                        val elapsedMs = System.currentTimeMillis() - startTimeMs
+                        val speedStr = if (elapsedMs > 0) {
+                            val bytesSec = (downloaded * 1000) / elapsedMs
+                            if (bytesSec > 1024 * 1024) {
+                                String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
+                            } else {
+                                String.format("%.2f KiB/s", bytesSec / 1024.0)
+                            }
+                        } else "0 B/s"
+
                         if (totalBytes > 0) {
                             val progress = downloaded.toFloat() / totalBytes
-                            val speed = String.format("%.1f MB/s", downloaded / 1024.0 / 1024.0)
-                            onProgress(progress, speed)
+                            val etaStr = if (downloaded > 0) {
+                                val totalEstMs = (totalBytes * elapsedMs) / downloaded
+                                val remainingSeconds = ((totalEstMs - elapsedMs) / 1000).toInt()
+                                if (remainingSeconds > 0) {
+                                    String.format("%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+                                } else "00:01"
+                            } else "00:01"
+                            onProgress(progress, speedStr, etaStr)
                         } else {
-                            val speed = String.format("%.1f MB", downloaded / 1024.0 / 1024.0)
-                            onProgress(0.5f, speed)
+                            onProgress(0.5f, speedStr, "--:--")
                         }
                     }
                 }
@@ -266,7 +282,7 @@ object VkVideoLoader {
     private suspend fun downloadHlsVideo(
         masterUrl: String,
         targetFile: java.io.File,
-        onProgress: (Float, String) -> Unit
+        onProgress: (Float, String, String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Starting HLS download from masterUrl: $masterUrl")
@@ -362,6 +378,7 @@ object VkVideoLoader {
             var downloaded = 0
             val total = segments.size
             var totalDownloadedBytes = 0L
+            val startTimeMs = System.currentTimeMillis()
 
             targetFile.outputStream().use { outputStream ->
                 for (segment in segments) {
@@ -402,8 +419,25 @@ object VkVideoLoader {
                     
                     downloaded++
                     val progress = downloaded.toFloat() / total
-                    val speed = String.format("%.1f MB (%.1f%%)", totalDownloadedBytes / 1024.0 / 1024.0, progress * 100)
-                    onProgress(progress, speed)
+                    val elapsedMs = System.currentTimeMillis() - startTimeMs
+                    val speedStr = if (elapsedMs > 0) {
+                        val bytesSec = (totalDownloadedBytes * 1000) / elapsedMs
+                        if (bytesSec > 1024 * 1024) {
+                            String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
+                        } else {
+                            String.format("%.2f KiB/s", bytesSec / 1024.0)
+                        }
+                    } else "0 B/s"
+
+                    val etaStr = if (downloaded > 0 && downloaded < total) {
+                        val totalEstMs = (total.toLong() * elapsedMs) / downloaded
+                        val remainingSeconds = ((totalEstMs - elapsedMs) / 1000).toInt()
+                        if (remainingSeconds > 0) {
+                            String.format("%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+                        } else "00:01"
+                    } else "00:01"
+
+                    onProgress(progress, speedStr, etaStr)
                 }
             }
             
