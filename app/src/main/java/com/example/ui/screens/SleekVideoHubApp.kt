@@ -119,7 +119,8 @@ fun SleekVideoHubApp(
     AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
         if (isTvOptimized) {
             Row(modifier = Modifier.fillMaxSize()) {
-                if (currentSelectedVideo == null || currentTab == "tv_mini") {
+                val isTvMiniFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
+                if ((currentSelectedVideo == null || currentTab == "tv_mini") && !isTvMiniFullscreen) {
                     SleekTvNavigationRail(
                         selectedTab = currentTab,
                         onTabSelected = { viewModel.selectTab(it) },

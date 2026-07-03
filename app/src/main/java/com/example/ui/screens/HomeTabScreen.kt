@@ -99,7 +99,7 @@ fun HomeTabScreen(
         }
 
         LaunchedEffect(shouldLoadMore) {
-            if (shouldLoadMore && !isChannelView) {
+            if (shouldLoadMore) {
                 viewModel.loadNextPage()
             }
         }
