@@ -87,7 +87,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         try {
             val jsonObj = JSONObject(trimmed)
             // Используем V2 парсер с endpointHint для самообучения
-            val parsed = com.example.data.rutube.SmartRutubeParserV2.ResponseAnalyzerV2.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzerV2.parse(jsonObj, url)
 
             android.util.Log.d("VideoRepository", "Parsed ${parsed.items.size} items from $url (type=${parsed.type}, confidence avg=${parsed.items.map { it.confidence }.average()})")
 
@@ -118,11 +118,11 @@ class VideoRepository(private val dao: SavedVideoDao) {
     // ==================== MAPPING ====================
 
     private fun mapNormalizedCardToVideo(
-        card: com.example.data.rutube.SmartRutubeParserV2.NormalizedCard,
+        card: com.example.data.rutube.SmartRutubeParser.NormalizedCard,
         defaultCategoryName: String
     ): Video {
         return when (card) {
-            is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.VideoCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
                 Video(
                     id = card.id,
                     title = card.title,
@@ -139,7 +139,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.channelAvatar
                 )
             }
-            is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.TvSeriesCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
                 val ratingStr = if (card.rating != null && card.rating > 0.05) " • Кинопоиск: ${card.rating}" else ""
                 val yearVal = card.year ?: "Передача"
                 Video(
@@ -155,7 +155,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.poster
                 )
             }
-            is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.PlaylistCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
                 Video(
                     id = "playlist_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
@@ -169,7 +169,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.thumbnail
                 )
             }
-            is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.ChannelCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
                 Video(
                     id = "channel_${card.id}__${card.actionUrl ?: ""}",
                     title = card.name,
@@ -185,7 +185,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.avatar
                 )
             }
-            is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.PromoCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
                 Video(
                     id = "promo_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
@@ -199,7 +199,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.thumbnail
                 )
             }
-            is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.UnknownCard -> {
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
                 Video(
                     id = "unknown_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
@@ -539,7 +539,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val url = "https://rutube.ru/api/v1/feeds/promogroup/382/?format=json&limit=100"
             val bodyStr = apiService.getDynamicUrl(url).string()
             val jsonObj = JSONObject(bodyStr)
-            val parsed = com.example.data.rutube.SmartRutubeParserV2.ResponseAnalyzerV2.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzerV2.parse(jsonObj, url)
 
             for (card in parsed.items) {
                 var title = ""
@@ -548,27 +548,27 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 val idVal = card.hashCode()
 
                 when (card) {
-                    is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.PromoCard -> {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.UnknownCard -> {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.TvSeriesCard -> {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
                         title = card.title
                         thumbnail = card.poster ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.PlaylistCard -> {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParserV2.NormalizedCard.VideoCard -> {
+                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: "/feeds/video/"
