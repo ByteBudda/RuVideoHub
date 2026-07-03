@@ -125,6 +125,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentSelectedVideo = MutableStateFlow<Video?>(null)
     val currentSelectedVideo = _currentSelectedVideo.asStateFlow()
 
+    // TV Mini Player Fullscreen state
+    private val _isTvMiniFullscreen = MutableStateFlow(false)
+    val isTvMiniFullscreen = _isTvMiniFullscreen.asStateFlow()
+
+    fun setTvMiniFullscreen(fullscreen: Boolean) {
+        _isTvMiniFullscreen.value = fullscreen
+    }
+
     // Simulated active player states
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
@@ -609,11 +617,27 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val snapshotCategory = currentCategory
         val snapshotQuery = currentQuery
         val snapshotPage = currentPage + 1
+        val snapshotChannelView = _isChannelView.value
+        val snapshotChannelActiveTab = _channelActiveTab.value
         
         viewModelScope.launch {
             _isMoreLoading.value = true
             try {
-                val newVideos = if (snapshotEndpoint != null) {
+                val newVideos = if (snapshotChannelView) {
+                    val channelIdRaw = _currentChannelVideo.value?.id?.substringAfter("channel_")?.substringBefore("__") ?: ""
+                    val endpoint = if (snapshotChannelActiveTab == "Видео") {
+                        snapshotEndpoint ?: "https://rutube.ru/api/video/person/$channelIdRaw/"
+                    } else {
+                        "https://rutube.ru/api/playlist/user/$channelIdRaw/"
+                    }
+                    val cleanEndpoint = toRutubeApiUrl(endpoint)
+                    val separator = if (cleanEndpoint.contains("?")) "&" else "?"
+                    val url = "${cleanEndpoint}${separator}format=json&page=$snapshotPage"
+                    val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                    val response = apiService.getDynamicUrl(url)
+                    val bodyStr = response.string()
+                    repository.parseVideoListJson(bodyStr, snapshotCategory ?: "Фильмы")
+                } else if (snapshotEndpoint != null) {
                     val cleanEndpoint = toRutubeApiUrl(snapshotEndpoint)
                     val separator = if (cleanEndpoint.contains("?")) "&" else "?"
                     val url = "${cleanEndpoint}${separator}format=json&page=$snapshotPage"
@@ -629,7 +653,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     isEndReached = true
                 } else {
                     currentPage = snapshotPage
-                    _dynamicVideos.value = (_dynamicVideos.value + newVideos).distinctBy { it.id }
+                    if (snapshotChannelView) {
+                        if (snapshotChannelActiveTab == "Видео") {
+                            _channelVideos.value = (_channelVideos.value + newVideos).distinctBy { it.id }
+                        } else {
+                            _channelPlaylists.value = (_channelPlaylists.value + newVideos).distinctBy { it.id }
+                        }
+                    } else {
+                        _dynamicVideos.value = (_dynamicVideos.value + newVideos).distinctBy { it.id }
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("VideoViewModel", "Error loading next page", e)
@@ -999,7 +1031,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 _channelActiveTab.value = "Видео"
                 selectTab("home")
                 currentPage = 1
-                isEndReached = true
+                isEndReached = false
 
                 launch {
                     _isLoading.value = true
