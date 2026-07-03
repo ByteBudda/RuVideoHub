@@ -218,7 +218,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val channelVideos: List<Video> = emptyList(),
         val channelPlaylists: List<Video> = emptyList(),
         val channelActiveTab: String = "Видео",
-        val dynamicVideos: List<Video> = emptyList()
+        val dynamicVideos: List<Video> = emptyList(),
+        val currentPage: Int = 1,
+        val isEndReached: Boolean = false,
+        val currentQuery: String? = null,
+        val currentCategory: String? = null,
+        val currentActiveApiEndpoint: String? = null
     )
 
     private val navHistory = java.util.Stack<NavigationSnapshot>()
@@ -236,7 +241,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             channelVideos = _channelVideos.value,
             channelPlaylists = _channelPlaylists.value,
             channelActiveTab = _channelActiveTab.value,
-            dynamicVideos = _dynamicVideos.value
+            dynamicVideos = _dynamicVideos.value,
+            currentPage = currentPage,
+            isEndReached = isEndReached,
+            currentQuery = currentQuery,
+            currentCategory = currentCategory,
+            currentActiveApiEndpoint = currentActiveApiEndpoint
         )
         if (navHistory.isEmpty() || navHistory.peek() != currentSnapshot) {
             navHistory.push(currentSnapshot)
@@ -274,6 +284,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _channelPlaylists.value = last.channelPlaylists
             _channelActiveTab.value = last.channelActiveTab
             _dynamicVideos.value = last.dynamicVideos
+            
+            currentPage = last.currentPage
+            isEndReached = last.isEndReached
+            currentQuery = last.currentQuery
+            currentCategory = last.currentCategory
+            currentActiveApiEndpoint = last.currentActiveApiEndpoint
 
             return true
         }
@@ -1560,7 +1576,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             add("[VK Загрузчик] Начат прямой сбор потока VK...")
         }
         
-        fun updateDl(progress: Float, speed: String, status: String, completed: Boolean) {
+        fun updateDl(progress: Float, speed: String, etaStr: String, status: String) {
             val currentDl = YtDlpDownload(
                 id = id,
                 title = video.title,
@@ -1568,7 +1584,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 thumbnailUrl = video.thumbnailUrl,
                 progress = progress,
                 speed = speed,
-                eta = if (completed) "00:00" else "--:--",
+                eta = etaStr,
                 status = status,
                 logs = logs.toList()
             )
@@ -1577,7 +1593,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        updateDl(0f, "0 B/s", "Downloading", false)
+        updateDl(0f, "0 B/s", "--:--", "Downloading")
         
         val cachedStreamUrl = _masterUrlCache[id] ?: _streamUrlCache[id] ?: ""
         val videoUrl = if (cachedStreamUrl.isNotBlank()) {
@@ -1597,12 +1613,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
         if (videoUrl.isBlank()) {
             logs.add("[VK Загрузчик] Ошибка: ссылка на поток не найдена!")
-            updateDl(0f, "0 B/s", "Error", false)
+            updateDl(0f, "0 B/s", "--:--", "Error")
+            delay(5000)
+            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             return
         }
 
         logs.add("[VK Загрузчик] Начинается скачивание...")
-        updateDl(0.01f, "0 B/s", "Downloading", false)
+        updateDl(0.01f, "0 B/s", "--:--", "Downloading")
 
         val downloadFolder = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         val targetFile = File(downloadFolder, "$id.mp4")
@@ -1610,30 +1628,37 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val success = com.example.data.vk.VkVideoLoader.downloadVideo(
             videoUrl = videoUrl,
             targetFile = targetFile,
-            onProgress = { progress, speed ->
+            onProgress = { progress, speed, etaStr ->
                 if ((progress * 100).toInt() % 10 == 0) {
-                    logs.add("[VK Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed)")
+                    logs.add("[VK Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed) ETA: $etaStr")
                 }
-                updateDl(progress, speed, "Downloading", false)
+                updateDl(progress, speed, etaStr, "Downloading")
             }
         )
 
         if (success) {
             try {
                 logs.add("[VK Загрузчик] Файл сохранен в ${targetFile.absolutePath}")
-                updateDl(1f, "0 B/s", "Finished", true)
+                updateDl(1f, "0 B/s", "00:00", "Finished")
                 
                 repository.toggleDownload(video)
                 if (_currentSelectedVideo.value?.id == id) {
                     _currentSelectedVideo.value = _currentSelectedVideo.value?.copy(isDownloaded = true)
                 }
+                
+                delay(3000)
+                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             } catch (e: Exception) {
                 logs.add("[VK Загрузчик] Ошибка сохранения файла: ${e.message}")
-                updateDl(0f, "0 B/s", "Error", false)
+                updateDl(0f, "0 B/s", "--:--", "Error")
+                delay(5000)
+                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
             }
         } else {
             logs.add("[VK Загрузчик] Ошибка скачивания видео!")
-            updateDl(0f, "0 B/s", "Error", false)
+            updateDl(0f, "0 B/s", "--:--", "Error")
+            delay(5000)
+            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
         }
     }
 
@@ -1657,6 +1682,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } finally {
                 downloadJobs.remove(video.id)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(video.id) }
+                }
             }
         }
         downloadJobs[video.id] = job
