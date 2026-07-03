@@ -172,59 +172,71 @@ object VkVideoLoader {
     // --- СКАЧИВАНИЕ ВИДЕО (если HLS) ---
     suspend fun downloadVideo(
         videoUrl: String,
+        targetFile: java.io.File,
         onProgress: (Float, String) -> Unit
-    ): ByteArray? = withContext(Dispatchers.IO) {
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
             // Если это HLS плейлист
             if (videoUrl.contains(".m3u8")) {
-                return@withContext downloadHlsVideo(videoUrl, onProgress)
+                return@withContext downloadHlsVideo(videoUrl, targetFile, onProgress)
             } else {
                 // Прямая загрузка MP4
-                return@withContext downloadMp4Video(videoUrl, onProgress)
+                return@withContext downloadMp4Video(videoUrl, targetFile, onProgress)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Download error: ${e.message}")
-            return@withContext null
+            false
         }
     }
 
     private suspend fun downloadMp4Video(
         url: String,
+        targetFile: java.io.File,
         onProgress: (Float, String) -> Unit
-    ): ByteArray? = withContext(Dispatchers.IO) {
+    ): Boolean = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", USER_AGENT)
             .header("Referer", "https://vk.com/")
             .build()
 
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@withContext null
-            
-            val body = response.body ?: return@withContext null
-            val totalBytes = body.contentLength()
-            val inputStream = body.byteStream()
-            
-            val outputStream = java.io.ByteArrayOutputStream()
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            var downloaded = 0L
-            
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                outputStream.write(buffer, 0, bytesRead)
-                downloaded += bytesRead
-                
-                if (totalBytes > 0) {
-                    val progress = downloaded.toFloat() / totalBytes
-                    val speed = String.format("%.1f MB/s", downloaded / 1024.0 / 1024.0)
-                    onProgress(progress, speed)
-                } else {
-                    val speed = String.format("%.1f MB", downloaded / 1024.0 / 1024.0)
-                    onProgress(0.5f, speed)
-                }
+        try {
+            targetFile.parentFile?.mkdirs()
+            if (targetFile.exists()) {
+                targetFile.delete()
             }
-            
-            return@withContext outputStream.toByteArray()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext false
+                
+                val body = response.body ?: return@withContext false
+                val totalBytes = body.contentLength()
+                val inputStream = body.byteStream()
+                
+                targetFile.outputStream().use { outputStream ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    var downloaded = 0L
+                    
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                        downloaded += bytesRead
+                        
+                        if (totalBytes > 0) {
+                            val progress = downloaded.toFloat() / totalBytes
+                            val speed = String.format("%.1f MB/s", downloaded / 1024.0 / 1024.0)
+                            onProgress(progress, speed)
+                        } else {
+                            val speed = String.format("%.1f MB", downloaded / 1024.0 / 1024.0)
+                            onProgress(0.5f, speed)
+                        }
+                    }
+                }
+                return@withContext true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "MP4 download error: ${e.message}")
+            false
         }
     }
 
@@ -253,8 +265,9 @@ object VkVideoLoader {
 
     private suspend fun downloadHlsVideo(
         masterUrl: String,
+        targetFile: java.io.File,
         onProgress: (Float, String) -> Unit
-    ): ByteArray? = withContext(Dispatchers.IO) {
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Starting HLS download from masterUrl: $masterUrl")
             // 1. Получаем мастер плейлист
@@ -267,9 +280,9 @@ object VkVideoLoader {
             val masterText = httpClient.newCall(masterRequest).execute().use { response ->
                 if (!response.isSuccessful) {
                     Log.e(TAG, "Failed to fetch master playlist, code: ${response.code}")
-                    return@withContext null
+                    return@withContext false
                 }
-                response.body?.string() ?: return@withContext null
+                response.body?.string() ?: return@withContext false
             }
             
             // 2. Ищем плейлист с наилучшим качеством
@@ -307,7 +320,7 @@ object VkVideoLoader {
 
             if (selectedUrl == null) {
                 Log.e(TAG, "Could not find any playlist stream URL in master playlist")
-                return@withContext null
+                return@withContext false
             }
             
             val fullPlaylistUrl = resolveUrl(masterUrl, selectedUrl)
@@ -323,9 +336,9 @@ object VkVideoLoader {
             val playlistText = httpClient.newCall(playlistRequest).execute().use { response ->
                 if (!response.isSuccessful) {
                     Log.e(TAG, "Failed to fetch stream playlist, code: ${response.code}")
-                    return@withContext null
+                    return@withContext false
                 }
-                response.body?.string() ?: return@withContext null
+                response.body?.string() ?: return@withContext false
             }
             
             // 4. Получаем список сегментов
@@ -335,58 +348,70 @@ object VkVideoLoader {
             
             if (segments.isEmpty()) {
                 Log.e(TAG, "Parsed segments list is empty")
-                return@withContext null
+                return@withContext false
             }
             
             Log.d(TAG, "Found ${segments.size} segments to download")
             
             // 5. Скачиваем сегменты
-            val outputStream = java.io.ByteArrayOutputStream()
+            targetFile.parentFile?.mkdirs()
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+
             var downloaded = 0
             val total = segments.size
-            
-            for (segment in segments) {
-                val segmentUrl = resolveUrl(fullPlaylistUrl, segment)
-                
-                val segmentRequest = Request.Builder()
-                    .url(segmentUrl)
-                    .header("User-Agent", USER_AGENT)
-                    .header("Referer", "https://vk.com/")
-                    .build()
-                
-                var success = false
-                var attempts = 0
-                while (!success && attempts < 3) {
-                    attempts++
-                    try {
-                        httpClient.newCall(segmentRequest).execute().use { response ->
-                            if (response.isSuccessful) {
-                                val data = response.body?.bytes() ?: byteArrayOf()
-                                outputStream.write(data)
-                                success = true
-                            } else {
-                                Log.e(TAG, "Failed to download segment, code: ${response.code}, attempt: $attempts")
+            var totalDownloadedBytes = 0L
+
+            targetFile.outputStream().use { outputStream ->
+                for (segment in segments) {
+                    val segmentUrl = resolveUrl(fullPlaylistUrl, segment)
+                    
+                    val segmentRequest = Request.Builder()
+                        .url(segmentUrl)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Referer", "https://vk.com/")
+                        .build()
+                    
+                    var success = false
+                    var attempts = 0
+                    while (!success && attempts < 3) {
+                        attempts++
+                        try {
+                            httpClient.newCall(segmentRequest).execute().use { response ->
+                                if (response.isSuccessful) {
+                                    val body = response.body
+                                    if (body != null) {
+                                        val inputStream = body.byteStream()
+                                        val buffer = ByteArray(8192)
+                                        var bytesRead: Int
+                                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                            outputStream.write(buffer, 0, bytesRead)
+                                            totalDownloadedBytes += bytesRead
+                                        }
+                                    }
+                                    success = true
+                                } else {
+                                    Log.e(TAG, "Failed to download segment, code: ${response.code}, attempt: $attempts")
+                                }
                             }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Segment download exception: ${e.message}, attempt: $attempts")
-                        if (attempts >= 3) {
-                            // Continue to next segment rather than failing entire download if possible
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Segment download exception: ${e.message}, attempt: $attempts")
                         }
                     }
+                    
+                    downloaded++
+                    val progress = downloaded.toFloat() / total
+                    val speed = String.format("%.1f MB (%.1f%%)", totalDownloadedBytes / 1024.0 / 1024.0, progress * 100)
+                    onProgress(progress, speed)
                 }
-                
-                downloaded++
-                val progress = downloaded.toFloat() / total
-                val speed = String.format("%.1f%%", progress * 100)
-                onProgress(progress, speed)
             }
             
-            Log.d(TAG, "HLS stream downloaded successfully, size: ${outputStream.size()} bytes")
-            return@withContext outputStream.toByteArray()
+            Log.d(TAG, "HLS stream downloaded successfully, size: $totalDownloadedBytes bytes")
+            return@withContext true
         } catch (e: Exception) {
             Log.e(TAG, "HLS download error: ${e.message}")
-            return@withContext null
+            false
         }
     }
 
