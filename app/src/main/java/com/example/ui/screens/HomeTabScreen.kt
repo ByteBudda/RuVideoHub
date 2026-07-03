@@ -1607,3 +1607,7 @@ fun SleekSearchChannelItem(
     }
 }
 
+       )
+    }
+}
+

@@ -119,8 +119,7 @@ fun SleekVideoHubApp(
     AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
         if (isTvOptimized) {
             Row(modifier = Modifier.fillMaxSize()) {
-                val isTvMiniFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
-                val shouldShowSidebar = (currentSelectedVideo == null || currentTab == "tv_mini") && !isTvMiniFullscreen
+                val shouldShowSidebar = currentSelectedVideo == null && currentTab != "tv_mini"
                 if (shouldShowSidebar) {
                     SleekTvNavigationRail(
                         selectedTab = currentTab,
@@ -439,6 +438,15 @@ fun SleekTvNavigationRail(
                         fontSize = 9.sp,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                         color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+ else GreyText,
                         maxLines = 1
                     )
                 }

@@ -56,12 +56,18 @@ fun TvMiniPlayerScreen(
     }
 
     var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
-    var localIsFullscreen by remember { mutableStateOf(false) }
+    val localIsFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.setTvMiniFullscreen(false)
+        }
+    }
 
     // D-pad back handler
     androidx.activity.compose.BackHandler(enabled = true) {
         if (localIsFullscreen) {
-            localIsFullscreen = false
+            viewModel.setTvMiniFullscreen(false)
         } else {
             viewModel.selectVideo(null)
             if (!viewModel.navigateBack()) {
@@ -83,7 +89,7 @@ fun TvMiniPlayerScreen(
                 videoTitle = currentVideo!!.title,
                 aspectMode = selectedAspectRatio,
                 isFullscreen = true,
-                onToggleFullscreen = { localIsFullscreen = false },
+                onToggleFullscreen = { viewModel.setTvMiniFullscreen(false) },
                 onChangeAspectRatio = { selectedAspectRatio = it },
                 onShare = { shareVideo(context, currentVideo!!) },
                 modifier = Modifier.fillMaxSize()
@@ -234,7 +240,7 @@ fun TvMiniPlayerScreen(
                             videoTitle = currentVideo!!.title,
                             aspectMode = selectedAspectRatio,
                             isFullscreen = false,
-                            onToggleFullscreen = { localIsFullscreen = true },
+                            onToggleFullscreen = { viewModel.setTvMiniFullscreen(true) },
                             onChangeAspectRatio = { selectedAspectRatio = it },
                             onShare = { shareVideo(context, currentVideo!!) },
                             modifier = Modifier.fillMaxSize()
@@ -270,7 +276,7 @@ fun TvMiniPlayerScreen(
                         
                         // Full Screen Button
                         Button(
-                            onClick = { localIsFullscreen = true },
+                            onClick = { viewModel.setTvMiniFullscreen(true) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF2C2A3A),
                                 contentColor = Color.White
