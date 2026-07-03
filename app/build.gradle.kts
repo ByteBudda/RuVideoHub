@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-  namespace = "com.bytebudda"
+  namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.ruvideohub.zmpqyq"
+    applicationId = "com.bytebudda"
     minSdk = 24
     targetSdk = 36
     versionCode = 3
@@ -88,7 +88,6 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
-  implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.ui)
   implementation(libs.androidx.media3.exoplayer.hls)
