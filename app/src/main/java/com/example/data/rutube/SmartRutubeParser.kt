@@ -9,12 +9,6 @@ import java.util.regex.Pattern
 
 /**
  * SMART RUTUBE PARSER V2 — AI-парсер с эвристическим пониманием схемы
- *
- * Принцип: не полагаться на жёсткие имена полей, а "понимать" JSON по:
- *  1. Сигнатуре объекта (какие поля присутствуют и их типы)
- *  2. Значениям полей (URL картинки, длительность в секундах, счётчики)
- *  3. Контексту эндпоинта (что ожидать от /search/ vs /feeds/)
- *  4. Рекурсивному поиску массивов карточек на любой глубине
  */
 object SmartRutubeParser {
 
@@ -27,10 +21,6 @@ object SmartRutubeParser {
 
     // ==================== SELF-LEARNING CACHE ====================
 
-    /**
-     * Кэш сопоставлений: endpointPattern -> (jsonPath -> FieldMapping)
-     * Позволяет "запоминать" структуру конкретных эндпоинтов
-     */
     private val fieldLearningCache = ConcurrentHashMap<String, MutableMap<String, FieldMapping>>()
     private val schemaSignatureCache = ConcurrentHashMap<String, EntitySignature>()
 
@@ -53,7 +43,7 @@ object SmartRutubeParser {
         VIDEO_DETAIL, CHANNEL_DETAIL, PLAYLIST_DETAIL, TV_DETAIL, UNKNOWN
     }
 
-    // ==================== PAID CONTENT DETECTION (enhanced) ====================
+    // ==================== PAID CONTENT DETECTION ====================
 
     private val PAID_PARTNERS = setOf(
         "PREMIER", "START", "IVI", "KION", "MORE.TV", "OKKO", "WINK", "AMEDIATEKA",
@@ -81,28 +71,24 @@ object SmartRutubeParser {
 
     // ==================== HEURISTIC VALUE ANALYZER ====================
 
-    /**
-     * Анализирует ЗНАЧЕНИЕ поля и определяет, что это за каноническое поле.
-     * Работает независимо от имени поля!
-     */
     object HeuristicValueAnalyzer {
 
-        // Паттерны для определения типа по значению
+        // Паттерны для определения типа по значению — ИСПРАВЛЕНЫ
         private val THUMBNAIL_PATTERNS = listOf(
-            Pattern.compile("https?://.*\.(jpg|jpeg|png|webp|gif)(\?.*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("https?://.*\\.(jpg|jpeg|png|webp|gif)(\\?.*)?$", Pattern.CASE_INSENSITIVE),
             Pattern.compile("https?://.*thumb.*", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("https?://.*pic\.rtbcdn.*", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("https?://.*pic\\.rtbcdn.*", Pattern.CASE_INSENSITIVE),
             Pattern.compile("https?://.*poster.*", Pattern.CASE_INSENSITIVE)
         )
 
         private val VIDEO_URL_PATTERNS = listOf(
-            Pattern.compile("https?://.*rutube\.ru/video/[a-f0-9]+.*", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("https?://.*rutube\.ru/shorts/[a-f0-9]+.*", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("https?://.*rutube\\.ru/video/[a-f0-9]+.*", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("https?://.*rutube\\.ru/shorts/[a-f0-9]+.*", Pattern.CASE_INSENSITIVE)
         )
 
-        private val DURATION_PATTERN = Pattern.compile("^\d+(:\d+)+$")
-        private val ISO_DATE_PATTERN = Pattern.compile("^\d{4}-\d{2}-\d{2}.*")
-        private val RUTUBE_DATE_PATTERN = Pattern.compile("^\d{4}-\d{2}-\d{2}T\d{2}:")
+        private val DURATION_PATTERN = Pattern.compile("^\\d+(:\\d+)+$")
+        private val ISO_DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}.*")
+        private val RUTUBE_DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:")
 
         fun analyzeValue(key: String, value: Any?, parentContext: JSONObject? = null): List<FieldGuess> {
             val guesses = mutableListOf<FieldGuess>()
@@ -111,9 +97,7 @@ object SmartRutubeParser {
             val strValue = value.toString()
             val keyLower = key.lowercase()
 
-            // 1. Анализ строковых значений
             if (value is String && strValue.isNotBlank()) {
-                // Thumbnail / Image
                 if (THUMBNAIL_PATTERNS.any { it.matcher(strValue).matches() }) {
                     val confidence = when {
                         keyLower.contains("thumb") || keyLower.contains("pic") ||
@@ -125,33 +109,28 @@ object SmartRutubeParser {
                     guesses.add(FieldGuess("thumbnail", confidence, "url_pattern_match"))
                 }
 
-                // Video URL / ID
                 if (VIDEO_URL_PATTERNS.any { it.matcher(strValue).matches() }) {
                     guesses.add(FieldGuess("video_url", 0.9, "rutube_video_pattern"))
                 }
 
-                // Duration string (e.g. "12:34")
                 if (DURATION_PATTERN.matcher(strValue).matches()) {
                     val confidence = if (keyLower.contains("duration") || keyLower.contains("length")) 0.95 else 0.7
                     guesses.add(FieldGuess("duration", confidence, "duration_format"))
                 }
 
-                // Date
                 if (RUTUBE_DATE_PATTERN.matcher(strValue).matches() || ISO_DATE_PATTERN.matcher(strValue).matches()) {
                     val confidence = if (keyLower.contains("date") || keyLower.contains("created") ||
                                        keyLower.contains("published") || keyLower.contains("time")) 0.95 else 0.7
                     guesses.add(FieldGuess("created", confidence, "date_format"))
                 }
 
-                // Title (короткая строка без спецсимволов, часто в начале объекта)
                 if (strValue.length in 3..200 && !strValue.startsWith("http") &&
-                    !strValue.matches(Regex("^\d+$"))) {
+                    !strValue.matches(Regex("^\\d+$"))) {
                     val confidence = if (keyLower.contains("title") || keyLower.contains("name") ||
                                        keyLower.contains("heading")) 0.9 else 0.4
                     guesses.add(FieldGuess("title", confidence, "text_heuristic"))
                 }
 
-                // Description (длинная строка)
                 if (strValue.length > 50) {
                     val confidence = if (keyLower.contains("desc") || keyLower.contains("about") ||
                                        keyLower.contains("content")) 0.9 else 0.45
@@ -159,46 +138,38 @@ object SmartRutubeParser {
                 }
             }
 
-            // 2. Анализ числовых значений
             if (value is Number) {
                 val num = value.toLong()
                 val dbl = value.toDouble()
 
-                // Views / Counters (большие числа > 100)
                 if (num > 100) {
                     val confidence = if (keyLower.contains("view") || keyLower.contains("hit") ||
                                        keyLower.contains("watch") || keyLower.contains("count")) 0.9 else 0.5
                     guesses.add(FieldGuess("views", confidence, "large_number"))
                 }
 
-                // Subscribers (средние числа, часто рядом с именем автора)
                 if (num > 10 && parentContext?.has("avatar") == true) {
                     val confidence = if (keyLower.contains("sub") || keyLower.contains("follow")) 0.95 else 0.55
                     guesses.add(FieldGuess("subscribers", confidence, "number_with_avatar"))
                 }
 
-                // Duration in seconds (обычно < 86400)
                 if (dbl > 0 && dbl < 86400 && (keyLower.contains("duration") || keyLower.contains("length"))) {
                     guesses.add(FieldGuess("duration_seconds", 0.95, "duration_numeric"))
                 }
 
-                // Seasons count (обычно 1-50)
                 if (num in 1..50 && (keyLower.contains("season") || keyLower.contains("seas"))) {
                     guesses.add(FieldGuess("seasons_count", 0.95, "seasons_numeric"))
                 }
 
-                // Year (1900-2030)
                 if (num in 1900..2030 && (keyLower.contains("year") || keyLower.contains("release"))) {
                     guesses.add(FieldGuess("year", 0.95, "year_numeric"))
                 }
 
-                // Rating (0.0 - 10.0)
                 if (dbl in 0.0..10.0 && (keyLower.contains("rating") || keyLower.contains("score") || keyLower.contains("rate"))) {
                     guesses.add(FieldGuess("rating", 0.9, "rating_numeric"))
                 }
             }
 
-            // 3. Анализ по имени ключа (fallback, но с высоким весом если имя точное)
             when {
                 keyLower in listOf("id", "code", "uuid", "video_id", "content_id") ->
                     guesses.add(FieldGuess("id", 0.9, "exact_key_name"))
@@ -236,10 +207,6 @@ object SmartRutubeParser {
 
     // ==================== SCHEMA SIGNATURE BUILDER ====================
 
-    /**
-     * Строит "сигнатуру" JSON-объекта — набор канонических полей с confidence.
-     * Это позволяет понять, что за сущность перед нами, даже если имена полей неизвестны.
-     */
     object SchemaAnalyzer {
 
         fun buildSignature(obj: JSONObject, depth: Int = 0): EntitySignature {
@@ -253,23 +220,19 @@ object SmartRutubeParser {
                 val key = keys.next()
                 val value = obj.opt(key)
 
-                // Анализируем значение эвристически
                 val guesses = HeuristicValueAnalyzer.analyzeValue(key, value, obj)
                 for (guess in guesses) {
                     fieldMap.getOrPut(guess.canonicalField) { mutableListOf() }
                         .add(FieldConfidence(guess.confidence, key, guess.reason))
                 }
 
-                // Ищем вложенные массивы (потенциальные списки карточек)
                 if (value is JSONArray && value.length() > 0) {
-                    // Проверим, является ли это массивом объектов
                     if (value.length() > 0 && value.optJSONObject(0) != null) {
                         nestedArrays.add(key)
                     }
                 }
             }
 
-            // Выбираем лучший confidence для каждого канонического поля
             val bestFields = fieldMap.mapValues { (_, confidences) ->
                 confidences.maxByOrNull { it.confidence } ?: FieldConfidence(0.0, "", "")
             }
@@ -281,7 +244,6 @@ object SmartRutubeParser {
             val fields = signature.fields
             val has = { key: String -> (fields[key]?.confidence ?: 0.0) > FIELD_CONFIDENCE_THRESHOLD }
 
-            // Определяем по URL
             val urlLower = url?.lowercase() ?: ""
             when {
                 urlLower.contains("/search/") -> return EntityType.VIDEO_LIST
@@ -292,7 +254,6 @@ object SmartRutubeParser {
                 urlLower.contains("/playlist/") -> return EntityType.PLAYLIST
             }
 
-            // Определяем по сигнатуре полей
             return when {
                 has("duration") && has("thumbnail") && has("title") && !has("seasons") && !has("subscribers") -> EntityType.VIDEO_ITEM
                 has("seasons") && has("title") -> EntityType.TV_SERIES
@@ -316,18 +277,11 @@ object SmartRutubeParser {
         val reason: String
     )
 
-    // ==================== ADAPTIVE EXTRACTOR V2 ====================
+    // ==================== ADAPTIVE EXTRACTOR ====================
 
-    object AdaptiveExtractorV2 {
+    object AdaptiveExtractor {
 
-        /**
-         * Извлекает значение по каноническому имени, используя:
-         * 1. Кэш обучения для этого эндпоинта
-         * 2. Эвристический анализ всех полей объекта
-         * 3. Точные алиасы как fallback
-         */
         fun extract(obj: JSONObject, canonicalField: String, endpointHint: String? = null): ExtractedValue? {
-            // Пробуем кэш обучения
             if (endpointHint != null) {
                 val cached = fieldLearningCache[endpointHint]?.get(canonicalField)
                 if (cached != null) {
@@ -338,17 +292,14 @@ object SmartRutubeParser {
                 }
             }
 
-            // Эвристический анализ всех полей
             val signature = SchemaAnalyzer.buildSignature(obj)
             val bestField = signature.fields[canonicalField]
             if (bestField != null && bestField.confidence > FIELD_CONFIDENCE_THRESHOLD) {
                 val raw = obj.opt(bestField.sourceKey)
                 if (raw != null && raw.toString().isNotBlank() && raw.toString() != "null") {
-                    // Сохраняем в кэш обучения
                     if (endpointHint != null) {
                         val endpointCache = fieldLearningCache.getOrPut(endpointHint) { mutableMapOf() }
                         endpointCache[canonicalField] = FieldMapping(canonicalField, bestField.confidence, bestField.sourceKey)
-                        // Ограничиваем размер кэша
                         if (endpointCache.size > LEARNING_CACHE_SIZE) {
                             endpointCache.entries.iterator().next().also { endpointCache.remove(it.key) }
                         }
@@ -357,7 +308,6 @@ object SmartRutubeParser {
                 }
             }
 
-            // Fallback на стандартные алиасы V1
             return extractViaAliases(obj, canonicalField)
         }
 
@@ -379,14 +329,12 @@ object SmartRutubeParser {
             }
 
             for (alias in aliases) {
-                // Прямой ключ
                 if (obj.has(alias)) {
                     val value = obj.opt(alias)
                     if (value != null && value.toString().isNotBlank() && value.toString() != "null") {
                         return ExtractedValue(value, 0.6, "alias_fallback")
                     }
                 }
-                // Вложенный путь через точку
                 if (alias.contains(".")) {
                     val parts = alias.split(".")
                     var current: Any? = obj
@@ -476,10 +424,6 @@ object SmartRutubeParser {
 
     // ==================== RECURSIVE CARD FINDER ====================
 
-    /**
-     * Рекурсивно ищет массивы объектов-карточек на любой глубине.
-     * Использует эвристики: предпочитает массивы объектов с полями title/thumbnail/id.
-     */
     object RecursiveCardFinder {
 
         fun findCardArrays(json: JSONObject, depth: Int = 0): List<JSONArray> {
@@ -488,8 +432,6 @@ object SmartRutubeParser {
             val visited = mutableSetOf<String>()
 
             findRecursive(json, depth, results, visited)
-
-            // Сортируем по "качеству" массива (чем больше объектов с title/thumbnail, тем лучше)
             return results.sortedByDescending { scoreArray(it) }
         }
 
@@ -509,11 +451,9 @@ object SmartRutubeParser {
                         val value = obj.opt(key)
 
                         if (value is JSONArray && value.length() > 0) {
-                            // Проверяем, похож ли массив на список карточек
                             if (looksLikeCardArray(value)) {
                                 results.add(value)
                             } else {
-                                // Иначе рекурсивно ищем внутри
                                 for (i in 0 until value.length()) {
                                     findRecursive(value.opt(i), depth + 1, results, visited)
                                 }
@@ -533,13 +473,11 @@ object SmartRutubeParser {
 
         private fun looksLikeCardArray(arr: JSONArray): Boolean {
             if (arr.length() == 0) return false
-            // Проверяем первые 3 элемента
             val sampleSize = minOf(arr.length(), 3)
             var score = 0
             for (i in 0 until sampleSize) {
                 val obj = arr.optJSONObject(i) ?: continue
                 val sig = SchemaAnalyzer.buildSignature(obj)
-                // Если есть title + (thumbnail или id) — это карточки
                 val hasTitle = (sig.fields["title"]?.confidence ?: 0.0) > 0.5
                 val hasThumb = (sig.fields["thumbnail"]?.confidence ?: 0.0) > 0.5
                 val hasId = (sig.fields["id"]?.confidence ?: 0.0) > 0.5
@@ -564,13 +502,12 @@ object SmartRutubeParser {
         }
     }
 
-    // ==================== PAID CONTENT DETECTOR V2 ====================
+    // ==================== PAID CONTENT DETECTOR ====================
 
-    object PaidContentDetectorV2 {
+    object PaidContentDetector {
 
         fun check(json: JSONObject, endpointHint: String? = null): PaidCheck {
-            // 1. Коды подписки (высший приоритет)
-            val subCodes = AdaptiveExtractorV2.getArray(json, "common_subscription_product_codes", endpointHint)
+            val subCodes = AdaptiveExtractor.getArray(json, "common_subscription_product_codes", endpointHint)
             if (subCodes != null && subCodes.length() > 0) {
                 val codes = (0 until subCodes.length()).map { subCodes.optString(it) }
                 val paidCode = codes.find { code ->
@@ -582,11 +519,10 @@ object SmartRutubeParser {
                 }
             }
 
-            // 2. Партнёры в авторе/названии фида
-            val authorName = AdaptiveExtractorV2.getString(json, "author", endpointHint)
-            val feedName = AdaptiveExtractorV2.getString(json, "feed_name", endpointHint)
-            val title = AdaptiveExtractorV2.getString(json, "title", endpointHint).lowercase()
-            val desc = AdaptiveExtractorV2.getString(json, "description", endpointHint).lowercase()
+            val authorName = AdaptiveExtractor.getString(json, "author", endpointHint)
+            val feedName = AdaptiveExtractor.getString(json, "feed_name", endpointHint)
+            val title = AdaptiveExtractor.getString(json, "title", endpointHint).lowercase()
+            val desc = AdaptiveExtractor.getString(json, "description", endpointHint).lowercase()
 
             for (partner in PAID_PARTNERS) {
                 if (authorName.contains(partner, ignoreCase = true) ||
@@ -595,28 +531,23 @@ object SmartRutubeParser {
                 }
             }
 
-            // 3. Прямой флаг
             if (json.optBoolean("is_paid", false)) {
                 return PaidCheck(true, "is_paid flag", 0.92)
             }
 
-            // 4. UMA контент
             if (json.optString("origin_type") == "uma") {
                 return PaidCheck(true, "UMA origin", 0.6)
             }
 
-            // 5. Лицензионный + официальный
             if (json.optBoolean("is_licensed", false) && json.optBoolean("is_official", false)) {
                 return PaidCheck(true, "Licensed official", 0.65)
             }
 
-            // 6. Ключевые слова
             if (PAID_KEYWORDS.any { title.contains(it) || desc.contains(it) }) {
                 return PaidCheck(true, "Paid keywords", 0.85)
             }
 
-            // 7. Короткий трейлер сериала
-            val duration = AdaptiveExtractorV2.getDouble(json, "duration", endpointHint, 0.0)
+            val duration = AdaptiveExtractor.getDouble(json, "duration", endpointHint, 0.0)
             val isTvShow = json.has("seasons_count") || json.optJSONObject("content_type")?.optString("model") == "tv"
             if (isTvShow && duration in 1.0..180.0) {
                 return PaidCheck(true, "Short TV trailer", 0.8)
@@ -641,7 +572,7 @@ object SmartRutubeParser {
         }
     }
 
-    // ==================== NORMALIZED CARDS (same structure, enhanced) ====================
+    // ==================== NORMALIZED CARDS ====================
 
     sealed class NormalizedCard {
         data class VideoCard(
@@ -665,7 +596,7 @@ object SmartRutubeParser {
             val description: String,
             val tags: List<String> = emptyList(),
             val actionUrl: String? = null,
-            val confidence: Double = 1.0 // уверенность парсера в этой карте
+            val confidence: Double = 1.0
         ) : NormalizedCard()
 
         data class TvSeriesCard(
@@ -721,7 +652,7 @@ object SmartRutubeParser {
             val thumbnail: String?,
             val rawType: String?,
             val actionUrl: String? = null,
-            val extractedFields: Map<String, String> = emptyMap(), // ВСЕ извлечённые поля для отладки
+            val extractedFields: Map<String, String> = emptyMap(),
             val confidence: Double = 0.5
         ) : NormalizedCard()
     }
@@ -731,17 +662,13 @@ object SmartRutubeParser {
     object UniversalNormalizer {
 
         fun normalizeOrNull(json: JSONObject, endpointHint: String? = null): NormalizedCard? {
-            if (PaidContentDetectorV2.shouldExclude(json, endpointHint)) return null
+            if (PaidContentDetector.shouldExclude(json, endpointHint)) return null
 
-            // Определяем, есть ли вложенный объект
             val data = if (json.has("object") && json.optJSONObject("object") != null)
                 json.optJSONObject("object")!! else json
 
-            // Строим сигнатуру и определяем тип
             val signature = SchemaAnalyzer.buildSignature(data)
             val detectedType = SchemaAnalyzer.detectEntityType(signature, endpointHint)
-
-            // Также проверяем content_type.model если есть
             val model = extractModel(json, data)
 
             return when {
@@ -756,7 +683,6 @@ object SmartRutubeParser {
                 detectedType == EntityType.PROMO_GROUP || json.has("button") || json.has("target") || model == "promo" ->
                     normalizePromo(json, endpointHint)
                 else -> {
-                    // Fallback: пытаемся создать UnknownCard с максимумом данных
                     normalizeUnknown(data, signature, endpointHint)
                 }
             }
@@ -779,57 +705,57 @@ object SmartRutubeParser {
         }
 
         private fun normalizeVideo(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.VideoCard {
-            val id = AdaptiveExtractorV2.getString(data, "id", endpointHint)
+            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
                 .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractorV2.getString(data, "code", endpointHint)
+                ?: AdaptiveExtractor.getString(data, "code", endpointHint)
                 ?: makeId("video", data, endpointHint)
 
-            val author = AdaptiveExtractorV2.getObject(data, "author", endpointHint)
-            val authorName = AdaptiveExtractorV2.getString(author ?: data, "title", endpointHint)
+            val author = AdaptiveExtractor.getObject(data, "author", endpointHint)
+            val authorName = AdaptiveExtractor.getString(author ?: data, "title", endpointHint)
                 .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractorV2.getString(data, "feed_name", endpointHint)
+                ?: AdaptiveExtractor.getString(data, "feed_name", endpointHint)
                 ?: "Rutube"
 
-            val viewsCount = AdaptiveExtractorV2.getLong(data, "views", endpointHint)
-            val durationSeconds = AdaptiveExtractorV2.getDouble(data, "duration", endpointHint, -1.0)
-            val paidCheck = PaidContentDetectorV2.check(data, endpointHint)
+            val viewsCount = AdaptiveExtractor.getLong(data, "views", endpointHint)
+            val durationSeconds = AdaptiveExtractor.getDouble(data, "duration", endpointHint, -1.0)
+            val paidCheck = PaidContentDetector.check(data, endpointHint)
 
             val isLive = data.optJSONObject("type")?.optInt("id") == 12
                     || data.optString("type") == "live"
                     || data.optBoolean("is_live", false)
 
             val ageVal = data.optJSONObject("pg_rating")?.opt("age")?.toString() ?: ""
-            val rawRating = AdaptiveExtractorV2.getString(data, "rating", endpointHint).takeIf { it.isNotBlank() }
+            val rawRating = AdaptiveExtractor.getString(data, "rating", endpointHint).takeIf { it.isNotBlank() }
             val ratingWithAge = if (ageVal.isNotBlank() && ageVal != "null") {
                 if (rawRating != null) "$rawRating ($ageVal+)" else "$ageVal+"
             } else rawRating
 
             val actionUrl = normalizeUrl(
-                AdaptiveExtractorV2.getString(data, "absolute_url", endpointHint)
+                AdaptiveExtractor.getString(data, "absolute_url", endpointHint)
                     .takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "url", endpointHint)
+                    ?: AdaptiveExtractor.getString(data, "url", endpointHint)
             )
 
             return NormalizedCard.VideoCard(
                 id = id,
-                title = AdaptiveExtractorV2.getString(data, "title", endpointHint, "Untitled"),
-                thumbnail = AdaptiveExtractorV2.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
-                previewGif = AdaptiveExtractorV2.getString(data, "preview_url", endpointHint).takeIf { it.isNotBlank() },
+                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
+                thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
+                previewGif = AdaptiveExtractor.getString(data, "preview_url", endpointHint).takeIf { it.isNotBlank() },
                 duration = if (isLive) "ЭФИР" else if (durationSeconds > 0) formatDuration(durationSeconds) else "00:00",
                 channelName = authorName,
-                channelId = AdaptiveExtractorV2.getString(author ?: data, "id", endpointHint).takeIf { it.isNotBlank() },
-                channelAvatar = AdaptiveExtractorV2.getString(author ?: data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
+                channelId = AdaptiveExtractor.getString(author ?: data, "id", endpointHint).takeIf { it.isNotBlank() },
+                channelAvatar = AdaptiveExtractor.getString(author ?: data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
                 views = formatCount(viewsCount),
                 rawViews = viewsCount,
-                published = formatDate(AdaptiveExtractorV2.getString(data, "created", endpointHint)),
-                publishedTimestamp = parseTimestamp(AdaptiveExtractorV2.getString(data, "created", endpointHint)),
+                published = formatDate(AdaptiveExtractor.getString(data, "created", endpointHint)),
+                publishedTimestamp = parseTimestamp(AdaptiveExtractor.getString(data, "created", endpointHint)),
                 rating = ratingWithAge,
                 isPaid = paidCheck.isPaid,
                 paidReason = paidCheck.reason.takeIf { paidCheck.isPaid },
                 requiresSubscription = paidCheck.requiresSubscription,
                 partner = paidCheck.partner,
-                description = AdaptiveExtractorV2.getString(data, "description", endpointHint),
-                tags = AdaptiveExtractorV2.getArray(data, "tags", endpointHint)?.let { arr ->
+                description = AdaptiveExtractor.getString(data, "description", endpointHint),
+                tags = AdaptiveExtractor.getArray(data, "tags", endpointHint)?.let { arr ->
                     (0 until arr.length()).mapNotNull { arr.optString(it).takeIf { s -> s.isNotBlank() } }
                 } ?: emptyList(),
                 actionUrl = actionUrl,
@@ -839,24 +765,24 @@ object SmartRutubeParser {
 
         private fun normalizeTvShow(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.TvSeriesCard {
             val actionUrl = normalizeUrl(
-                AdaptiveExtractorV2.getString(data, "absolute_url", endpointHint)
+                AdaptiveExtractor.getString(data, "absolute_url", endpointHint)
                     .takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "url", endpointHint)
+                    ?: AdaptiveExtractor.getString(data, "url", endpointHint)
             )
-            val id = AdaptiveExtractorV2.getString(data, "id", endpointHint)
+            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
                 .takeIf { it.isNotBlank() }
                 ?: makeId("tv", data, endpointHint)
-            val paidCheck = PaidContentDetectorV2.check(data, endpointHint)
+            val paidCheck = PaidContentDetector.check(data, endpointHint)
 
             return NormalizedCard.TvSeriesCard(
                 id = id,
-                title = AdaptiveExtractorV2.getString(data, "title", endpointHint, "Untitled"),
-                originalTitle = AdaptiveExtractorV2.getString(data, "original_title", endpointHint).takeIf { it.isNotBlank() },
-                poster = AdaptiveExtractorV2.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
-                year = AdaptiveExtractorV2.getString(data, "year", endpointHint).takeIf { it.isNotBlank() },
-                rating = AdaptiveExtractorV2.getDouble(data, "rating", endpointHint).takeIf { it > 0 },
-                seasonsCount = AdaptiveExtractorV2.getInt(data, "seasons", endpointHint, 1),
-                description = AdaptiveExtractorV2.getString(data, "description", endpointHint).takeIf { it.isNotBlank() },
+                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
+                originalTitle = AdaptiveExtractor.getString(data, "original_title", endpointHint).takeIf { it.isNotBlank() },
+                poster = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
+                year = AdaptiveExtractor.getString(data, "year", endpointHint).takeIf { it.isNotBlank() },
+                rating = AdaptiveExtractor.getDouble(data, "rating", endpointHint).takeIf { it > 0 },
+                seasonsCount = AdaptiveExtractor.getInt(data, "seasons", endpointHint, 1),
+                description = AdaptiveExtractor.getString(data, "description", endpointHint).takeIf { it.isNotBlank() },
                 isPaid = paidCheck.isPaid,
                 paidReason = paidCheck.reason.takeIf { paidCheck.isPaid },
                 requiresSubscription = paidCheck.requiresSubscription,
@@ -867,45 +793,45 @@ object SmartRutubeParser {
         }
 
         private fun normalizeChannel(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.ChannelCard {
-            val url = AdaptiveExtractorV2.getString(data, "url", endpointHint)
-            var id = AdaptiveExtractorV2.getString(data, "id", endpointHint)
+            val url = AdaptiveExtractor.getString(data, "url", endpointHint)
+            var id = AdaptiveExtractor.getString(data, "id", endpointHint)
             if (id.isBlank()) {
-                val match = Regex("/(?:person|channel)/(\d+)").find(url)
+                val match = Regex("/(?:person|channel)/(\\d+)").find(url)
                 id = match?.groupValues?.get(1) ?: makeId("ch", data, endpointHint)
             }
-            val subsCount = AdaptiveExtractorV2.getLong(data, "subscribers", endpointHint)
+            val subsCount = AdaptiveExtractor.getLong(data, "subscribers", endpointHint)
 
             return NormalizedCard.ChannelCard(
                 id = id,
-                name = AdaptiveExtractorV2.getString(data, "title", endpointHint, "Untitled"),
-                avatar = AdaptiveExtractorV2.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "avatar", endpointHint).takeIf { it.isNotBlank() },
-                description = AdaptiveExtractorV2.getString(data, "description", endpointHint).takeIf { it.isNotBlank() },
+                name = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
+                avatar = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "avatar", endpointHint).takeIf { it.isNotBlank() },
+                description = AdaptiveExtractor.getString(data, "description", endpointHint).takeIf { it.isNotBlank() },
                 subscribers = formatCount(subsCount),
                 rawSubscribers = subsCount,
-                videosCount = AdaptiveExtractorV2.getInt(data, "videos", endpointHint, 0),
+                videosCount = AdaptiveExtractor.getInt(data, "videos", endpointHint, 0),
                 actionUrl = normalizeUrl(url),
                 confidence = sig.fields.values.map { it.confidence }.average().coerceIn(0.0, 1.0)
             )
         }
 
         private fun normalizePlaylist(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.PlaylistCard {
-            val url = AdaptiveExtractorV2.getString(data, "url", endpointHint)
-            val id = AdaptiveExtractorV2.getString(data, "id", endpointHint)
+            val url = AdaptiveExtractor.getString(data, "url", endpointHint)
+            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
                 .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractorV2.getString(data, "playlist_id", endpointHint)
+                ?: AdaptiveExtractor.getString(data, "playlist_id", endpointHint)
                 ?: makeId("playlist", data, endpointHint)
 
-            val vCount = AdaptiveExtractorV2.getInt(data, "videos", endpointHint, 0)
+            val vCount = AdaptiveExtractor.getInt(data, "videos", endpointHint, 0)
                 .takeIf { it > 0 }
                 ?: data.optInt("videos_count", data.optInt("video_count", 0))
 
             return NormalizedCard.PlaylistCard(
                 id = id,
-                title = AdaptiveExtractorV2.getString(data, "title", endpointHint, "Untitled"),
-                thumbnail = AdaptiveExtractorV2.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "image", endpointHint).takeIf { it.isNotBlank() },
+                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
+                thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "image", endpointHint).takeIf { it.isNotBlank() },
                 videosCount = vCount,
                 actionUrl = normalizeUrl(url.takeIf { it.isNotBlank() } ?: "https://rutube.ru/api/playlist/custom/$id/videos/"),
                 confidence = sig.fields.values.map { it.confidence }.average().coerceIn(0.0, 1.0)
@@ -916,36 +842,35 @@ object SmartRutubeParser {
             val button = data.optJSONObject("button")
             val actionUrl = normalizeUrl(
                 button?.optString("button_url")?.takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "target", endpointHint)
-                    ?: AdaptiveExtractorV2.getString(data, "url", endpointHint)
+                    ?: AdaptiveExtractor.getString(data, "target", endpointHint)
+                    ?: AdaptiveExtractor.getString(data, "url", endpointHint)
             )
-            val title = AdaptiveExtractorV2.getString(data, "title", endpointHint, "Untitled")
-            val description = AdaptiveExtractorV2.getString(data, "description", endpointHint)
+            val title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled")
+            val description = AdaptiveExtractor.getString(data, "description", endpointHint)
 
             val checkText = (title + " " + description + " " + actionUrl).lowercase()
             if (isBlockedText(checkText)) return null
 
-            val id = AdaptiveExtractorV2.getString(data, "id", endpointHint)
+            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
                 .takeIf { it.isNotBlank() }
                 ?: makeId("promo", data, endpointHint)
 
             return NormalizedCard.PromoCard(
                 id = id,
                 title = title,
-                thumbnail = AdaptiveExtractorV2.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractorV2.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() },
+                thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() },
                 description = description.takeIf { it.isNotBlank() },
                 actionUrl = actionUrl
             )
         }
 
         private fun normalizeUnknown(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.UnknownCard {
-            val url = AdaptiveExtractorV2.getString(data, "url", endpointHint)
-            val id = AdaptiveExtractorV2.getString(data, "id", endpointHint)
+            val url = AdaptiveExtractor.getString(data, "url", endpointHint)
+            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
                 .takeIf { it.isNotBlank() }
                 ?: makeId("unknown", data, endpointHint)
 
-            // Извлекаем ВСЕ поля для отладки и отображения
             val extractedFields = mutableMapOf<String, String>()
             for (key in data.keys()) {
                 val value = data.opt(key)
@@ -956,8 +881,8 @@ object SmartRutubeParser {
 
             return NormalizedCard.UnknownCard(
                 id = id,
-                title = AdaptiveExtractorV2.getString(data, "title", endpointHint, "Unknown"),
-                thumbnail = AdaptiveExtractorV2.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
+                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Unknown"),
+                thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
                 rawType = data.optJSONObject("type")?.optString("name") ?: data.optString("type", "unknown"),
                 actionUrl = normalizeUrl(url),
                 extractedFields = extractedFields,
@@ -966,23 +891,22 @@ object SmartRutubeParser {
         }
 
         private fun makeId(prefix: String, data: JSONObject, endpointHint: String?): String {
-            val title = AdaptiveExtractorV2.getString(data, "title", endpointHint)
-            val url = AdaptiveExtractorV2.getString(data, "url", endpointHint)
+            val title = AdaptiveExtractor.getString(data, "title", endpointHint)
+            val url = AdaptiveExtractor.getString(data, "url", endpointHint)
             val base = url.takeIf { it.isNotBlank() } ?: title
             val hash = base.hashCode().toString().replace("-", "n")
             return "${prefix}_$hash"
         }
     }
 
-    // ==================== RESPONSE ANALYZER V2 ====================
+    // ==================== RESPONSE ANALYZER ====================
 
-    object ResponseAnalyzerV2 {
+    object ResponseAnalyzer {
 
         fun parse(jsonObj: JSONObject, url: String? = null): ParsedResponse {
             val endpointHint = classifyEndpoint(url)
             val isPromoGroup = endpointHint.contains("promogroup") || url?.contains("/promogroup/") == true
 
-            // 1. Проверяем стандартные паттерны
             if (jsonObj.has("tabs")) {
                 return parseCatalogFeed(jsonObj, endpointHint, isPromoGroup)
             }
@@ -991,7 +915,6 @@ object SmartRutubeParser {
                 return parsePaginatedResponse(jsonObj, endpointHint, isPromoGroup)
             }
 
-            // 2. Проверяем, является ли корень одиночной сущностью
             val rootSig = SchemaAnalyzer.buildSignature(jsonObj)
             val rootType = SchemaAnalyzer.detectEntityType(rootSig, url)
 
@@ -1003,7 +926,6 @@ object SmartRutubeParser {
                 )
             }
 
-            // 3. Рекурсивный поиск карточек на любой глубине
             val cardArrays = RecursiveCardFinder.findCardArrays(jsonObj)
             if (cardArrays.isNotEmpty()) {
                 val items = mutableListOf<NormalizedCard>()
@@ -1084,11 +1006,9 @@ object SmartRutubeParser {
                 }
             }
 
-            // Извлечение связанного контента
             val relatedTv = extractRelated<NormalizedCard.TvSeriesCard>(jsonObj, "related_tv", endpointHint)
             val relatedPersons = extractRelated<NormalizedCard.ChannelCard>(jsonObj, "related_person", endpointHint)
 
-            // Собираем items из results + табы
             val items = mutableListOf<NormalizedCard>()
             val resultsArray = jsonObj.optJSONArray("results")
             if (resultsArray != null) {
@@ -1108,7 +1028,6 @@ object SmartRutubeParser {
                 }
             }
 
-            // Добавляем табы как UnknownCard для навигации
             for (tab in tabList) {
                 for (res in tab.resources) {
                     items.add(NormalizedCard.UnknownCard(
@@ -1123,8 +1042,8 @@ object SmartRutubeParser {
 
             return ParsedResponse(
                 type = EntityType.FEED_CATALOG,
-                title = AdaptiveExtractorV2.getString(jsonObj, "title", endpointHint, "Каталог"),
-                description = AdaptiveExtractorV2.getString(jsonObj, "description", endpointHint).takeIf { it.isNotBlank() },
+                title = AdaptiveExtractor.getString(jsonObj, "title", endpointHint, "Каталог"),
+                description = AdaptiveExtractor.getString(jsonObj, "description", endpointHint).takeIf { it.isNotBlank() },
                 tabs = tabList,
                 items = items,
                 pagination = PaginationExtractor.extract(jsonObj),
@@ -1144,7 +1063,6 @@ object SmartRutubeParser {
 
             for (i in 0 until resultsArray.length()) {
                 val item = resultsArray.optJSONObject(i) ?: continue
-                // Разворачиваем widget-структуры
                 val nestedCards = item.optJSONArray("cards")
                     ?: item.optJSONArray("items")
                     ?: item.optJSONArray("results")
@@ -1216,7 +1134,7 @@ object SmartRutubeParser {
         }
     }
 
-    // ==================== PAGINATION EXTRACTOR (unchanged logic) ====================
+    // ==================== PAGINATION EXTRACTOR ====================
 
     object PaginationExtractor {
         fun extract(json: JSONObject): PaginationInfo {
