@@ -121,9 +121,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
         return checkText.contains("premier") ||
                checkText.contains("start") ||
-               checkText.contains("viju") ||
-               checkText.contains("премьер") ||
-               checkText.contains("вижу")
+               checkText.contains("viju") 
     }
 
     // ==================== MAPPING ====================
