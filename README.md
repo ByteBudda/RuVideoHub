@@ -1,6 +1,4 @@
 
-
-```markdown
 # 🎬 RuVideoHub
 
 **Неофициальный open-source клиент для Rutube**
