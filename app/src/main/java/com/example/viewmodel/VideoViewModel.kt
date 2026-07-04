@@ -611,7 +611,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         if (currentRequestId != requestId) return@launch
                         val bodyStr = response.string()
                         val jsonObj = org.json.JSONObject(bodyStr)
-                        val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, isPromoGroup = finalUrl.contains("promogroup"))
+                        val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, finalUrl)
                         
                         if (currentRequestId != requestId) return@launch
                         _feedTabs.value = emptyList()
