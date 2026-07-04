@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.Pattern
 
 /**
- * SMART RUTUBE PARSER V2 — AI-парсер с эвристическим пониманием схемы
+ * SMART RUTUBE PARSER V2 — AI-парсер с эвристическим пониманием ум
  */
 object SmartRutubeParser {
 
@@ -1007,7 +1007,21 @@ object SmartRutubeParser {
             }
 
             val relatedTv = extractRelated<NormalizedCard.TvSeriesCard>(jsonObj, "related_tv", endpointHint)
-            val relatedPersons = extractRelated<NormalizedCard.ChannelCard>(jsonObj, "related_person", endpointHint)
+            val relatedPersons = extractRelated<NormalizedCard.ChannelCard>(jsonObj, "related_person", endpointHint).toMutableList()
+
+            // Also search for other possible root-level fields that represent the author/channel of this feed
+            val possibleRootKeys = listOf("author", "person", "channel", "user", "owner")
+            for (key in possibleRootKeys) {
+                val optObj = jsonObj.optJSONObject(key)
+                if (optObj != null) {
+                    val normalized = UniversalNormalizer.normalizeOrNull(optObj, endpointHint)
+                    if (normalized is NormalizedCard.ChannelCard) {
+                        if (relatedPersons.none { it.id == normalized.id }) {
+                            relatedPersons.add(normalized)
+                        }
+                    }
+                }
+            }
 
             val items = mutableListOf<NormalizedCard>()
             val resultsArray = jsonObj.optJSONArray("results")
@@ -1018,11 +1032,11 @@ object SmartRutubeParser {
                     if (nestedCards != null) {
                         for (j in 0 until nestedCards.length()) {
                             val nested = nestedCards.optJSONObject(j) ?: continue
-                            val norm = if (isPromoGroup) UniversalNormalizer.normalizePromo(nested, endpointHint) else UniversalNormalizer.normalizeOrNull(nested, endpointHint)
+                            val norm = UniversalNormalizer.normalizeOrNull(nested, endpointHint)
                             norm?.let { items.add(it) }
                         }
                     } else {
-                        val norm = if (isPromoGroup) UniversalNormalizer.normalizePromo(item, endpointHint) else UniversalNormalizer.normalizeOrNull(item, endpointHint)
+                        val norm = UniversalNormalizer.normalizeOrNull(item, endpointHint)
                         norm?.let { items.add(it) }
                     }
                 }
@@ -1071,11 +1085,11 @@ object SmartRutubeParser {
                 if (nestedCards != null && nestedCards.length() > 0) {
                     for (j in 0 until nestedCards.length()) {
                         val nested = nestedCards.optJSONObject(j) ?: continue
-                        val norm = if (isPromoGroup) UniversalNormalizer.normalizePromo(nested, endpointHint) else UniversalNormalizer.normalizeOrNull(nested, endpointHint)
+                        val norm = UniversalNormalizer.normalizeOrNull(nested, endpointHint)
                         if (norm != null) items.add(norm) else filteredCount++
                     }
                 } else {
-                    val norm = if (isPromoGroup) UniversalNormalizer.normalizePromo(item, endpointHint) else UniversalNormalizer.normalizeOrNull(item, endpointHint)
+                    val norm = UniversalNormalizer.normalizeOrNull(item, endpointHint)
                     if (norm != null) items.add(norm) else filteredCount++
                 }
             }
@@ -1089,10 +1103,29 @@ object SmartRutubeParser {
                 else -> EntityType.VIDEO_LIST
             }
 
+            val relatedTv = extractRelated<NormalizedCard.TvSeriesCard>(jsonObj, "related_tv", endpointHint)
+            val relatedPersons = extractRelated<NormalizedCard.ChannelCard>(jsonObj, "related_person", endpointHint).toMutableList()
+
+            // Also search for other possible root-level fields that represent the author/channel of this feed
+            val possibleRootKeys = listOf("author", "person", "channel", "user", "owner")
+            for (key in possibleRootKeys) {
+                val optObj = jsonObj.optJSONObject(key)
+                if (optObj != null) {
+                    val normalized = UniversalNormalizer.normalizeOrNull(optObj, endpointHint)
+                    if (normalized is NormalizedCard.ChannelCard) {
+                        if (relatedPersons.none { it.id == normalized.id }) {
+                            relatedPersons.add(normalized)
+                        }
+                    }
+                }
+            }
+
             return ParsedResponse(
                 type = overallType,
                 items = items,
                 pagination = pagination,
+                relatedTv = relatedTv,
+                relatedPersons = relatedPersons,
                 metadata = ResponseMetadata(filteredPaidCount = filteredCount, totalOriginalCount = resultsArray.length())
             )
         }
