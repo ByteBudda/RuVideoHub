@@ -1255,7 +1255,7 @@ object SmartRutubeParser {
     // ==================== HELPERS ====================
 
     private fun isBlockedText(text: String): Boolean {
-        return text.contains("premier") || text.contains("start") || text.contains("viju") ||
+        return text.contains("premier") || text.contains("start") || text.contains("viju")
     }
 
     private fun formatDuration(seconds: Double): String {
