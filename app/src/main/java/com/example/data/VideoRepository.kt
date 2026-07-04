@@ -39,12 +39,11 @@ class VideoRepository(private val dao: SavedVideoDao) {
         RutubeCategory(1001, "Фильмы", "https://pic.rtbcdn.ru/promoitem/55/c1/55c106e53da7e36f144347990cb39885.png", "/api/feeds/movies/"),
         RutubeCategory(1002, "Сериалы", "https://pic.rtbcdn.ru/promoitem/55/c1/55c106e53da7e36f144347990cb39885.png", "/api/feeds/serials/"),
         RutubeCategory(1003, "Телепередачи", "https://pic.rtbcdn.ru/promoitem/11/4b/114b0e5e339a889c31ee106e9b986c53.png", "/api/feeds/tv/"),
-        RutubeCategory(2001, "Онлайн ТВ", "https://pic.rtbcdn.ru/promoitem/3f/e6/3fe614a9cfa0e1c2f25d71102558109d.png", "/api/feeds/tvchannels/"),
-        RutubeCategory(2002, "Развлекательные", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/entertainment/"),
+        RutubeCategory(2001, "Онлайн ТВ", "https://pic.rtbcdn.ru/promoitem/3f/e6/3fe614a9cfa0e1c2f25d71102558109d.png", "/api/feeds/tvchannels/"), 
         RutubeCategory(2003, "Реалити", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/reality/"),
         RutubeCategory(2004, "Ток-шоу", "https://pic.rtbcdn.ru/promoitem/11/4b/114b0e5e339a889c31ee106e9b986c53.png", "/api/feeds/talk-show/"),
         RutubeCategory(1004, "Мультфильмы", "https://pic.rtbcdn.ru/promoitem/2025-06-06/64/73/64734dadd906cefa63183b96cd260e1b.png", "/api/feeds/cartoons/"),
-        RutubeCategory(1005, "Music", "https://pic.rtbcdn.ru/promoitem/8c/49/8c49dbbe473765f4c881090860ddee01.png", "/api/feeds/music/"),
+        RutubeCategory(1005, "Музыка", "https://pic.rtbcdn.ru/promoitem/8c/49/8c49dbbe473765f4c881090860ddee01.png", "/api/feeds/music/"),
         RutubeCategory(1006, "Спорт", "https://pic.rtbcdn.ru/promoitem/dc/04/dc049d8eb246cec4eeb63c615d302bd4.png", "/api/feeds/sport/"),
         RutubeCategory(1007, "Юмор", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/umor/"),
         RutubeCategory(1008, "Видеоигры", "https://pic.rtbcdn.ru/promoitem/8b/57/8b57e8c2550b1a269b028f6567bbffe6.png", "/api/feeds/games/"),
@@ -58,6 +57,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         RutubeCategory(1016, "Путешествия", "https://pic.rtbcdn.ru/promoitem/24/95/2495ff72ab1d9a70411f2ee8ef6c3b5f.png", "/api/feeds/travel/"),
         RutubeCategory(1017, "Кулинария", "https://pic.rtbcdn.ru/promoitem/02/50/0250d5124179a913e26eb8965f48228e.png", "/api/feeds/food/"),
         RutubeCategory(1018, "Аниме", "https://pic.rtbcdn.ru/promoitem/1d/59/1d59b21c708d89744b20d9f220a47b1a.png", "/api/feeds/anime/")
+         RutubeCategory(1019, "Популярное", "https://pic.rtbcdn.ru/promoitem/2025-03-19/ce/96/ce966ee58083f9bf8aa35fdabe6f2337.png", "/api/tags/video/6716/")
     )
 
     init {
@@ -440,7 +440,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             if (!isNetworkError) {
                 try {
                     val fallbackBody = com.example.data.rutube.RutubeRetrofitClient.apiService.searchVideos(selectedCategoryName, page = page).string()
-                    val searchUrl = "https://rutube.ru/api/search/video/?query=${selectedCategoryName}&page=$page"
+                    val searchUrl = "https://rutube.ru/api/search/combined/video_playlist?query=${selectedCategoryName}&page=$page"
                     val searchVideos = parseAnyResponse(fallbackBody, selectedCategoryName, searchUrl)
                     if (searchVideos.isNotEmpty()) {
                         lastFetchSource = "Rutube LIVE"
@@ -652,8 +652,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
     private fun isBlockedText(text: String): Boolean {
         return text.contains("premier") ||
                text.contains("start") ||
-               text.contains("viju") ||
-               text.contains("премьер") ||
-               text.contains("вижу")
+               text.contains("viju") 
     }
 }
