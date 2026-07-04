@@ -42,8 +42,8 @@ RuVideoHub — это альтернативный клиент Rutube, созд
 Или соберите проект самостоятельно:
 
 ```bash
-git clone https://github.com/yourusername/ruvideohub.git
-cd ruvideohub
+git clone https://github.com/ByteBudda/RuVideoHub.git
+cd RuVideoHub
 ./gradlew assembleDebug
 ```
 
