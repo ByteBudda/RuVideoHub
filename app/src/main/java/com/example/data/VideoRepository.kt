@@ -40,7 +40,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         RutubeCategory(1002, "Сериалы", "https://pic.rtbcdn.ru/promoitem/55/c1/55c106e53da7e36f144347990cb39885.png", "/api/feeds/serials/"),
         RutubeCategory(1003, "Телепередачи", "https://pic.rtbcdn.ru/promoitem/11/4b/114b0e5e339a889c31ee106e9b986c53.png", "/api/feeds/tv/"),
         RutubeCategory(1004, "Мультфильмы", "https://pic.rtbcdn.ru/promoitem/2025-06-06/64/73/64734dadd906cefa63183b96cd260e1b.png", "/api/feeds/cartoons/"),
-        RutubeCategory(1005, "Музыка", "https://pic.rtbcdn.ru/promoitem/8c/49/8c49dbbe473765f4c881090860ddee01.png", "/api/feeds/music/"),
+        RutubeCategory(1005, "Music", "https://pic.rtbcdn.ru/promoitem/8c/49/8c49dbbe473765f4c881090860ddee01.png", "/api/feeds/music/"),
         RutubeCategory(1006, "Спорт", "https://pic.rtbcdn.ru/promoitem/dc/04/dc049d8eb246cec4eeb63c615d302bd4.png", "/api/feeds/sport/"),
         RutubeCategory(1007, "Юмор", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/umor/"),
         RutubeCategory(1008, "Видеоигры", "https://pic.rtbcdn.ru/promoitem/8b/57/8b57e8c2550b1a269b028f6567bbffe6.png", "/api/feeds/games/"),
@@ -97,6 +97,13 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     mapped.add(video)
                 }
             }
+
+            for (card in parsed.relatedPersons) {
+                val video = mapNormalizedCardToVideo(card, defaultCategoryName)
+                if (!isBlockedContent(video)) {
+                    mapped.add(video)
+                }
+            }
         } catch (ex: Exception) {
             android.util.Log.e("VideoRepository", "Error parsing $url", ex)
         }
@@ -107,10 +114,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
      * Проверка на блокируемый контент (платные партнёры)
      */
     private fun isBlockedContent(video: Video): Boolean {
-        // Категории не блокируем
-        if (video.duration == "КАТАЛОГ" || video.duration == "ПОДБОРКА") {
-            return false
-        }
         val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
         return checkText.contains("premier") ||
                checkText.contains("start") ||
@@ -159,6 +162,20 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.poster
                 )
             }
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
+                Video(
+                    id = "playlist_${card.id}__${card.actionUrl ?: ""}",
+                    title = card.title,
+                    channel = "Плейлист • Подборка",
+                    views = "${card.videosCount} видео",
+                    timeAgo = "Смотреть плейлист",
+                    duration = "ПЛЕЙЛИСТ",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = "Смотрите полную подборку видео из этого плейлиста.",
+                    thumbnailUrl = card.thumbnail
+                )
+            }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
                 Video(
                     id = "channel_${card.id}__${card.actionUrl ?: ""}",
@@ -175,36 +192,18 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.avatar
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
-                Video(
-                    id = "playlist_${card.id}__${card.actionUrl ?: ""}",
-                    title = card.title,
-                    channel = "Плейлист • Подборка",
-                    views = "${card.videosCount} видео",
-                    timeAgo = "Смотреть плейлист",
-                    duration = "ПЛЕЙЛИСТ",
-                    isPro = false,
-                    category = defaultCategoryName,
-                    description = "Смотрите полную подборку видео из этого плейлиста.",
-                    thumbnailUrl = card.thumbnail
-                )
-            }
-            // 👇 ПРОМО-ПОДБОРКИ МАППИМ КАК UNKNOWN
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
                 Video(
-                    id = "unknown_${card.id}__${card.actionUrl ?: ""}",
+                    id = "promo_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
-                    channel = card.title,  // 👈 ЗАГОЛОВОК ПОДБОРКИ
-                    views = "",
-                    timeAgo = "Подборка",
-                    duration = "КАТАЛОГ",
-                    isPro = false,
+                    channel = "Реклама",
+                    views = "Промо",
+                    timeAgo = "Перейти по ссылке",
+                    duration = "ПРОМО",
+                    isPro = true,
                     category = defaultCategoryName,
-                    description = card.description ?: "Подборка: ${card.title}",
-                    thumbnailUrl = card.thumbnail,
-                    authorId = null,
-                    authorActionUrl = card.actionUrl,
-                    authorAvatarUrl = null
+                    description = card.description ?: "Спонсорский медиаконтент.",
+                    thumbnailUrl = card.thumbnail
                 )
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
@@ -395,21 +394,14 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 val feedResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(showcaseUrl)
                 val feedJsonStr = feedResponse.string()
                 val feedObj = JSONObject(feedJsonStr)
-                val tabsArray = feedObj.optJSONArray("tabs")
+                val parsedFeed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(feedObj, showcaseUrl)
 
                 val resourceUrls = mutableListOf<String>()
-                if (tabsArray != null && tabsArray.length() > 0) {
-                    for (t in 0 until tabsArray.length()) {
-                        val tab = tabsArray.optJSONObject(t) ?: continue
-                        val resourcesArray = tab.optJSONArray("resources")
-                        if (resourcesArray != null) {
-                            for (r in 0 until resourcesArray.length()) {
-                                val res = resourcesArray.optJSONObject(r) ?: continue
-                                val urlVal = res.optString("url")
-                                if (urlVal.isNotBlank() && !resourceUrls.contains(urlVal)) {
-                                    resourceUrls.add(urlVal)
-                                }
-                            }
+                for (tab in parsedFeed.tabs) {
+                    for (res in tab.resources) {
+                        val urlVal = res.url
+                        if (urlVal != null && urlVal.isNotBlank() && !resourceUrls.contains(urlVal)) {
+                            resourceUrls.add(urlVal)
                         }
                     }
                 }
