@@ -89,7 +89,7 @@ fun HomeTabScreen(
         }
 
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-        var isLargeCardsMode by remember { androidx.compose.runtime.mutableStateOf(false) }
+        val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
         
         val shouldLoadMore by remember {
             derivedStateOf {
@@ -173,8 +173,6 @@ fun HomeTabScreen(
                 SleekHeader(
                     searchQuery = searchQuery,
                     onSearchQueryChanged = { viewModel.setSearchQuery(it) },
-                    isLargeCardsMode = isLargeCardsMode,
-                    onToggleViewMode = { isLargeCardsMode = !isLargeCardsMode },
                     isDark = isDarkTheme,
                     isTvOptimized = isTvOptimized
                 )
@@ -787,8 +785,6 @@ fun HomeTabScreen(
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
-    isLargeCardsMode: Boolean,
-    onToggleViewMode: () -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
@@ -851,18 +847,6 @@ fun SleekHeader(
                         contentDescription = "Очистить",
                         tint = GreyText,
                         modifier = Modifier.size(14.dp)
-                    )
-                }
-            } else {
-                IconButton(
-                    onClick = onToggleViewMode,
-                    modifier = Modifier.size(24.dp).sleekTvFocus(CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (isLargeCardsMode) Icons.Default.ViewList else Icons.Default.GridView,
-                        contentDescription = "Вид",
-                        tint = GreyText,
-                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
