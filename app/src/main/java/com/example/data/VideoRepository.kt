@@ -194,7 +194,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 Video(
                     id = "unknown_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
-                    channel = card.title,
+                    channel = card.title,  // 👈 ЗАГОЛОВОК ПОДБОРКИ
                     views = "",
                     timeAgo = "Подборка",
                     duration = "КАТАЛОГ",
