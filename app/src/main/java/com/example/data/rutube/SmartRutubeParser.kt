@@ -821,27 +821,44 @@ object SmartRutubeParser {
         }
 
         private fun normalizePlaylist(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.PlaylistCard {
-            val url = AdaptiveExtractor.getString(data, "url", endpointHint)
-            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
-                .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractor.getString(data, "playlist_id", endpointHint)
-                ?: makeId("playlist", data, endpointHint)
+    val url = AdaptiveExtractor.getString(data, "url", endpointHint)
+    val obj = data.optJSONObject("object")
+    
+    val id = AdaptiveExtractor.getString(data, "id", endpointHint)
+        .takeIf { it.isNotBlank() }
+        ?: AdaptiveExtractor.getString(data, "playlist_id", endpointHint)
+        ?: obj?.optString("id", null)
+        ?: data.optString("object_id", null)
+        ?: makeId("playlist", data, endpointHint)
 
-            val vCount = AdaptiveExtractor.getInt(data, "videos", endpointHint, 0)
-                .takeIf { it > 0 }
-                ?: data.optInt("videos_count", data.optInt("video_count", 0))
+    val vCount = AdaptiveExtractor.getInt(data, "videos", endpointHint, 0)
+        .takeIf { it > 0 }
+        ?: data.optInt("videos_count", data.optInt("video_count", 0))
+        ?: obj?.optInt("video_count", 0)
+        ?: 0
 
-            return NormalizedCard.PlaylistCard(
-                id = id,
-                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
-                thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() }
-                    ?: AdaptiveExtractor.getString(data, "image", endpointHint).takeIf { it.isNotBlank() },
-                videosCount = vCount,
-                actionUrl = normalizeUrl(url.takeIf { it.isNotBlank() } ?: "https://rutube.ru/api/playlist/custom/$id/videos/"),
-                confidence = sig.fields.values.map { it.confidence }.average().coerceIn(0.0, 1.0)
-            )
-        }
+    val contentUrl = url.takeIf { it.isNotBlank() }
+        ?: obj?.optString("absolute_url", null)
+        ?: obj?.optString("content", null)
+        ?: data.optString("content", null)
+        ?: data.optString("view_url", null)
+        ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
+
+    return NormalizedCard.PlaylistCard(
+        id = id,
+        title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled")
+            .takeIf { it.isNotBlank() }
+            ?: obj?.optString("name", "Untitled") 
+            ?: "Untitled",
+        thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
+            ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() }
+            ?: AdaptiveExtractor.getString(data, "image", endpointHint).takeIf { it.isNotBlank() }
+            ?: obj?.optString("picture", null),
+        videosCount = vCount,
+        actionUrl = normalizeUrl(contentUrl),
+        confidence = sig.fields.values.map { it.confidence }.average().coerceIn(0.0, 1.0)
+    )
+}
 
         fun normalizePromo(data: JSONObject, endpointHint: String? = null): NormalizedCard.PromoCard? {
             val button = data.optJSONObject("button")
