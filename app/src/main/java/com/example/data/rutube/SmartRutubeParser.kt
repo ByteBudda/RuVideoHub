@@ -875,7 +875,7 @@ object SmartRutubeParser {
             )
         }
 
-        private fun normalizePromo(data: JSONObject, endpointHint: String? = null): NormalizedCard.PromoCard? {
+        fun normalizePromo(data: JSONObject, endpointHint: String? = null): NormalizedCard.PromoCard? {
             val button = data.optJSONObject("button")
             val actionUrl = normalizeUrl(
                 button?.optString("button_url")?.takeIf { it.isNotBlank() }
