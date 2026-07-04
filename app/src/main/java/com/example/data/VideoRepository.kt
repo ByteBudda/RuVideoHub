@@ -87,7 +87,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         try {
             val jsonObj = JSONObject(trimmed)
             // Используем парсер с endpointHint для самообучения
-            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzerV2.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, url)
 
             android.util.Log.d("VideoRepository", "Parsed ${parsed.items.size} items from $url (type=${parsed.type})")
 
@@ -538,7 +538,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val url = "https://rutube.ru/api/v1/feeds/promogroup/382/?format=json&limit=100"
             val bodyStr = apiService.getDynamicUrl(url).string()
             val jsonObj = JSONObject(bodyStr)
-            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzerV2.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, url)
 
             for (card in parsed.items) {
                 var title = ""
