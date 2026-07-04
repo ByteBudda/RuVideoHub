@@ -377,7 +377,9 @@ fun HomeTabScreen(
                                                 category = firstItem.category,
                                                 description = "",
                                                 thumbnailUrl = firstItem.authorAvatarUrl,
-                                                authorAvatarUrl = firstItem.authorAvatarUrl
+                                                authorAvatarUrl = firstItem.authorAvatarUrl,
+                                                authorId = firstItem.authorId,
+                                                authorActionUrl = firstItem.authorActionUrl
                                             )
                                             viewModel.selectVideo(channelDummy)
                                         }
@@ -407,7 +409,9 @@ fun HomeTabScreen(
                                                 category = video.category,
                                                 description = "",
                                                 thumbnailUrl = video.authorAvatarUrl,
-                                                authorAvatarUrl = video.authorAvatarUrl
+                                                authorAvatarUrl = video.authorAvatarUrl,
+                                                authorId = video.authorId,
+                                                authorActionUrl = video.authorActionUrl
                                             )
                                             viewModel.selectVideo(channelDummy)
                                         }
@@ -525,7 +529,9 @@ fun HomeTabScreen(
                                             category = firstItem.category,
                                             description = "",
                                             thumbnailUrl = firstItem.authorAvatarUrl,
-                                            authorAvatarUrl = firstItem.authorAvatarUrl
+                                            authorAvatarUrl = firstItem.authorAvatarUrl,
+                                            authorId = firstItem.authorId,
+                                            authorActionUrl = firstItem.authorActionUrl
                                         )
                                         viewModel.selectVideo(channelDummy)
                                     }
@@ -556,7 +562,9 @@ fun HomeTabScreen(
                                             category = video.category,
                                             description = "",
                                             thumbnailUrl = video.authorAvatarUrl,
-                                            authorAvatarUrl = video.authorAvatarUrl
+                                            authorAvatarUrl = video.authorAvatarUrl,
+                                            authorId = video.authorId,
+                                            authorActionUrl = video.authorActionUrl
                                         )
                                         viewModel.selectVideo(channelDummy)
                                     }
