@@ -247,10 +247,7 @@ object SmartRutubeParser {
             val urlLower = url?.lowercase() ?: ""
             when {
                 urlLower.contains("/search/") -> return EntityType.VIDEO_LIST
-                urlLower.contains("/feeds/cardgroup/") -> return EntityType.CONTAINER
-                urlLower.contains("/feeds/promogroup/") -> return EntityType.PROMO_GROUP
-                urlLower.contains("/tags/video/") -> return EntityType.VIDEO_LIST
-                urlLower.contains("/feeds/") -> return EntityType.FEED_CATALOG
+                urlLower.contains("/feeds/") || urlLower.contains("/promogroup/") -> return EntityType.FEED_CATALOG
                 urlLower.contains("/video/") && !urlLower.contains("/api/") -> return EntityType.VIDEO_ITEM
                 urlLower.contains("/channel/") || urlLower.contains("/person/") -> return EntityType.CHANNEL
                 urlLower.contains("/tv/") || urlLower.contains("/serial/") -> return EntityType.TV_SERIES
@@ -674,8 +671,13 @@ object SmartRutubeParser {
             val detectedType = SchemaAnalyzer.detectEntityType(signature, endpointHint)
             val model = extractModel(json, data)
 
+            val isLiveStream = data.optJSONObject("type")?.optInt("id") == 12
+                    || data.optString("type") == "live"
+                    || data.optBoolean("is_live", false)
+                    || json.optBoolean("is_live", false)
+
             return when {
-                detectedType == EntityType.VIDEO_ITEM || model in listOf("video", "live", "shorts") ->
+                isLiveStream || detectedType == EntityType.VIDEO_ITEM || model in listOf("video", "live", "shorts") ->
                     normalizeVideo(data, signature, endpointHint)
                 detectedType == EntityType.TV_SERIES || model in listOf("tv", "show", "serial", "tvshow", "movie") ->
                     normalizeTvShow(data, signature, endpointHint)
@@ -978,27 +980,19 @@ object SmartRutubeParser {
                     val model = contentType?.optString("model") ?: "unknown"
                     val urlVal = resObj.optString("url", "").lowercase()
 
-                    // === URL имеет ВЫСШИЙ приоритет над model! ===
-                    var detectedType = when {
-                        urlVal.contains("/feeds/cardgroup/") -> EntityType.CONTAINER
-                        urlVal.contains("/feeds/promogroup/") -> EntityType.PROMO_GROUP
-                        urlVal.contains("/tags/video/") -> EntityType.VIDEO_LIST
-                        urlVal.contains("/feeds/") -> EntityType.FEED_CATALOG
-                        urlVal.contains("/video/") -> EntityType.VIDEO_ITEM
-                        urlVal.contains("/channel/") || urlVal.contains("/person/") || urlVal.contains("/userchannel/") -> EntityType.CHANNEL
-                        urlVal.contains("/tv/") || urlVal.contains("/show/") || urlVal.contains("/serial/") || urlVal.contains("/subscriptiontvseries/") -> EntityType.TV_SERIES
-                        urlVal.contains("/playlist/") -> EntityType.PLAYLIST
+                    var detectedType = when (model) {
+                        "tag", "playlist" -> EntityType.VIDEO_LIST
+                        "tv" -> EntityType.TV_SERIES
+                        "cardgroup", "subscriptiontvseries", "promogroup" -> EntityType.CONTAINER
+                        "userchannel", "person", "channel", "author" -> EntityType.CHANNEL
                         else -> EntityType.UNKNOWN
                     }
 
-                    // Fallback на model только если URL не определил тип
-                    if (detectedType == EntityType.UNKNOWN) {
-                        detectedType = when (model) {
-                            "tag", "playlist" -> EntityType.VIDEO_LIST
-                            "tv" -> EntityType.TV_SERIES
-                            "cardgroup", "subscriptiontvseries" -> EntityType.CONTAINER
-                            "promogroup", "feedsource" -> EntityType.PROMO_GROUP
-                            "userchannel", "person", "channel", "author" -> EntityType.CHANNEL
+                    if (detectedType == EntityType.UNKNOWN && urlVal.isNotBlank()) {
+                        detectedType = when {
+                            urlVal.contains("/person/") || urlVal.contains("/channel/") || urlVal.contains("/userchannel/") -> EntityType.CHANNEL
+                            urlVal.contains("/tv/") || urlVal.contains("/show/") || urlVal.contains("/serial/") || urlVal.contains("/subscriptiontvseries/") -> EntityType.TV_SERIES
+                            urlVal.contains("/playlist/") -> EntityType.PLAYLIST
                             else -> EntityType.UNKNOWN
                         }
                     }
