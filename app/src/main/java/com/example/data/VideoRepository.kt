@@ -107,6 +107,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
      * Проверка на блокируемый контент (платные партнёры)
      */
     private fun isBlockedContent(video: Video): Boolean {
+        // Категории не блокируем
+        if (video.duration == "КАТАЛОГ" || video.duration == "ПОДБОРКА") {
+            return false
+        }
         val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
         return checkText.contains("premier") ||
                checkText.contains("start") ||
@@ -183,6 +187,25 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.avatar,
                     authorId = card.id,
                     authorAvatarUrl = card.avatar
+                )
+            }
+            // 👇 ДОБАВЛЯЕМ PromoCard
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
+                val targetUrl = card.actionUrl ?: ""
+                Video(
+                    id = "category_${card.id}__$targetUrl",
+                    title = card.title,
+                    channel = card.title,
+                    views = "",
+                    timeAgo = "Подборка",
+                    duration = "КАТАЛОГ",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = card.description ?: "Подборка: ${card.title}",
+                    thumbnailUrl = card.thumbnail,
+                    authorId = null,
+                    authorActionUrl = targetUrl,
+                    authorAvatarUrl = null
                 )
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
