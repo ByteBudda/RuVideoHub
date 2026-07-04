@@ -185,20 +185,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.avatar
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
-                Video(
-                    id = "promo_${card.id}__${card.actionUrl ?: ""}",
-                    title = card.title,
-                    channel = "Реклама",
-                    views = "Промо",
-                    timeAgo = "Перейти по ссылке",
-                    duration = "ПРОМО",
-                    isPro = true,
-                    category = defaultCategoryName,
-                    description = card.description ?: "Спонсорский медиаконтент.",
-                    thumbnailUrl = card.thumbnail
-                )
-            }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
                 Video(
                     id = "unknown_${card.id}__${card.actionUrl ?: ""}",
