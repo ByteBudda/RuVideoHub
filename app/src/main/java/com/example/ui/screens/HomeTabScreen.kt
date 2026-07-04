@@ -89,6 +89,7 @@ fun HomeTabScreen(
         }
 
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        var isLargeCardsMode by remember { androidx.compose.runtime.mutableStateOf(false) }
         
         val shouldLoadMore by remember {
             derivedStateOf {
@@ -172,6 +173,8 @@ fun HomeTabScreen(
                 SleekHeader(
                     searchQuery = searchQuery,
                     onSearchQueryChanged = { viewModel.setSearchQuery(it) },
+                    isLargeCardsMode = isLargeCardsMode,
+                    onToggleViewMode = { isLargeCardsMode = !isLargeCardsMode },
                     isDark = isDarkTheme,
                     isTvOptimized = isTvOptimized
                 )
@@ -364,6 +367,7 @@ fun HomeTabScreen(
                                     video = firstItem,
                                     onVideoClick = { viewModel.selectVideo(firstItem) },
                                     onDownloadToggle = { viewModel.toggleDownload(firstItem) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(firstItem) },
                                     isDark = isDarkTheme,
                                     onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
                                         {
@@ -391,33 +395,63 @@ fun HomeTabScreen(
 
                         if (searchVideos.size > 1) {
                             items(searchVideos.subList(1, searchVideos.size), key = { it.id }) { video ->
-                                SecondaryVideoItemRow(
-                                    video = video,
-                                    onVideoClick = { viewModel.selectVideo(video) },
-                                    onDownloadToggle = { viewModel.toggleDownload(video) },
-                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                    isDark = isDarkTheme,
-                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                        {
-                                            val channelDummy = Video(
-                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                                title = video.channel,
-                                                channel = video.channel,
-                                                views = "",
-                                                timeAgo = "",
-                                                duration = "КАНАЛ",
-                                                category = video.category,
-                                                description = "",
-                                                thumbnailUrl = video.authorAvatarUrl,
-                                                authorAvatarUrl = video.authorAvatarUrl,
-                                                authorId = video.authorId,
-                                                authorActionUrl = video.authorActionUrl
-                                            )
-                                            viewModel.selectVideo(channelDummy)
-                                        }
-                                    } else null,
-                                    isTvOptimized = isTvOptimized
-                                )
+                                if (isLargeCardsMode) {
+                                    HeroVideoCard(
+                                        video = video,
+                                        onVideoClick = { viewModel.selectVideo(video) },
+                                        onDownloadToggle = { viewModel.toggleDownload(video) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                        isDark = isDarkTheme,
+                                        onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                            {
+                                                val channelDummy = Video(
+                                                    id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                    title = video.channel,
+                                                    channel = video.channel,
+                                                    views = "",
+                                                    timeAgo = "",
+                                                    duration = "КАНАЛ",
+                                                    category = video.category,
+                                                    description = "",
+                                                    thumbnailUrl = video.authorAvatarUrl,
+                                                    authorAvatarUrl = video.authorAvatarUrl,
+                                                    authorId = video.authorId,
+                                                    authorActionUrl = video.authorActionUrl
+                                                )
+                                                viewModel.selectVideo(channelDummy)
+                                            }
+                                        } else null,
+                                        isTvOptimized = isTvOptimized
+                                    )
+                                } else {
+                                    SecondaryVideoItemRow(
+                                        video = video,
+                                        onVideoClick = { viewModel.selectVideo(video) },
+                                        onDownloadToggle = { viewModel.toggleDownload(video) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                        isDark = isDarkTheme,
+                                        onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                            {
+                                                val channelDummy = Video(
+                                                    id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                    title = video.channel,
+                                                    channel = video.channel,
+                                                    views = "",
+                                                    timeAgo = "",
+                                                    duration = "КАНАЛ",
+                                                    category = video.category,
+                                                    description = "",
+                                                    thumbnailUrl = video.authorAvatarUrl,
+                                                    authorAvatarUrl = video.authorAvatarUrl,
+                                                    authorId = video.authorId,
+                                                    authorActionUrl = video.authorActionUrl
+                                                )
+                                                viewModel.selectVideo(channelDummy)
+                                            }
+                                        } else null,
+                                        isTvOptimized = isTvOptimized
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -516,6 +550,7 @@ fun HomeTabScreen(
                                 video = firstItem,
                                 onVideoClick = { viewModel.selectVideo(firstItem) },
                                 onDownloadToggle = { viewModel.toggleDownload(firstItem) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(firstItem) },
                                 isDark = isDarkTheme,
                                 onChannelClick = if (!firstItem.authorId.isNullOrBlank()) {
                                     {
@@ -544,33 +579,63 @@ fun HomeTabScreen(
                     // Section listed items
                     if (currentVideos.size > 1) {
                         items(currentVideos.subList(1, currentVideos.size), key = { it.id }) { video ->
-                            SecondaryVideoItemRow(
-                                video = video,
-                                onVideoClick = { viewModel.selectVideo(video) },
-                                onDownloadToggle = { viewModel.toggleDownload(video) },
-                                onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                isDark = isDarkTheme,
-                                onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                    {
-                                        val channelDummy = Video(
-                                            id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                            title = video.channel,
-                                            channel = video.channel,
-                                            views = "",
-                                            timeAgo = "",
-                                            duration = "КАНАЛ",
-                                            category = video.category,
-                                            description = "",
-                                            thumbnailUrl = video.authorAvatarUrl,
-                                            authorAvatarUrl = video.authorAvatarUrl,
-                                            authorId = video.authorId,
-                                            authorActionUrl = video.authorActionUrl
-                                        )
-                                        viewModel.selectVideo(channelDummy)
-                                    }
-                                } else null,
-                                isTvOptimized = isTvOptimized
-                            )
+                            if (isLargeCardsMode) {
+                                HeroVideoCard(
+                                    video = video,
+                                    onVideoClick = { viewModel.selectVideo(video) },
+                                    onDownloadToggle = { viewModel.toggleDownload(video) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                    isDark = isDarkTheme,
+                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                        {
+                                            val channelDummy = Video(
+                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                title = video.channel,
+                                                channel = video.channel,
+                                                views = "",
+                                                timeAgo = "",
+                                                duration = "КАНАЛ",
+                                                category = video.category,
+                                                description = "",
+                                                thumbnailUrl = video.authorAvatarUrl,
+                                                authorAvatarUrl = video.authorAvatarUrl,
+                                                authorId = video.authorId,
+                                                authorActionUrl = video.authorActionUrl
+                                            )
+                                            viewModel.selectVideo(channelDummy)
+                                        }
+                                    } else null,
+                                    isTvOptimized = isTvOptimized
+                                )
+                            } else {
+                                SecondaryVideoItemRow(
+                                    video = video,
+                                    onVideoClick = { viewModel.selectVideo(video) },
+                                    onDownloadToggle = { viewModel.toggleDownload(video) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                    isDark = isDarkTheme,
+                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                        {
+                                            val channelDummy = Video(
+                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                title = video.channel,
+                                                channel = video.channel,
+                                                views = "",
+                                                timeAgo = "",
+                                                duration = "КАНАЛ",
+                                                category = video.category,
+                                                description = "",
+                                                thumbnailUrl = video.authorAvatarUrl,
+                                                authorAvatarUrl = video.authorAvatarUrl,
+                                                authorId = video.authorId,
+                                                authorActionUrl = video.authorActionUrl
+                                            )
+                                            viewModel.selectVideo(channelDummy)
+                                        }
+                                    } else null,
+                                    isTvOptimized = isTvOptimized
+                                )
+                            }
                         }
                     }
                 } else {
@@ -722,6 +787,8 @@ fun HomeTabScreen(
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
+    isLargeCardsMode: Boolean,
+    onToggleViewMode: () -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
@@ -784,6 +851,18 @@ fun SleekHeader(
                         contentDescription = "Очистить",
                         tint = GreyText,
                         modifier = Modifier.size(14.dp)
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onToggleViewMode,
+                    modifier = Modifier.size(24.dp).sleekTvFocus(CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (isLargeCardsMode) Icons.Default.ViewList else Icons.Default.GridView,
+                        contentDescription = "Вид",
+                        tint = GreyText,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -926,6 +1005,7 @@ fun HeroVideoCard(
     video: Video,
     onVideoClick: () -> Unit,
     onDownloadToggle: () -> Unit,
+    onBookmarkToggle: () -> Unit,
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
@@ -1042,21 +1122,42 @@ fun HeroVideoCard(
                 }
 
                 // Action buttons right
-                IconButton(
-                    onClick = onDownloadToggle,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(PrimaryContainer)
-                        .sleekTvFocus(CircleShape)
-                        .testTag("download_button_${video.id}")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                        contentDescription = "Скачать",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    IconButton(
+                        onClick = onBookmarkToggle,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryContainer)
+                            .sleekTvFocus(CircleShape)
+                            .testTag("bookmark_button_${video.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = "В избранное",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDownloadToggle,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryContainer)
+                            .sleekTvFocus(CircleShape)
+                            .testTag("download_button_${video.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                            contentDescription = "Скачать",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
