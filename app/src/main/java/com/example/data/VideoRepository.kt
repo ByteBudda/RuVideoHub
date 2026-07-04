@@ -56,8 +56,8 @@ class VideoRepository(private val dao: SavedVideoDao) {
         RutubeCategory(1015, "Обучение", "https://pic.rtbcdn.ru/promoitem/15/8d/158d95d4cb03f4187226734c611cfbbe.png", "/api/feeds/education/"),
         RutubeCategory(1016, "Путешествия", "https://pic.rtbcdn.ru/promoitem/24/95/2495ff72ab1d9a70411f2ee8ef6c3b5f.png", "/api/feeds/travel/"),
         RutubeCategory(1017, "Кулинария", "https://pic.rtbcdn.ru/promoitem/02/50/0250d5124179a913e26eb8965f48228e.png", "/api/feeds/food/"),
-        RutubeCategory(1018, "Аниме", "https://pic.rtbcdn.ru/promoitem/1d/59/1d59b21c708d89744b20d9f220a47b1a.png", "/api/feeds/anime/")
-         RutubeCategory(1019, "Популярное", "https://pic.rtbcdn.ru/promoitem/2025-03-19/ce/96/ce966ee58083f9bf8aa35fdabe6f2337.png", "/api/tags/video/6716/")
+        RutubeCategory(1018, "Аниме", "https://pic.rtbcdn.ru/promoitem/1d/59/1d59b21c708d89744b20d9f220a47b1a.png", "/api/feeds/anime/"), 
+        RutubeCategory(1019, "Популярное", "https://pic.rtbcdn.ru/promoitem/2025-03-19/ce/96/ce966ee58083f9bf8aa35fdabe6f2337.png", "/api/tags/video/6716/")
     )
 
     init {
