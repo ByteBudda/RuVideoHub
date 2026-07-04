@@ -30,6 +30,7 @@ fun SettingsTabScreen(
 ) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+    val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
     val playerQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
     val downloadQuality by viewModel.downloadQuality.collectAsStateWithLifecycle()
 
@@ -167,6 +168,68 @@ fun SettingsTabScreen(
                     checked = isTvOptimized,
                     onCheckedChange = { viewModel.toggleTvOptimized() },
                     modifier = Modifier.testTag("setting_tv_switch")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Отображение",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 8.dp, start = 4.dp)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceVariant.copy(alpha = if (isDarkTheme) 0.5f else 1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ViewList,
+                            contentDescription = "Крупные карточки",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Крупные карточки в каталоге",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Использовать большой размер для видео в списках",
+                            fontSize = 10.sp,
+                            color = GreyText
+                        )
+                    }
+                }
+                Switch(
+                    checked = isLargeCardsMode,
+                    onCheckedChange = { viewModel.toggleLargeCardsMode() },
+                    modifier = Modifier.testTag("setting_large_cards_switch")
                 )
             }
         }
