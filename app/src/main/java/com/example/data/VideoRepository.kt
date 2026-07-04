@@ -159,20 +159,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.poster
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
-                Video(
-                    id = "playlist_${card.id}__${card.actionUrl ?: ""}",
-                    title = card.title,
-                    channel = "Плейлист • Подборка",
-                    views = "${card.videosCount} видео",
-                    timeAgo = "Смотреть плейлист",
-                    duration = "ПЛЕЙЛИСТ",
-                    isPro = false,
-                    category = defaultCategoryName,
-                    description = "Смотрите полную подборку видео из этого плейлиста.",
-                    thumbnailUrl = card.thumbnail
-                )
-            }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
                 Video(
                     id = "channel_${card.id}__${card.actionUrl ?: ""}",
@@ -189,11 +175,24 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.avatar
                 )
             }
-            // 👇 ДОБАВЛЯЕМ PromoCard
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
-                val targetUrl = card.actionUrl ?: ""
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
                 Video(
-                    id = "category_${card.id}__$targetUrl",
+                    id = "playlist_${card.id}__${card.actionUrl ?: ""}",
+                    title = card.title,
+                    channel = "Плейлист • Подборка",
+                    views = "${card.videosCount} видео",
+                    timeAgo = "Смотреть плейлист",
+                    duration = "ПЛЕЙЛИСТ",
+                    isPro = false,
+                    category = defaultCategoryName,
+                    description = "Смотрите полную подборку видео из этого плейлиста.",
+                    thumbnailUrl = card.thumbnail
+                )
+            }
+            // 👇 ПРОМО-ПОДБОРКИ МАППИМ КАК UNKNOWN
+            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
+                Video(
+                    id = "unknown_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
                     channel = card.title,
                     views = "",
@@ -204,7 +203,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     description = card.description ?: "Подборка: ${card.title}",
                     thumbnailUrl = card.thumbnail,
                     authorId = null,
-                    authorActionUrl = targetUrl,
+                    authorActionUrl = card.actionUrl,
                     authorAvatarUrl = null
                 )
             }
