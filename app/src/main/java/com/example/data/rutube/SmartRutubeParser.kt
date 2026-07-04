@@ -73,7 +73,6 @@ object SmartRutubeParser {
 
     object HeuristicValueAnalyzer {
 
-        // Паттерны для определения типа по значению — ИСПРАВЛЕНЫ
         private val THUMBNAIL_PATTERNS = listOf(
             Pattern.compile("https?://.*\\.(jpg|jpeg|png|webp|gif)(\\?.*)?$", Pattern.CASE_INSENSITIVE),
             Pattern.compile("https?://.*thumb.*", Pattern.CASE_INSENSITIVE),
@@ -680,12 +679,12 @@ object SmartRutubeParser {
             return when {
                 isLiveStream || detectedType == EntityType.VIDEO_ITEM || model in listOf("video", "live", "shorts") ->
                     normalizeVideo(data, signature, endpointHint)
+                model in listOf("playlist_series", "playlist") || detectedType == EntityType.PLAYLIST ->
+                    normalizePlaylist(data, signature, endpointHint)
                 detectedType == EntityType.TV_SERIES || model in listOf("tv", "show", "serial", "tvshow", "movie") ->
                     normalizeTvShow(data, signature, endpointHint)
                 detectedType == EntityType.CHANNEL || model in listOf("userchannel", "person", "channel", "author", "user") ->
                     normalizeChannel(data, signature, endpointHint)
-                detectedType == EntityType.PLAYLIST || model == "playlist" ->
-                    normalizePlaylist(data, signature, endpointHint)
                 detectedType == EntityType.PROMO_GROUP || json.has("button") || json.has("target") || model == "promo" ->
                     normalizePromo(json, endpointHint)
                 else -> {
@@ -770,21 +769,31 @@ object SmartRutubeParser {
         }
 
         private fun normalizeTvShow(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.TvSeriesCard {
+            val obj = data.optJSONObject("object")
+            
             val actionUrl = normalizeUrl(
-                AdaptiveExtractor.getString(data, "absolute_url", endpointHint)
-                    .takeIf { it.isNotBlank() }
+                obj?.optString("absolute_url", null)
+                    ?: AdaptiveExtractor.getString(data, "absolute_url", endpointHint)
                     ?: AdaptiveExtractor.getString(data, "url", endpointHint)
             )
-            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
-                .takeIf { it.isNotBlank() }
+            
+            val id = obj?.optString("id", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: data.optString("object_id", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: AdaptiveExtractor.getString(data, "id", endpointHint)
                 ?: makeId("tv", data, endpointHint)
+                
             val paidCheck = PaidContentDetector.check(data, endpointHint)
 
             return NormalizedCard.TvSeriesCard(
                 id = id,
-                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
+                title = obj?.optString("name", null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
                 originalTitle = AdaptiveExtractor.getString(data, "original_title", endpointHint).takeIf { it.isNotBlank() },
-                poster = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
+                poster = obj?.optString("picture", null)
+                    ?: AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
                 year = AdaptiveExtractor.getString(data, "year", endpointHint).takeIf { it.isNotBlank() },
                 rating = AdaptiveExtractor.getDouble(data, "rating", endpointHint).takeIf { it > 0 },
                 seasonsCount = AdaptiveExtractor.getInt(data, "seasons", endpointHint, 1),
@@ -824,28 +833,49 @@ object SmartRutubeParser {
 
         private fun normalizePlaylist(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.PlaylistCard {
             val url = AdaptiveExtractor.getString(data, "url", endpointHint)
-            val id = AdaptiveExtractor.getString(data, "id", endpointHint)
-                .takeIf { it.isNotBlank() }
+            val obj = data.optJSONObject("object")
+            
+            // Ищем ID плейлиста в правильном порядке
+            val id = obj?.optString("id", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: data.optString("object_id", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: AdaptiveExtractor.getString(data, "id", endpointHint)
+                ?.takeIf { it.isNotBlank() }
                 ?: AdaptiveExtractor.getString(data, "playlist_id", endpointHint)
                 ?: makeId("playlist", data, endpointHint)
 
-            val vCount = AdaptiveExtractor.getInt(data, "videos", endpointHint, 0)
-                .takeIf { it > 0 }
+            // Количество видео
+            val vCount = obj?.optInt("video_count", 0)
+                ?.takeIf { it > 0 }
+                ?: AdaptiveExtractor.getInt(data, "videos", endpointHint, 0)
+                ?.takeIf { it > 0 }
                 ?: data.optInt("videos_count", data.optInt("video_count", 0))
+
+            // Контент-урл
+            val contentUrl = obj?.optString("absolute_url", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: obj?.optString("content", null)
+                ?: url.takeIf { it.isNotBlank() }
+                ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
 
             return NormalizedCard.PlaylistCard(
                 id = id,
-                title = AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
-                thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
+                title = obj?.optString("name", null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled"),
+                thumbnail = obj?.optString("picture", null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
                     ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() }
                     ?: AdaptiveExtractor.getString(data, "image", endpointHint).takeIf { it.isNotBlank() },
                 videosCount = vCount,
-                actionUrl = normalizeUrl(url.takeIf { it.isNotBlank() } ?: "https://rutube.ru/api/playlist/custom/$id/videos/"),
+                actionUrl = normalizeUrl(contentUrl),
                 confidence = sig.fields.values.map { it.confidence }.average().coerceIn(0.0, 1.0)
             )
         }
 
-        fun normalizePromo(data: JSONObject, endpointHint: String? = null): NormalizedCard.PromoCard? {
+        private fun normalizePromo(data: JSONObject, endpointHint: String? = null): NormalizedCard.PromoCard? {
             val button = data.optJSONObject("button")
             val actionUrl = normalizeUrl(
                 button?.optString("button_url")?.takeIf { it.isNotBlank() }
@@ -1016,7 +1046,6 @@ object SmartRutubeParser {
             val relatedTv = extractRelated<NormalizedCard.TvSeriesCard>(jsonObj, "related_tv", endpointHint)
             val relatedPersons = extractRelated<NormalizedCard.ChannelCard>(jsonObj, "related_person", endpointHint).toMutableList()
 
-            // Also search for other possible root-level fields that represent the author/channel of this feed
             val possibleRootKeys = listOf("author", "person", "channel", "user", "owner")
             for (key in possibleRootKeys) {
                 val optObj = jsonObj.optJSONObject(key)
@@ -1116,7 +1145,6 @@ object SmartRutubeParser {
             val relatedTv = extractRelated<NormalizedCard.TvSeriesCard>(jsonObj, "related_tv", endpointHint)
             val relatedPersons = extractRelated<NormalizedCard.ChannelCard>(jsonObj, "related_person", endpointHint).toMutableList()
 
-            // Also search for other possible root-level fields that represent the author/channel of this feed
             val possibleRootKeys = listOf("author", "person", "channel", "user", "owner")
             for (key in possibleRootKeys) {
                 val optObj = jsonObj.optJSONObject(key)
