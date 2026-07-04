@@ -83,6 +83,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putBoolean("is_tv_optimized", newValue).apply()
     }
 
+    // View Mode (Large Cards)
+    private val _isLargeCardsMode = MutableStateFlow(false)
+    val isLargeCardsMode = _isLargeCardsMode.asStateFlow()
+
+    fun toggleLargeCardsMode() {
+        val newValue = !_isLargeCardsMode.value
+        _isLargeCardsMode.value = newValue
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("is_large_cards_mode", newValue).apply()
+    }
+
     // User Agreement State
     private val _isTermsAgreed = MutableStateFlow(false)
     val isTermsAgreed = _isTermsAgreed.asStateFlow()
@@ -366,6 +377,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 getApplication<Application>().packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
         val savedIsTvOptimized = sharedPrefs.getBoolean("is_tv_optimized", isDeviceTv)
         _isTvOptimized.value = savedIsTvOptimized
+
+        val savedIsLargeCardsMode = sharedPrefs.getBoolean("is_large_cards_mode", false)
+        _isLargeCardsMode.value = savedIsLargeCardsMode
 
         val savedPlayerQuality = sharedPrefs.getString("player_quality", "Авто") ?: "Авто"
         _playerQuality.value = savedPlayerQuality
@@ -1307,7 +1321,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             fallbackUrls.add(finalUrl)
                         }
 
-                        if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
+                        if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {
+                            fallbackUrls.add("https://rutube.ru/api/feeds/$rawId/?format=json")
                             fallbackUrls.add("https://rutube.ru/api/feeds/promogroup/$rawId/?format=json")
                             fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
                             fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
