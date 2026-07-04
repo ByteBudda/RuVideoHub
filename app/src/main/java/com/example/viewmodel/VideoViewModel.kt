@@ -400,7 +400,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectFeedTab(tab: com.example.data.rutube.SmartRutubeParser.TabInfo) {
-        pushToHistory()
+        selectFeedTabInternal(tab, pushHistory = true)
+    }
+
+    private fun selectFeedTabInternal(tab: com.example.data.rutube.SmartRutubeParser.TabInfo, pushHistory: Boolean) {
+        if (pushHistory) {
+            pushToHistory()
+        }
         _selectedFeedTab.value = tab
         _selectedSubfolderName.value = null
         _isChannelView.value = false
@@ -614,15 +620,20 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, finalUrl)
                         
                         if (currentRequestId != requestId) return@launch
-                        _feedTabs.value = emptyList()
-                        _selectedFeedTab.value = null
                         
-                        val parsedVideos = repository.parseVideoListJson(bodyStr, targetCategory)
-                        if (parsedVideos.isNotEmpty()) {
-                            _dynamicVideos.value = parsedVideos
-                            currentActiveApiEndpoint = toRutubeApiUrl(urlToFetch)
+                        if (parsed.tabs.isNotEmpty()) {
+                            _feedTabs.value = parsed.tabs
+                            selectFeedTabInternal(parsed.tabs.first(), pushHistory = false)
                         } else {
-                            _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                            _feedTabs.value = emptyList()
+                            _selectedFeedTab.value = null
+                            val parsedVideos = repository.parseVideoListJson(bodyStr, targetCategory)
+                            if (parsedVideos.isNotEmpty()) {
+                                _dynamicVideos.value = parsedVideos
+                                currentActiveApiEndpoint = toRutubeApiUrl(urlToFetch)
+                            } else {
+                                _dynamicVideos.value = repository.fetchRealVideos(null, targetCategory, page = 1)
+                            }
                         }
                     } else {
                         if (currentRequestId != requestId) return@launch
@@ -683,6 +694,13 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     repository.parseVideoListJson(bodyStr, snapshotCategory ?: "Фильмы")
                 } else {
                     repository.fetchRealVideos(snapshotQuery, snapshotCategory, snapshotPage)
+                }
+
+                if (currentActiveApiEndpoint != snapshotEndpoint || 
+                    currentCategory != snapshotCategory || 
+                    currentQuery != snapshotQuery || 
+                    _isChannelView.value != snapshotChannelView) {
+                    return@launch
                 }
 
                 if (newVideos.isEmpty()) {
@@ -828,18 +846,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             
             // Resolve nested Matryoshka tab structures if results was empty
             val jsonObj = org.json.JSONObject(bodyStr)
-            val tabsArray = jsonObj.optJSONArray("tabs")
-            if (tabsArray != null && tabsArray.length() > 0) {
+            val parsedFeed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, apiUrl)
+            if (parsedFeed.tabs.isNotEmpty()) {
                 val urls = mutableListOf<String>()
-                for (i in 0 until tabsArray.length()) {
-                    val tabObj = tabsArray.optJSONObject(i) ?: continue
-                    val resArray = tabObj.optJSONArray("resources")
-                    if (resArray != null) {
-                        for (j in 0 until resArray.length()) {
-                            val resUrl = resArray.optJSONObject(j)?.optString("url")
-                            if (!resUrl.isNullOrBlank()) {
-                                urls.add(resUrl)
-                            }
+                for (tab in parsedFeed.tabs) {
+                    for (res in tab.resources) {
+                        val resUrl = res.url
+                        if (!resUrl.isNullOrBlank()) {
+                            urls.add(resUrl)
                         }
                     }
                 }
@@ -957,126 +971,205 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectVideo(video: Video?) {
-        if (video != null && (
-            video.id.startsWith("tv_") || 
-            video.id.startsWith("channel_") ||
-            video.id.startsWith("playlist_") ||
-            video.id.startsWith("promo_") ||
-            video.id.startsWith("unknown_")
-        )) {
-            pushToHistory()
-        }
-        
-        if (video != null && video.id.startsWith("tv_")) {
-            val fullTvId = video.id.substringAfter("tv_")
-            val idParts = fullTvId.split("__")
-            val tvId = idParts.getOrNull(0) ?: ""
-            val rawActionUrl = idParts.getOrNull(1) ?: ""
-
-            viewModelScope.launch {
-                _isChannelView.value = false
-                _currentChannelVideo.value = null
-                _channelVideos.value = emptyList()
-                _channelPlaylists.value = emptyList()
-                _channelActiveTab.value = "Видео"
-                _isLoading.value = true
-                try {
-                    var loadedVideos: List<Video> = emptyList()
-                    val fallbackUrls = mutableListOf<String>()
-
-                    if (rawActionUrl.isNotBlank() && rawActionUrl != "null") {
-                        val cleanApiUrl = toRutubeApiUrl(rawActionUrl)
-                        val finalUrl = if (cleanApiUrl.contains("?")) {
-                            if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
-                        } else {
-                            "$cleanApiUrl?format=json"
-                        }
-                        fallbackUrls.add(finalUrl)
-                    }
-
-                    if (tvId.isNotBlank()) {
-                        // High Priority - Video lists
-                        fallbackUrls.add("https://rutube.ru/api/metainfo/tv/$tvId/video/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/tv/$tvId/video/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$tvId/video/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/playlist/custom/$tvId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/playlist/custom/$tvId/videos/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$tvId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/person/$tvId/video/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/video/person/$tvId/?format=json")
-                        
-                        // Fallbacks - Containers/Metainfo
-                        fallbackUrls.add("https://rutube.ru/api/metainfo/tv/$tvId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/tv/$tvId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$tvId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/person/$tvId/?format=json")
-                    }
-
-                    for (url in fallbackUrls.distinct()) {
-                        val candidates = fetchVideosResolvingTabs(url, video.category)
-                        val hasPlayableVideos = candidates.any {
-                            it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
-                            it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
-                            it.duration != "КАТАЛОГ"
-                        }
-                        if (candidates.isNotEmpty()) {
-                            if (hasPlayableVideos) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url)
-                                break
-                            } else if (loadedVideos.isEmpty()) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url)
-                            }
-                        }
-                    }
-
-                    if (loadedVideos.isNotEmpty()) {
-                        _selectedSubfolderName.value = video.title
-                        _dynamicVideos.value = loadedVideos
-                        _searchQuery.value = ""
-                        selectTab("home")
-                        currentPage = 1
-                        isEndReached = false
-                    } else {
-                        currentPage = 1
-                        isEndReached = true
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("VideoViewModel", "Error fetching TV episodes", e)
-                } finally {
-                    _isLoading.value = false
-                }
-            }
+        if (video == null) {
+            _currentSelectedVideo.value = null
+            _isPlaying.value = false
+            stopPlaybackTicker()
             return
         }
 
-        if (video != null && video.id.startsWith("channel_")) {
-            val fullChannelId = video.id.substringAfter("channel_")
-            val idParts = fullChannelId.split("__")
-            val channelId = idParts.getOrNull(0) ?: ""
-            val rawActionUrl = idParts.getOrNull(1) ?: ""
+        val prefix = when {
+            video.id.startsWith("tv_") -> "tv_"
+            video.id.startsWith("channel_") -> "channel_"
+            video.id.startsWith("playlist_") -> "playlist_"
+            video.id.startsWith("promo_") -> "promo_"
+            video.id.startsWith("unknown_") -> "unknown_"
+            else -> ""
+        }
+        val fullIdWithUrl = if (prefix.isNotEmpty()) video.id.removePrefix(prefix) else video.id
+        val idParts = fullIdWithUrl.split("__")
+        val rawId = idParts.getOrNull(0) ?: ""
+        val actionUrl = idParts.getOrNull(1) ?: ""
+        val finalActionUrl = actionUrl.takeIf { it.isNotBlank() && it != "null" } ?: video.authorActionUrl ?: ""
 
-            viewModelScope.launch {
-                _isChannelView.value = true
-                _currentChannelVideo.value = video
-                _selectedSubfolderName.value = video.title
-                _searchQuery.value = ""
-                _channelVideos.value = emptyList()
-                _channelPlaylists.value = emptyList()
-                _channelActiveTab.value = "Видео"
-                selectTab("home")
-                currentPage = 1
-                isEndReached = false
+        val trueType = when {
+            video.duration == "КАНАЛ" -> "CHANNEL"
+            video.duration == "СЕРИАЛ" -> "TV_SERIES"
+            video.duration == "ПЛЕЙЛИСТ" -> "PLAYLIST"
+            video.duration in listOf("КАТАЛОГ", "ПАПКА", "ПРОМО") -> "CATALOG"
+            
+            prefix.isEmpty() -> "VIDEO"
+            
+            finalActionUrl.contains("/channel/") || finalActionUrl.contains("/person/") || finalActionUrl.contains("/video/person/") -> "CHANNEL"
+            finalActionUrl.contains("/tv/") || finalActionUrl.contains("/serial/") || finalActionUrl.contains("/series/") || finalActionUrl.contains("/brand/") || finalActionUrl.contains("/metainfo/tv/") -> "TV_SERIES"
+            finalActionUrl.contains("/playlist/") || finalActionUrl.contains("/plst/") -> "PLAYLIST"
+            finalActionUrl.contains("/feeds/") || finalActionUrl.contains("/promogroup/") || finalActionUrl.contains("/tags/") -> "CATALOG"
+            
+            video.id.startsWith("channel_") -> "CHANNEL"
+            video.id.startsWith("tv_") -> "TV_SERIES"
+            video.id.startsWith("playlist_") -> "PLAYLIST"
+            video.id.startsWith("unknown_") || video.id.startsWith("promo_") -> "CATALOG"
+            
+            else -> "VIDEO"
+        }
 
-                launch {
+        if (trueType != "VIDEO") {
+            pushToHistory()
+        }
+
+        when (trueType) {
+            "CHANNEL" -> {
+                viewModelScope.launch {
+                    _isChannelView.value = true
+                    _currentChannelVideo.value = video
+                    _selectedSubfolderName.value = video.title
+                    _searchQuery.value = ""
+                    _channelVideos.value = emptyList()
+                    _channelPlaylists.value = emptyList()
+                    _channelActiveTab.value = "Видео"
+                    selectTab("home")
+                    currentPage = 1
+                    isEndReached = false
+
+                    val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+
+                    launch {
+                        try {
+                            val searchName = video.title.takeIf { it.isNotBlank() } ?: video.channel
+                            if (searchName.isNotBlank()) {
+                                val encodedTitle = java.net.URLEncoder.encode(searchName, "UTF-8")
+                                val searchPersonUrl = "https://rutube.ru/api/search/person/?query=$encodedTitle&format=json"
+                                val response = apiService.getDynamicUrl(searchPersonUrl)
+                                val bodyStr = response.string()
+                                val channels = repository.parseVideoListJson(bodyStr, video.category, searchPersonUrl)
+                                val matchedChannel = channels.firstOrNull { 
+                                    it.authorId == rawId || it.title.equals(searchName, ignoreCase = true)
+                                } ?: channels.firstOrNull()
+                                
+                                if (matchedChannel != null) {
+                                    val currentVal = _currentChannelVideo.value
+                                    if (currentVal != null) {
+                                        _currentChannelVideo.value = currentVal.copy(
+                                            views = matchedChannel.views.takeIf { it.isNotBlank() } ?: currentVal.views,
+                                            timeAgo = matchedChannel.timeAgo.takeIf { it.isNotBlank() } ?: currentVal.timeAgo,
+                                            description = matchedChannel.description.takeIf { it.isNotBlank() } ?: currentVal.description,
+                                            thumbnailUrl = matchedChannel.thumbnailUrl.takeIf { !it.isNullOrBlank() } ?: currentVal.thumbnailUrl,
+                                            authorAvatarUrl = matchedChannel.authorAvatarUrl.takeIf { !it.isNullOrBlank() } ?: currentVal.authorAvatarUrl,
+                                            channel = matchedChannel.channel.takeIf { it.isNotBlank() } ?: currentVal.channel
+                                        )
+                                    }
+                                }
+                            }
+                        } catch (ex: Exception) {
+                            android.util.Log.e("VideoViewModel", "Failed to enrich channel metadata", ex)
+                        }
+                    }
+
+                    launch {
+                        _isLoading.value = true
+                        try {
+                            var loadedVideos: List<Video> = emptyList()
+                            val fallbackUrls = mutableListOf<String>()
+
+                            if (finalActionUrl.isNotBlank()) {
+                                val cleanApiUrl = toRutubeApiUrl(finalActionUrl)
+                                val finalUrl = if (cleanApiUrl.contains("?")) {
+                                    if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
+                                } else {
+                                    "$cleanApiUrl?format=json"
+                                }
+                                fallbackUrls.add(finalUrl)
+                            }
+
+                            if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
+                                fallbackUrls.add("https://rutube.ru/api/video/person/$rawId/?format=json")
+                                fallbackUrls.add("https://rutube.ru/api/feeds/person/$rawId/?format=json")
+                                fallbackUrls.add("https://rutube.ru/api/feeds/person/$rawId/video/?format=json")
+                                fallbackUrls.add("https://rutube.ru/api/metainfo/person/$rawId/video/?format=json")
+                            }
+
+                            for (url in fallbackUrls.distinct()) {
+                                val candidates = fetchVideosResolvingTabs(url, video.category)
+                                
+                                val fetchedChannel = candidates.firstOrNull { it.duration == "КАНАЛ" }
+                                if (fetchedChannel != null) {
+                                    val currentVal = _currentChannelVideo.value
+                                    if (currentVal != null) {
+                                        _currentChannelVideo.value = currentVal.copy(
+                                            views = fetchedChannel.views.takeIf { it.isNotBlank() } ?: currentVal.views,
+                                            timeAgo = fetchedChannel.timeAgo.takeIf { it.isNotBlank() } ?: currentVal.timeAgo,
+                                            description = fetchedChannel.description.takeIf { it.isNotBlank() } ?: currentVal.description,
+                                            thumbnailUrl = fetchedChannel.thumbnailUrl.takeIf { !it.isNullOrBlank() } ?: currentVal.thumbnailUrl,
+                                            authorAvatarUrl = fetchedChannel.authorAvatarUrl.takeIf { !it.isNullOrBlank() } ?: currentVal.authorAvatarUrl,
+                                            channel = fetchedChannel.channel.takeIf { it.isNotBlank() } ?: currentVal.channel
+                                        )
+                                    }
+                                }
+
+                                val hasPlayableVideos = candidates.any {
+                                    it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
+                                    it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
+                                    it.duration != "КАТАЛОГ"
+                                }
+                                if (candidates.isNotEmpty()) {
+                                    if (hasPlayableVideos) {
+                                        loadedVideos = candidates
+                                        currentActiveApiEndpoint = toRutubeApiUrl(url)
+                                        break
+                                    } else if (loadedVideos.isEmpty()) {
+                                        loadedVideos = candidates
+                                        currentActiveApiEndpoint = toRutubeApiUrl(url)
+                                    }
+                                }
+                            }
+                            
+                            _channelVideos.value = loadedVideos
+
+                            val firstVideo = loadedVideos.firstOrNull { !it.authorAvatarUrl.isNullOrBlank() }
+                            if (firstVideo != null) {
+                                val cur = _currentChannelVideo.value
+                                if (cur != null && (cur.thumbnailUrl.isNullOrBlank() || cur.authorAvatarUrl.isNullOrBlank())) {
+                                    _currentChannelVideo.value = cur.copy(
+                                        thumbnailUrl = firstVideo.authorAvatarUrl,
+                                        authorAvatarUrl = firstVideo.authorAvatarUrl
+                                    )
+                                }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("VideoViewModel", "Error resolving channel videos", e)
+                        } finally {
+                            _isLoading.value = false
+                        }
+                    }
+
+                    if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
+                        launch {
+                            _isLoadingPlaylists.value = true
+                            try {
+                                _channelPlaylists.value = fetchVideosResolvingTabs("https://rutube.ru/api/playlist/user/$rawId/?format=json", video.category)
+                            } catch (e: Exception) {
+                                android.util.Log.e("VideoViewModel", "Error resolving channel playlists", e)
+                            } finally {
+                                _isLoadingPlaylists.value = false
+                            }
+                        }
+                    }
+                }
+            }
+            "TV_SERIES" -> {
+                viewModelScope.launch {
+                    _isChannelView.value = false
+                    _currentChannelVideo.value = null
+                    _channelVideos.value = emptyList()
+                    _channelPlaylists.value = emptyList()
+                    _channelActiveTab.value = "Видео"
                     _isLoading.value = true
                     try {
                         var loadedVideos: List<Video> = emptyList()
                         val fallbackUrls = mutableListOf<String>()
 
-                        if (rawActionUrl.isNotBlank() && rawActionUrl != "null") {
-                            val cleanApiUrl = toRutubeApiUrl(rawActionUrl)
+                        if (finalActionUrl.isNotBlank()) {
+                            val cleanApiUrl = toRutubeApiUrl(finalActionUrl)
                             val finalUrl = if (cleanApiUrl.contains("?")) {
                                 if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
                             } else {
@@ -1085,11 +1178,19 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             fallbackUrls.add(finalUrl)
                         }
 
-                        if (channelId.isNotBlank()) {
-                            fallbackUrls.add("https://rutube.ru/api/video/person/$channelId/?format=json")
-                            fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/?format=json")
-                            fallbackUrls.add("https://rutube.ru/api/feeds/person/$channelId/video/?format=json")
-                            fallbackUrls.add("https://rutube.ru/api/metainfo/person/$channelId/video/?format=json")
+                        if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
+                            fallbackUrls.add("https://rutube.ru/api/metainfo/tv/$rawId/video/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/tv/$rawId/video/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/video/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/videos/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/person/$rawId/video/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/video/person/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/metainfo/tv/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/tv/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/person/$rawId/?format=json")
                         }
 
                         for (url in fallbackUrls.distinct()) {
@@ -1110,139 +1211,146 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                         }
-                        
-                        _channelVideos.value = loadedVideos
 
-                        val firstVideo = loadedVideos.firstOrNull { !it.authorAvatarUrl.isNullOrBlank() }
-                        if (firstVideo != null) {
-                            val cur = _currentChannelVideo.value
-                            if (cur != null && (cur.thumbnailUrl.isNullOrBlank() || cur.authorAvatarUrl.isNullOrBlank())) {
-                                _currentChannelVideo.value = cur.copy(
-                                    thumbnailUrl = firstVideo.authorAvatarUrl,
-                                    authorAvatarUrl = firstVideo.authorAvatarUrl
-                                )
-                            }
+                        if (loadedVideos.isNotEmpty()) {
+                            _selectedSubfolderName.value = video.title
+                            _dynamicVideos.value = loadedVideos
+                            _searchQuery.value = ""
+                            selectTab("home")
+                            currentPage = 1
+                            isEndReached = false
+                        } else {
+                            currentPage = 1
+                            isEndReached = true
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("VideoViewModel", "Error resolving channel videos", e)
+                        android.util.Log.e("VideoViewModel", "Error fetching TV episodes", e)
                     } finally {
                         _isLoading.value = false
                     }
                 }
-
-                if (channelId.isNotBlank()) {
-                    launch {
-                        _isLoadingPlaylists.value = true
-                        try {
-                            _channelPlaylists.value = fetchVideosResolvingTabs("https://rutube.ru/api/playlist/user/$channelId/?format=json", video.category)
-                        } catch (e: Exception) {
-                            android.util.Log.e("VideoViewModel", "Error resolving channel playlists", e)
-                        } finally {
-                            _isLoadingPlaylists.value = false
-                        }
-                    }
-                }
             }
-            return
-        }
+            "PLAYLIST" -> {
+                viewModelScope.launch {
+                    _isChannelView.value = false
+                    _currentChannelVideo.value = null
+                    _channelVideos.value = emptyList()
+                    _channelPlaylists.value = emptyList()
+                    _channelActiveTab.value = "Видео"
+                    _isLoading.value = true
+                    try {
+                        var loadedVideos: List<Video> = emptyList()
+                        val fallbackUrls = mutableListOf<String>()
 
-        if (video != null && (video.id.startsWith("unknown_") || video.id.startsWith("playlist_") || video.id.startsWith("promo_"))) {
-            val prefix = when {
-                video.id.startsWith("unknown_") -> "unknown_"
-                video.id.startsWith("playlist_") -> "playlist_"
-                video.id.startsWith("promo_") -> "promo_"
-                else -> ""
-            }
-            val parts = video.id.substringAfter(prefix).split("__")
-            val rawId = parts.getOrNull(0) ?: ""
-            val actionUrl = parts.getOrNull(1) ?: ""
-            
-            viewModelScope.launch {
-                _isChannelView.value = false
-                _currentChannelVideo.value = null
-                _channelVideos.value = emptyList()
-                _channelPlaylists.value = emptyList()
-                _channelActiveTab.value = "Видео"
-                _isLoading.value = true
-                try {
-                    var loadedVideos: List<Video> = emptyList()
-                    val fallbackUrls = mutableListOf<String>()
-
-                    if (actionUrl.isNotBlank() && actionUrl != "null") {
-                        val cleanApiUrl = toRutubeApiUrl(actionUrl)
-                        val finalUrl = if (cleanApiUrl.contains("?")) {
-                            if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
-                        } else {
-                            "$cleanApiUrl?format=json"
+                        if (finalActionUrl.isNotBlank()) {
+                            val cleanApiUrl = toRutubeApiUrl(finalActionUrl)
+                            val finalUrl = if (cleanApiUrl.contains("?")) {
+                                if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
+                            } else {
+                                "$cleanApiUrl?format=json"
+                            }
+                            fallbackUrls.add(finalUrl)
                         }
-                        fallbackUrls.add(finalUrl)
-                    }
 
-                    if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
-                        fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/videos/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/promogroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
-                        fallbackUrls.add("https://rutube.ru/api/feeds/subscriptiontvseries/$rawId/?format=json")
-                    }
-
-                    for (url in fallbackUrls.distinct()) {
-                        val candidates = fetchVideosResolvingTabs(url, video.category)
-                        val hasPlayableVideos = candidates.any {
-                            it.duration != "СЕРИАЛ" && it.duration != "КАНАЛ" && 
-                            it.duration != "ПЛЕЙЛИСТ" && it.duration != "ПРОМО" && 
-                            it.duration != "КАТАЛОГ"
+                        if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
+                            fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/videos/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
                         }
-                        if (candidates.isNotEmpty()) {
-                            if (hasPlayableVideos) {
+
+                        for (url in fallbackUrls.distinct()) {
+                            val candidates = fetchVideosResolvingTabs(url, video.category)
+                            if (candidates.isNotEmpty()) {
                                 loadedVideos = candidates
                                 currentActiveApiEndpoint = toRutubeApiUrl(url)
                                 break
-                            } else if (loadedVideos.isEmpty()) {
-                                loadedVideos = candidates
-                                currentActiveApiEndpoint = toRutubeApiUrl(url)
                             }
                         }
-                    }
 
-                    if (loadedVideos.isNotEmpty()) {
-                        _selectedSubfolderName.value = video.title
-                        _dynamicVideos.value = loadedVideos
-                        _searchQuery.value = ""
-                        selectTab("home")
-                        
-                        currentPage = 1
-                        isEndReached = false
-                    } else {
-                        currentPage = 1
-                        isEndReached = true
+                        if (loadedVideos.isNotEmpty()) {
+                            _selectedSubfolderName.value = video.title
+                            _dynamicVideos.value = loadedVideos
+                            _searchQuery.value = ""
+                            selectTab("home")
+                            currentPage = 1
+                            isEndReached = false
+                        } else {
+                            currentPage = 1
+                            isEndReached = true
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoViewModel", "Error fetching playlist videos", e)
+                    } finally {
+                        _isLoading.value = false
                     }
-                } catch (e: Exception) {
-                    android.util.Log.e("VideoViewModel", "Error resolving unknown/container Matryoshka card", e)
-                } finally {
-                    _isLoading.value = false
                 }
             }
-            return
-        }
+            "CATALOG" -> {
+                viewModelScope.launch {
+                    _isChannelView.value = false
+                    _currentChannelVideo.value = null
+                    _channelVideos.value = emptyList()
+                    _channelPlaylists.value = emptyList()
+                    _channelActiveTab.value = "Видео"
+                    _isLoading.value = true
+                    try {
+                        var loadedVideos: List<Video> = emptyList()
+                        val fallbackUrls = mutableListOf<String>()
 
-        _currentSelectedVideo.value = video
-        // Open playing state automatically if a real video is selected for instant streaming
-        if (video != null) {
-            _isPlaying.value = true
-            _playProgress.value = 0f
-            startPlaybackTicker()
-            addToRecentHistory(video)
-            if (_isTvOptimized.value) {
-                _currentTab.value = "tv_mini"
+                        if (finalActionUrl.isNotBlank()) {
+                            val cleanApiUrl = toRutubeApiUrl(finalActionUrl)
+                            val finalUrl = if (cleanApiUrl.contains("?")) {
+                                if (cleanApiUrl.contains("format=json")) cleanApiUrl else "$cleanApiUrl&format=json"
+                            } else {
+                                "$cleanApiUrl?format=json"
+                            }
+                            fallbackUrls.add(finalUrl)
+                        }
+
+                        if (rawId.isNotBlank() && rawId.all { it.isLetterOrDigit() }) {
+                            fallbackUrls.add("https://rutube.ru/api/feeds/promogroup/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/v1/feeds/promogroup/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/feeds/cardgroup/$rawId/?format=json")
+                            fallbackUrls.add("https://rutube.ru/api/tags/video/$rawId/?format=json")
+                        }
+
+                        for (url in fallbackUrls.distinct()) {
+                            val candidates = fetchVideosResolvingTabs(url, video.category)
+                            if (candidates.isNotEmpty()) {
+                                loadedVideos = candidates
+                                currentActiveApiEndpoint = toRutubeApiUrl(url)
+                                break
+                            }
+                        }
+
+                        if (loadedVideos.isNotEmpty()) {
+                            _selectedSubfolderName.value = video.title
+                            _dynamicVideos.value = loadedVideos
+                            _searchQuery.value = ""
+                            selectTab("home")
+                            currentPage = 1
+                            isEndReached = false
+                        } else {
+                            currentPage = 1
+                            isEndReached = true
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoViewModel", "Error fetching catalog videos", e)
+                    } finally {
+                        _isLoading.value = false
+                    }
+                }
             }
-        } else {
-            _isPlaying.value = false
-            _playProgress.value = 0f
-            stopPlaybackTicker()
+            else -> {
+                _currentSelectedVideo.value = video
+                _isPlaying.value = true
+                _playProgress.value = 0f
+                startPlaybackTicker()
+                addToRecentHistory(video)
+                if (_isTvOptimized.value) {
+                    _currentTab.value = "tv_mini"
+                }
+            }
         }
     }
 
