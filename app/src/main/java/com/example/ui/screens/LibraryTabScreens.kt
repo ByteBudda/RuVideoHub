@@ -29,6 +29,8 @@ import com.example.ui.theme.SecondaryBackground
 import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun RecentsTabScreen(
@@ -634,84 +636,374 @@ fun LibraryTabScreen(
                 hint = "Вы можете добавить медиа в этот список, нажав на кнопку закладок на карточке видео."
             )
         } else {
+            val videos = remember(bookmarkedVideos) {
+                bookmarkedVideos.filter { 
+                    it.duration != "КАНАЛ" && 
+                    it.duration != "ПАПКА" && 
+                    it.duration != "КАТАЛОГ" && 
+                    it.duration != "СЕРИАЛ" && 
+                    it.duration != "ПЛЕЙЛИСТ" 
+                }
+            }
+            val channels = remember(bookmarkedVideos) {
+                bookmarkedVideos.filter { it.duration == "КАНАЛ" }
+            }
+            val subcategories = remember(bookmarkedVideos) {
+                bookmarkedVideos.filter { 
+                    it.duration == "ПАПКА" || 
+                    it.duration == "КАТАЛОГ" || 
+                    it.duration == "СЕРИАЛ" 
+                }
+            }
+            val playlists = remember(bookmarkedVideos) {
+                bookmarkedVideos.filter { it.duration == "ПЛЕЙЛИСТ" }
+            }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
-                items(bookmarkedVideos, key = { it.id }) { saved ->
-                     val videoRuntime = Video(
-                        id = saved.id,
-                        title = saved.title,
-                        channel = saved.channel,
-                        views = saved.views,
-                        timeAgo = saved.timeAgo,
-                        duration = saved.duration,
-                        isPro = saved.isPro,
-                        category = saved.category,
-                        description = "Сохраненный элемент.",
-                        thumbnailUrl = saved.thumbnailUrl,
-                        isDownloaded = saved.isDownloaded,
-                        isBookmarked = true
-                    )
-
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
-                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                            .clickable { viewModel.selectVideo(videoRuntime) }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            VideoThumbnail(
-                                id = saved.id,
-                                duration = saved.duration,
-                                thumbnailUrl = saved.thumbnailUrl,
-                                modifier = Modifier
-                                    .width(80.dp)
-                                    .height(48.dp)
-                            )
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = saved.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onBackground
+                // 1. VIDEOS
+                if (videos.isNotEmpty()) {
+                    item {
+                        BookmarkSectionHeader(
+                            title = "Видео",
+                            count = videos.size,
+                            icon = Icons.Default.VideoLibrary
+                        )
+                    }
+                    items(videos, key = { "vid_" + it.id }) { saved ->
+                        BookmarkItemRow(
+                            saved = saved,
+                            viewModel = viewModel,
+                            isDarkTheme = isDarkTheme,
+                            isTvOptimized = isTvOptimized,
+                            onDelete = {
+                                val videoRuntime = Video(
+                                    id = saved.id, title = saved.title, channel = saved.channel,
+                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
                                 )
-                                Text(
-                                    text = saved.channel,
-                                    fontSize = 10.sp,
-                                    color = GreyText
-                                )
+                                viewModel.toggleBookmark(videoRuntime)
                             }
-
-                            IconButton(
-                                onClick = { viewModel.toggleBookmark(videoRuntime) },
-                                modifier = Modifier.size(32.dp)
-                                    .sleekTvFocus(CircleShape)
-                                    .testTag("delete_bookmark_${saved.id}")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Bookmark,
-                                    contentDescription = "Удалить из закладок",
-                                    tint = Primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                        )
                     }
                 }
+
+                // 2. CHANNELS
+                if (channels.isNotEmpty()) {
+                    item {
+                        BookmarkSectionHeader(
+                            title = "Каналы",
+                            count = channels.size,
+                            icon = Icons.Default.Tv
+                        )
+                    }
+                    items(channels, key = { "chan_" + it.id }) { saved ->
+                        BookmarkItemRow(
+                            saved = saved,
+                            viewModel = viewModel,
+                            isDarkTheme = isDarkTheme,
+                            isTvOptimized = isTvOptimized,
+                            onDelete = {
+                                val videoRuntime = Video(
+                                    id = saved.id, title = saved.title, channel = saved.channel,
+                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                )
+                                viewModel.toggleBookmark(videoRuntime)
+                            }
+                        )
+                    }
+                }
+
+                // 3. SUBCATEGORIES
+                if (subcategories.isNotEmpty()) {
+                    item {
+                        BookmarkSectionHeader(
+                            title = "Подкатегории",
+                            count = subcategories.size,
+                            icon = Icons.Default.Folder
+                        )
+                    }
+                    items(subcategories, key = { "sub_" + it.id }) { saved ->
+                        BookmarkItemRow(
+                            saved = saved,
+                            viewModel = viewModel,
+                            isDarkTheme = isDarkTheme,
+                            isTvOptimized = isTvOptimized,
+                            onDelete = {
+                                val videoRuntime = Video(
+                                    id = saved.id, title = saved.title, channel = saved.channel,
+                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                )
+                                viewModel.toggleBookmark(videoRuntime)
+                            }
+                        )
+                    }
+                }
+
+                // 4. PLAYLISTS
+                if (playlists.isNotEmpty()) {
+                    item {
+                        BookmarkSectionHeader(
+                            title = "Плейлисты",
+                            count = playlists.size,
+                            icon = Icons.Default.PlaylistPlay
+                        )
+                    }
+                    items(playlists, key = { "play_" + it.id }) { saved ->
+                        BookmarkItemRow(
+                            saved = saved,
+                            viewModel = viewModel,
+                            isDarkTheme = isDarkTheme,
+                            isTvOptimized = isTvOptimized,
+                            onDelete = {
+                                val videoRuntime = Video(
+                                    id = saved.id, title = saved.title, channel = saved.channel,
+                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                )
+                                viewModel.toggleBookmark(videoRuntime)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BookmarkSectionHeader(
+    title: String,
+    count: Int,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 6.dp, start = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$count",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = GreyText,
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun BookmarkItemRow(
+    saved: SavedVideo,
+    viewModel: VideoViewModel,
+    isDarkTheme: Boolean,
+    isTvOptimized: Boolean,
+    onDelete: () -> Unit
+) {
+    val isChannel = saved.duration == "КАНАЛ"
+    val isSubcategory = saved.duration == "ПАПКА" || saved.duration == "КАТАЛОГ" || saved.duration == "СЕРИАЛ"
+    val isPlaylist = saved.duration == "ПЛЕЙЛИСТ"
+
+    val videoRuntime = remember(saved) {
+        Video(
+            id = saved.id,
+            title = saved.title,
+            channel = saved.channel,
+            views = saved.views,
+            timeAgo = saved.timeAgo,
+            duration = saved.duration,
+            isPro = saved.isPro,
+            category = saved.category,
+            description = "Сохраненный элемент.",
+            thumbnailUrl = saved.thumbnailUrl,
+            isDownloaded = saved.isDownloaded,
+            isBookmarked = true
+        )
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+            .clickable { viewModel.selectVideo(videoRuntime) }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isChannel) {
+                    if (!saved.thumbnailUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = saved.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
+                        )
+                    } else {
+                        val firstLetter = saved.title.firstOrNull()?.toString() ?: "К"
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Primary.copy(alpha = 0.2f))
+                                .border(1.dp, Primary.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = firstLetter,
+                                color = Primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                } else if (isPlaylist) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlaylistPlay,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else if (isSubcategory) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
+                            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    VideoThumbnail(
+                        id = saved.id,
+                        duration = saved.duration,
+                        thumbnailUrl = saved.thumbnailUrl,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = saved.title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    val typeLabel = when {
+                        isChannel -> "Канал"
+                        isPlaylist -> "Плейлист"
+                        isSubcategory -> {
+                            when (saved.duration) {
+                                "СЕРИАЛ" -> "Сериал"
+                                "КАТАЛОГ" -> "Каталог"
+                                else -> "Подкатегория"
+                            }
+                        }
+                        else -> null
+                    }
+
+                    if (typeLabel != null) {
+                        Text(
+                            text = typeLabel,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+
+                    if (!isChannel && saved.channel.isNotBlank()) {
+                        Text(
+                            text = saved.channel,
+                            fontSize = 10.sp,
+                            color = GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(32.dp)
+                    .sleekTvFocus(CircleShape)
+                    .testTag("delete_bookmark_${saved.id}")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Bookmark,
+                    contentDescription = "Удалить из закладок",
+                    tint = Primary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
