@@ -463,11 +463,42 @@ fun LibraryTabScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
+    // Состояния раскрытия секций
+    var isVideosExpanded by remember { mutableStateOf(true) }
+    var isChannelsExpanded by remember { mutableStateOf(true) }
+    var isSubcategoriesExpanded by remember { mutableStateOf(true) }
+    var isPlaylistsExpanded by remember { mutableStateOf(true) }
+
+    // Группировка элементов
+    val videos = remember(bookmarkedVideos) {
+        bookmarkedVideos.filter { 
+            it.duration != "КАНАЛ" && 
+            it.duration != "ПАПКА" && 
+            it.duration != "КАТАЛОГ" && 
+            it.duration != "СЕРИАЛ" && 
+            it.duration != "ПЛЕЙЛИСТ" 
+        }
+    }
+    val channels = remember(bookmarkedVideos) {
+        bookmarkedVideos.filter { it.duration == "КАНАЛ" }
+    }
+    val subcategories = remember(bookmarkedVideos) {
+        bookmarkedVideos.filter { 
+            it.duration == "ПАПКА" || 
+            it.duration == "КАТАЛОГ" || 
+            it.duration == "СЕРИАЛ" 
+        }
+    }
+    val playlists = remember(bookmarkedVideos) {
+        bookmarkedVideos.filter { it.duration == "ПЛЕЙЛИСТ" }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Заголовок и кнопки управления
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -494,7 +525,6 @@ fun LibraryTabScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // TV Optimization Toggle button
                 IconButton(
                     onClick = { viewModel.toggleTvOptimized() },
                     modifier = Modifier
@@ -540,7 +570,7 @@ fun LibraryTabScreen(
             }
         }
 
-        // Simple Stats Row
+        // Статистика
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -617,162 +647,142 @@ fun LibraryTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Мои Закладки",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-
         if (bookmarkedVideos.isEmpty()) {
             EmptyStateContainer(
                 title = "Список избранного пуст",
                 hint = "Вы можете добавить медиа в этот список, нажав на кнопку закладок на карточке видео."
             )
         } else {
-            val videos = remember(bookmarkedVideos) {
-                bookmarkedVideos.filter { 
-                    it.duration != "КАНАЛ" && 
-                    it.duration != "ПАПКА" && 
-                    it.duration != "КАТАЛОГ" && 
-                    it.duration != "СЕРИАЛ" && 
-                    it.duration != "ПЛЕЙЛИСТ" 
-                }
-            }
-            val channels = remember(bookmarkedVideos) {
-                bookmarkedVideos.filter { it.duration == "КАНАЛ" }
-            }
-            val subcategories = remember(bookmarkedVideos) {
-                bookmarkedVideos.filter { 
-                    it.duration == "ПАПКА" || 
-                    it.duration == "КАТАЛОГ" || 
-                    it.duration == "СЕРИАЛ" 
-                }
-            }
-            val playlists = remember(bookmarkedVideos) {
-                bookmarkedVideos.filter { it.duration == "ПЛЕЙЛИСТ" }
-            }
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 // 1. VIDEOS
                 if (videos.isNotEmpty()) {
                     item {
-                        BookmarkSectionHeader(
+                        CollapsibleSection(
                             title = "Видео",
                             count = videos.size,
-                            icon = Icons.Default.VideoLibrary
+                            icon = Icons.Default.VideoLibrary,
+                            isExpanded = isVideosExpanded,
+                            onToggle = { isVideosExpanded = !isVideosExpanded }
                         )
                     }
-                    items(videos, key = { "vid_" + it.id }) { saved ->
-                        BookmarkItemRow(
-                            saved = saved,
-                            viewModel = viewModel,
-                            isDarkTheme = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            onDelete = {
-                                val videoRuntime = Video(
-                                    id = saved.id, title = saved.title, channel = saved.channel,
-                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                )
-                                viewModel.toggleBookmark(videoRuntime)
-                            }
-                        )
+                    if (isVideosExpanded) {
+                        items(videos, key = { "vid_" + it.id }) { saved ->
+                            BookmarkItemRow(
+                                saved = saved,
+                                viewModel = viewModel,
+                                isDarkTheme = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                onDelete = {
+                                    val videoRuntime = Video(
+                                        id = saved.id, title = saved.title, channel = saved.channel,
+                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                    )
+                                    viewModel.toggleBookmark(videoRuntime)
+                                }
+                            )
+                        }
                     }
                 }
 
                 // 2. CHANNELS
                 if (channels.isNotEmpty()) {
                     item {
-                        BookmarkSectionHeader(
+                        CollapsibleSection(
                             title = "Каналы",
                             count = channels.size,
-                            icon = Icons.Default.Tv
+                            icon = Icons.Default.Tv,
+                            isExpanded = isChannelsExpanded,
+                            onToggle = { isChannelsExpanded = !isChannelsExpanded }
                         )
                     }
-                    items(channels, key = { "chan_" + it.id }) { saved ->
-                        BookmarkItemRow(
-                            saved = saved,
-                            viewModel = viewModel,
-                            isDarkTheme = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            onDelete = {
-                                val videoRuntime = Video(
-                                    id = saved.id, title = saved.title, channel = saved.channel,
-                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                )
-                                viewModel.toggleBookmark(videoRuntime)
-                            }
-                        )
+                    if (isChannelsExpanded) {
+                        items(channels, key = { "chan_" + it.id }) { saved ->
+                            BookmarkItemRow(
+                                saved = saved,
+                                viewModel = viewModel,
+                                isDarkTheme = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                onDelete = {
+                                    val videoRuntime = Video(
+                                        id = saved.id, title = saved.title, channel = saved.channel,
+                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                    )
+                                    viewModel.toggleBookmark(videoRuntime)
+                                }
+                            )
+                        }
                     }
                 }
 
                 // 3. SUBCATEGORIES
                 if (subcategories.isNotEmpty()) {
                     item {
-                        BookmarkSectionHeader(
+                        CollapsibleSection(
                             title = "Подкатегории",
                             count = subcategories.size,
-                            icon = Icons.Default.Folder
+                            icon = Icons.Default.Folder,
+                            isExpanded = isSubcategoriesExpanded,
+                            onToggle = { isSubcategoriesExpanded = !isSubcategoriesExpanded }
                         )
                     }
-                    items(subcategories, key = { "sub_" + it.id }) { saved ->
-                        BookmarkItemRow(
-                            saved = saved,
-                            viewModel = viewModel,
-                            isDarkTheme = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            onDelete = {
-                                val videoRuntime = Video(
-                                    id = saved.id, title = saved.title, channel = saved.channel,
-                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                )
-                                viewModel.toggleBookmark(videoRuntime)
-                            }
-                        )
+                    if (isSubcategoriesExpanded) {
+                        items(subcategories, key = { "sub_" + it.id }) { saved ->
+                            BookmarkItemRow(
+                                saved = saved,
+                                viewModel = viewModel,
+                                isDarkTheme = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                onDelete = {
+                                    val videoRuntime = Video(
+                                        id = saved.id, title = saved.title, channel = saved.channel,
+                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                    )
+                                    viewModel.toggleBookmark(videoRuntime)
+                                }
+                            )
+                        }
                     }
                 }
 
                 // 4. PLAYLISTS
                 if (playlists.isNotEmpty()) {
                     item {
-                        BookmarkSectionHeader(
+                        CollapsibleSection(
                             title = "Плейлисты",
                             count = playlists.size,
-                            icon = Icons.Default.PlaylistPlay
+                            icon = Icons.Default.PlaylistPlay,
+                            isExpanded = isPlaylistsExpanded,
+                            onToggle = { isPlaylistsExpanded = !isPlaylistsExpanded }
                         )
                     }
-                    items(playlists, key = { "play_" + it.id }) { saved ->
-                        BookmarkItemRow(
-                            saved = saved,
-                            viewModel = viewModel,
-                            isDarkTheme = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            onDelete = {
-                                val videoRuntime = Video(
-                                    id = saved.id, title = saved.title, channel = saved.channel,
-                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                    isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                )
-                                viewModel.toggleBookmark(videoRuntime)
-                            }
-                        )
+                    if (isPlaylistsExpanded) {
+                        items(playlists, key = { "play_" + it.id }) { saved ->
+                            BookmarkItemRow(
+                                saved = saved,
+                                viewModel = viewModel,
+                                isDarkTheme = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                onDelete = {
+                                    val videoRuntime = Video(
+                                        id = saved.id, title = saved.title, channel = saved.channel,
+                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                    )
+                                    viewModel.toggleBookmark(videoRuntime)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -781,40 +791,57 @@ fun LibraryTabScreen(
 }
 
 @Composable
-fun BookmarkSectionHeader(
+fun CollapsibleSection(
     title: String,
     count: Int,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isExpanded: Boolean,
+    onToggle: () -> Unit
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 6.dp, start = 4.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .sleekTvFocus(RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Primary,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = "$count",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = GreyText,
+        Row(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
-                .padding(horizontal = 8.dp, vertical = 2.dp)
-        )
+                .fillMaxWidth()
+                .clickable { onToggle() }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "$count",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = GreyText,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                tint = GreyText,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }
 
