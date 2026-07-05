@@ -98,6 +98,50 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     private val _isTermsAgreed = MutableStateFlow(false)
     val isTermsAgreed = _isTermsAgreed.asStateFlow()
 
+    // Start Page States ("default", "category", "custom_url", "favorite")
+    private val _startPageType = MutableStateFlow("default")
+    val startPageType = _startPageType.asStateFlow()
+
+    private val _startPageCategory = MutableStateFlow("Фильмы")
+    val startPageCategory = _startPageCategory.asStateFlow()
+
+    private val _startPageCustomUrl = MutableStateFlow("")
+    val startPageCustomUrl = _startPageCustomUrl.asStateFlow()
+
+    private val _startPageFavoriteId = MutableStateFlow("")
+    val startPageFavoriteId = _startPageFavoriteId.asStateFlow()
+
+    private val _startPageFavoriteTitle = MutableStateFlow("")
+    val startPageFavoriteTitle = _startPageFavoriteTitle.asStateFlow()
+
+    fun setStartPageType(type: String) {
+        _startPageType.value = type
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putString("start_page_type", type).apply()
+    }
+
+    fun setStartPageCategory(category: String) {
+        _startPageCategory.value = category
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putString("start_page_category", category).apply()
+    }
+
+    fun setStartPageCustomUrl(url: String) {
+        _startPageCustomUrl.value = url
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().putString("start_page_custom_url", url).apply()
+    }
+
+    fun setStartPageFavorite(id: String, title: String) {
+        _startPageFavoriteId.value = id
+        _startPageFavoriteTitle.value = title
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit()
+            .putString("start_page_favorite_id", id)
+            .putString("start_page_favorite_title", title)
+            .apply()
+    }
+
     fun agreeToTerms() {
         _isTermsAgreed.value = true
         val sharedPrefs = getApplication<Application>().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -387,7 +431,53 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val savedDownloadQuality = sharedPrefs.getString("download_quality", "720p") ?: "720p"
         _downloadQuality.value = savedDownloadQuality
 
-        fetchRealVideos()
+        val savedStartPageType = sharedPrefs.getString("start_page_type", "default") ?: "default"
+        val savedStartPageCategory = sharedPrefs.getString("start_page_category", "Фильмы") ?: "Фильмы"
+        val savedStartPageCustomUrl = sharedPrefs.getString("start_page_custom_url", "") ?: ""
+        val savedStartPageFavoriteId = sharedPrefs.getString("start_page_favorite_id", "") ?: ""
+        val savedStartPageFavoriteTitle = sharedPrefs.getString("start_page_favorite_title", "") ?: ""
+        _startPageType.value = savedStartPageType
+        _startPageCategory.value = savedStartPageCategory
+        _startPageCustomUrl.value = savedStartPageCustomUrl
+        _startPageFavoriteId.value = savedStartPageFavoriteId
+        _startPageFavoriteTitle.value = savedStartPageFavoriteTitle
+
+        if (savedStartPageType == "favorite" && savedStartPageFavoriteId.isNotBlank()) {
+            viewModelScope.launch {
+                val saved = repository.getVideoById(savedStartPageFavoriteId)
+                if (saved != null) {
+                    val videoRuntime = Video(
+                        id = saved.id,
+                        title = saved.title,
+                        channel = saved.channel,
+                        views = saved.views,
+                        timeAgo = saved.timeAgo,
+                        duration = saved.duration,
+                        isPro = saved.isPro,
+                        category = saved.category,
+                        description = "Стартовый экран.",
+                        thumbnailUrl = saved.thumbnailUrl,
+                        isDownloaded = saved.isDownloaded,
+                        isBookmarked = saved.isBookmarked
+                    )
+                    selectVideo(videoRuntime)
+                    navHistory.clear()
+                } else {
+                    _selectedCategory.value = "Фильмы"
+                    fetchRealVideos()
+                }
+            }
+        } else if (savedStartPageType == "custom_url" && savedStartPageCustomUrl.isNotBlank()) {
+            _selectedCategory.value = "Стартовая"
+            fetchRealVideos(category = "Стартовая", targetUrl = savedStartPageCustomUrl)
+        } else if (savedStartPageType == "category") {
+            _selectedCategory.value = savedStartPageCategory
+            fetchRealVideos(category = savedStartPageCategory)
+        } else {
+            _selectedCategory.value = "Фильмы"
+            fetchRealVideos()
+        }
+
         fetchRealCategories()
     }
 
@@ -850,11 +940,19 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun fetchVideosResolvingTabs(apiUrl: String, defaultCategory: String): List<Video> {
         val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+        android.util.Log.d("PlaylistDebug", "fetchVideosResolvingTabs: Fetching from $apiUrl")
         try {
             val response = apiService.getDynamicUrl(apiUrl)
             val bodyStr = response.string()
+            val trimmed = bodyStr.trim()
+            if (!trimmed.startsWith("{")) {
+                android.util.Log.w("PlaylistDebug", "fetchVideosResolvingTabs: Response from $apiUrl is not JSON (possibly HTML/blocked/error): ${trimmed.take(200)}")
+                return emptyList()
+            }
+
             val loaded = repository.parseVideoListJson(bodyStr, defaultCategory)
             if (loaded.isNotEmpty()) {
+                android.util.Log.d("PlaylistDebug", "fetchVideosResolvingTabs: Successfully loaded ${loaded.size} videos directly from $apiUrl")
                 return loaded
             }
             
@@ -862,6 +960,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             val jsonObj = org.json.JSONObject(bodyStr)
             val parsedFeed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, apiUrl)
             if (parsedFeed.tabs.isNotEmpty()) {
+                android.util.Log.d("PlaylistDebug", "fetchVideosResolvingTabs: Resolving ${parsedFeed.tabs.size} nested tabs from $apiUrl")
                 val urls = mutableListOf<String>()
                 for (tab in parsedFeed.tabs) {
                     for (res in tab.resources) {
@@ -881,14 +980,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         } else {
                             "$cleanSubUrl?format=json"
                         }
+                        android.util.Log.d("PlaylistDebug", "fetchVideosResolvingTabs: Fetching sub-tab from $subFinalUrl")
                         val subResponse = apiService.getDynamicUrl(subFinalUrl)
-                        val subVideos = repository.parseVideoListJson(subResponse.string(), defaultCategory)
-                        combined.addAll(subVideos)
+                        val subBody = subResponse.string()
+                        if (subBody.trim().startsWith("{")) {
+                            val subVideos = repository.parseVideoListJson(subBody, defaultCategory)
+                            combined.addAll(subVideos)
+                        } else {
+                            android.util.Log.w("PlaylistDebug", "fetchVideosResolvingTabs: Sub-tab response is not JSON from $subFinalUrl")
+                        }
                     } catch (subEx: Exception) {
                         android.util.Log.e("VideoViewModel", "Error fetching tab resource $rawUrl", subEx)
                     }
                 }
                 if (combined.isNotEmpty()) {
+                    android.util.Log.d("PlaylistDebug", "fetchVideosResolvingTabs: Returning ${combined.size} combined videos from tabs")
                     return combined.distinctBy { it.id }
                 }
             }
@@ -929,15 +1035,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val apiPath = when {
             path.startsWith("plst/") -> {
                 val plId = path.substringAfter("plst/")
-                "api/playlist/custom/$plId/videos/"
+                "api/playlist/custom/$plId/"
             }
             path.startsWith("api/video/playlist/") -> {
                 val plId = path.substringAfter("api/video/playlist/")
-                "api/playlist/custom/$plId/videos/"
+                "api/playlist/custom/$plId/"
             }
             path.startsWith("playlist/") -> {
                 val plId = path.substringAfter("playlist/")
-                "api/playlist/custom/$plId/videos/"
+                "api/playlist/custom/$plId/"
             }
             path.startsWith("tv/") -> {
                 val tvId = path.substringAfter("tv/")
@@ -1271,6 +1377,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             fallbackUrls.add("https://rutube.ru/api/playlist/custom/$rawId/?format=json")
                             fallbackUrls.add("https://rutube.ru/api/feeds/playlist/$rawId/?format=json")
                         }
+
+                        // Добавить логирование
+                        android.util.Log.d("PlaylistDebug", "Trying URLs: $fallbackUrls")
 
                         for (url in fallbackUrls.distinct()) {
                             val candidates = fetchVideosResolvingTabs(url, video.category)
