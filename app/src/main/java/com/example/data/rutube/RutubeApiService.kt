@@ -14,12 +14,11 @@ interface RutubeApiService {
         @Query("content_type") contentType: String? = null
     ): ResponseBody
 
-    @GET("api/search/combined/cards/list/")
+    @GET("api/search/combined/video_playlist/")
     suspend fun searchCombined(
         @Query("query") query: String,
         @Query("page") page: Int = 1,
-        @Query("format") format: String = "json",
-        @Query("fields") fields: String = "video_count"
+        @Query("format") format: String = "json"
     ): ResponseBody
 
     @GET("api/playlist/user/{channel_id}/")
