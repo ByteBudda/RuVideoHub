@@ -251,16 +251,16 @@ object SmartRutubeParser {
                 urlLower.contains("/video/") && !urlLower.contains("/api/") -> return EntityType.VIDEO_ITEM
                 urlLower.contains("/channel/") || urlLower.contains("/person/") -> return EntityType.CHANNEL
                 urlLower.contains("/tv/") || urlLower.contains("/serial/") -> return EntityType.TV_SERIES
-                urlLower.contains("/playlist/") -> return EntityType.PLAYLIST
+                (urlLower.contains("/playlist/") || urlLower.contains("/plst/")) && !urlLower.contains("/videos") -> return EntityType.PLAYLIST
             }
 
             return when {
-                has("duration") && has("thumbnail") && has("title") && !has("seasons") && !has("subscribers") -> EntityType.VIDEO_ITEM
                 has("seasons") && has("title") -> EntityType.TV_SERIES
-                has("subscribers") && has("avatar") && !has("duration") -> EntityType.CHANNEL
-                has("videos") && !has("duration") && !has("subscribers") -> EntityType.PLAYLIST
+                (has("videos") || has("video_count") || has("videos_count") || has("count")) && !has("subscribers") -> EntityType.PLAYLIST
+                has("subscribers") && has("avatar") -> EntityType.CHANNEL
                 signature.nestedArrays.isNotEmpty() && !has("duration") -> EntityType.CONTAINER
-                has("title") && has("thumbnail") && !has("duration") && !has("subscribers") -> EntityType.PROMO_GROUP
+                has("duration") && has("thumbnail") && has("title") -> EntityType.VIDEO_ITEM
+                has("title") && has("thumbnail") && !has("subscribers") -> EntityType.PROMO_GROUP
                 else -> EntityType.UNKNOWN
             }
         }
@@ -325,6 +325,7 @@ object SmartRutubeParser {
                 "videos" -> listOf("video_count", "videos_count", "total_videos")
                 "seasons" -> listOf("seasons_count", "seasons")
                 "avatar" -> listOf("avatar_url", "avatar", "picture_url", "picture", "logo_url", "logo")
+                "url" -> listOf("video_url", "absolute_url", "url", "link")
                 else -> listOf(canonicalField)
             }
 
@@ -429,19 +430,19 @@ object SmartRutubeParser {
         fun findCardArrays(json: JSONObject, depth: Int = 0): List<JSONArray> {
             if (depth > MAX_RECURSION_DEPTH) return emptyList()
             val results = mutableListOf<JSONArray>()
-            val visited = mutableSetOf<String>()
+            val visited = mutableSetOf<Int>()
 
             findRecursive(json, depth, results, visited)
             return results.sortedByDescending { scoreArray(it) }
         }
 
-        private fun findRecursive(obj: Any?, depth: Int, results: MutableList<JSONArray>, visited: MutableSet<String>) {
+        private fun findRecursive(obj: Any?, depth: Int, results: MutableList<JSONArray>, visited: MutableSet<Int>) {
             if (depth > MAX_RECURSION_DEPTH) return
             if (obj == null) return
 
             when (obj) {
                 is JSONObject -> {
-                    val identity = obj.toString().take(200)
+                    val identity = System.identityHashCode(obj)
                     if (identity in visited) return
                     visited.add(identity)
 
@@ -464,6 +465,10 @@ object SmartRutubeParser {
                     }
                 }
                 is JSONArray -> {
+                    val identity = System.identityHashCode(obj)
+                    if (identity in visited) return
+                    visited.add(identity)
+                    
                     for (i in 0 until obj.length()) {
                         findRecursive(obj.opt(i), depth + 1, results, visited)
                     }
@@ -669,7 +674,14 @@ object SmartRutubeParser {
                 json.optJSONObject("object")!! else json
 
             val signature = SchemaAnalyzer.buildSignature(data)
-            val detectedType = SchemaAnalyzer.detectEntityType(signature, endpointHint)
+            val objectUrl = data.optString("url", null)?.takeIf { it.isNotBlank() }
+                ?: data.optString("absolute_url", null)?.takeIf { it.isNotBlank() }
+                ?: data.optString("video_url", null)?.takeIf { it.isNotBlank() }
+            
+            // Only use endpointHint for type detection if the item doesn't have its own URL
+            // AND the model is completely unknown. But we must be careful not to label
+            // videos as TV_SERIES just because they are in a TV_SERIES endpoint.
+            val detectedType = SchemaAnalyzer.detectEntityType(signature, objectUrl)
             val model = extractModel(json, data)
 
             val isLiveStream = data.optJSONObject("type")?.optInt("id") == 12
@@ -677,19 +689,40 @@ object SmartRutubeParser {
                     || data.optBoolean("is_live", false)
                     || json.optBoolean("is_live", false)
 
+            val isTvModel = model in listOf("tv", "show", "serial", "tvshow")
+            val isChannelModel = model in listOf("userchannel", "person", "channel", "author", "user")
+            val isPlaylistModel = model == "playlist"
+            val isPromoModel = model == "promo"
+            val isVideoModel = model in listOf("video", "live", "shorts", "episode", "trailer", "movie")
+
             return when {
-                isLiveStream || detectedType == EntityType.VIDEO_ITEM || model in listOf("video", "live", "shorts") ->
-                    normalizeVideo(data, signature, endpointHint)
-                detectedType == EntityType.TV_SERIES || model in listOf("tv", "show", "serial", "tvshow", "movie") ->
-                    normalizeTvShow(data, signature, endpointHint)
-                detectedType == EntityType.CHANNEL || model in listOf("userchannel", "person", "channel", "author", "user") ->
-                    normalizeChannel(data, signature, endpointHint)
-                detectedType == EntityType.PLAYLIST || model == "playlist" ->
-                    normalizePlaylist(data, signature, endpointHint)
-                detectedType == EntityType.PROMO_GROUP || json.has("button") || json.has("target") || model == "promo" ->
-                    normalizePromo(json, endpointHint)
+                isTvModel -> normalizeTvShow(data, signature, endpointHint)
+                isChannelModel -> normalizeChannel(data, signature, endpointHint)
+                isPlaylistModel -> normalizePlaylist(data, signature, endpointHint)
+                isPromoModel || json.has("button") || json.has("target") -> normalizePromo(json, endpointHint)
+                isVideoModel || isLiveStream -> normalizeVideo(data, signature, endpointHint)
+                
+                // Fallbacks if model is unknown
+                detectedType == EntityType.CHANNEL -> normalizeChannel(data, signature, endpointHint)
+                detectedType == EntityType.PLAYLIST -> normalizePlaylist(data, signature, endpointHint)
+                detectedType == EntityType.PROMO_GROUP -> normalizePromo(json, endpointHint)
+                detectedType == EntityType.VIDEO_ITEM -> normalizeVideo(data, signature, endpointHint)
+                detectedType == EntityType.TV_SERIES -> normalizeTvShow(data, signature, endpointHint)
+                
+                // If detectedType is UNKNOWN, try to use endpointHint if it provides a strong clue, 
+                // but only if the item doesn't look like a video.
                 else -> {
-                    normalizeUnknown(data, signature, endpointHint)
+                    val endpointType = SchemaAnalyzer.detectEntityType(signature, endpointHint)
+                    val looksLikeVideo = signature.fields["duration"]?.confidence ?: 0.0 > 0.5
+                    
+                    if (looksLikeVideo) {
+                        normalizeVideo(data, signature, endpointHint)
+                    } else when (endpointType) {
+                        EntityType.CHANNEL -> normalizeChannel(data, signature, endpointHint)
+                        EntityType.PLAYLIST -> normalizePlaylist(data, signature, endpointHint)
+                        EntityType.TV_SERIES -> normalizeTvShow(data, signature, endpointHint)
+                        else -> normalizeUnknown(data, signature, endpointHint)
+                    }
                 }
             }
         }
@@ -717,10 +750,15 @@ object SmartRutubeParser {
                 ?: makeId("video", data, endpointHint)
 
             val author = AdaptiveExtractor.getObject(data, "author", endpointHint)
-            val authorName = AdaptiveExtractor.getString(author ?: data, "title", endpointHint)
-                .takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractor.getString(data, "feed_name", endpointHint)
-                ?: "Rutube"
+            val authorName = if (author != null) {
+                AdaptiveExtractor.getString(author, "name", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(author, "title", endpointHint).takeIf { it.isNotBlank() }
+                    ?: "Rutube"
+            } else {
+                AdaptiveExtractor.getString(data, "feed_name", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "author", endpointHint).takeIf { it.isNotBlank() }
+                    ?: "Rutube"
+            }
 
             val viewsCount = AdaptiveExtractor.getLong(data, "views", endpointHint)
             val durationSeconds = AdaptiveExtractor.getDouble(data, "duration", endpointHint, -1.0)
@@ -749,8 +787,10 @@ object SmartRutubeParser {
                 previewGif = AdaptiveExtractor.getString(data, "preview_url", endpointHint).takeIf { it.isNotBlank() },
                 duration = if (isLive) "ЭФИР" else if (durationSeconds > 0) formatDuration(durationSeconds) else "00:00",
                 channelName = authorName,
-                channelId = AdaptiveExtractor.getString(author ?: data, "id", endpointHint).takeIf { it.isNotBlank() },
-                channelAvatar = AdaptiveExtractor.getString(author ?: data, "thumbnail", endpointHint).takeIf { it.isNotBlank() },
+                channelId = author?.let { AdaptiveExtractor.getString(it, "id", endpointHint) }?.takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "author_id", endpointHint).takeIf { it.isNotBlank() },
+                channelAvatar = author?.let { AdaptiveExtractor.getString(it, "thumbnail", endpointHint) }?.takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "author_avatar", endpointHint).takeIf { it.isNotBlank() },
                 views = formatCount(viewsCount),
                 rawViews = viewsCount,
                 published = formatDate(AdaptiveExtractor.getString(data, "created", endpointHint)),
@@ -771,8 +811,8 @@ object SmartRutubeParser {
 
         private fun normalizeTvShow(data: JSONObject, sig: EntitySignature, endpointHint: String?): NormalizedCard.TvSeriesCard {
             val actionUrl = normalizeUrl(
-                AdaptiveExtractor.getString(data, "absolute_url", endpointHint)
-                    .takeIf { it.isNotBlank() }
+                AdaptiveExtractor.getString(data, "content", endpointHint).takeIf { it.isNotBlank() }
+                    ?: AdaptiveExtractor.getString(data, "absolute_url", endpointHint).takeIf { it.isNotBlank() }
                     ?: AdaptiveExtractor.getString(data, "url", endpointHint)
             )
             val id = AdaptiveExtractor.getString(data, "id", endpointHint)
@@ -846,7 +886,6 @@ object SmartRutubeParser {
             val contentUrl = target.optString("absolute_url", null)?.takeIf { it.isNotBlank() }
                 ?: target.optString("content", null)?.takeIf { it.isNotBlank() }
                 ?: data.optString("url", null)?.takeIf { it.isNotBlank() }
-                ?: url.takeIf { it.isNotBlank() }
                 ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
 
             val title = target.optString("name", null)?.takeIf { it.isNotBlank() }

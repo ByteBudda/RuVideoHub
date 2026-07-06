@@ -1,0 +1,14 @@
+                    ) {
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .testTag("dismiss_player")
+                                .focusRequester(closeButtonFocusRequester)
+                                .sleekTvFocus(CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Свернуть плеер",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }

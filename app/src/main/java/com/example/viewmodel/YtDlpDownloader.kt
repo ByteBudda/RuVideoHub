@@ -309,22 +309,27 @@ object YtDlpDownloader {
                             
                             var segmentBytes: ByteArray? = null
                             var retryCount = 0
-                            val maxRetries = 3
+                            val maxRetries = 5
                             
+                            val strictClient = okHttpClient.newBuilder()
+                                .connectTimeout(15, TimeUnit.SECONDS)
+                                .readTimeout(15, TimeUnit.SECONDS)
+                                .build()
+
                             while (segmentBytes == null && retryCount < maxRetries) {
                                 try {
                                     val req = Request.Builder().url(segmentUrl).build()
-                                    okHttpClient.newCall(req).execute().use { resp ->
+                                    strictClient.newCall(req).execute().use { resp ->
                                         if (resp.isSuccessful && resp.body != null) {
                                             segmentBytes = resp.body!!.bytes()
                                         } else {
                                             retryCount++
-                                            delay(1000L * retryCount)
+                                            delay(1500L * retryCount)
                                         }
                                     }
                                 } catch (e: Exception) {
                                     retryCount++
-                                    delay(1000L * retryCount)
+                                    delay(1500L * retryCount)
                                     if (retryCount >= maxRetries) {
                                         throw e
                                     }
@@ -407,9 +412,9 @@ object YtDlpDownloader {
                 delay(1200)
 
                 val backupUrls = listOf(
-                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                    "${com.example.utils.ApiEndpoints.BACKUP_MIRROR_BUCKET}BigBuckBunny.mp4",
+                    "${com.example.utils.ApiEndpoints.BACKUP_MIRROR_BUCKET}ElephantsDream.mp4",
+                    "${com.example.utils.ApiEndpoints.BACKUP_MIRROR_BUCKET}ForBiggerBlazes.mp4"
                 )
                 val indexChoice = Math.abs(id.hashCode()) % backupUrls.size
                 val chosenBackupUrl = backupUrls[indexChoice]

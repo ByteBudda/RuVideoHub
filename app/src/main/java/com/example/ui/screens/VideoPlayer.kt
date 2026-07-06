@@ -33,6 +33,7 @@ import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.viewmodel.VideoViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.testTag
 
 @Composable
 fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
@@ -80,6 +81,36 @@ fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
     }
 }
 
+private fun forceResizeViewAndDescendants(v: android.view.View) {
+    v.forceLayout()
+    v.requestLayout()
+    v.invalidate()
+    if (v is android.view.ViewGroup) {
+        for (i in 0 until v.childCount) {
+            forceResizeViewAndDescendants(v.getChildAt(i))
+        }
+    }
+}
+
+private fun forceFullResize(view: android.view.View) {
+    view.layoutParams = android.view.ViewGroup.LayoutParams(
+        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+    )
+    
+    // Force layout on the view and all descendants
+    forceResizeViewAndDescendants(view)
+    
+    // Walk up the parent chain and force layout on all ancestors
+    var parent = view.parent as? android.view.ViewGroup
+    while (parent != null) {
+        parent.forceLayout()
+        parent.requestLayout()
+        parent.invalidate()
+        parent = parent.parent as? android.view.ViewGroup
+    }
+}
+
 @Composable
 fun RutubeVideoPlayer(
     videoId: String,
@@ -87,6 +118,8 @@ fun RutubeVideoPlayer(
     videoTitle: String = "",
     aspectMode: VlcAspectRatio = VlcAspectRatio.FIT,
     isFullscreen: Boolean = false,
+    isMiniPlayer: Boolean = false,
+    isLive: Boolean = false,
     onToggleFullscreen: () -> Unit = {},
     onChangeAspectRatio: (VlcAspectRatio) -> Unit = {},
     onShare: () -> Unit = {},
@@ -148,6 +181,11 @@ fun RutubeVideoPlayer(
     var retryTrigger by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(videoId, selectedQuality, retryTrigger) {
+        if (isLive) {
+            useEmbedPlayer = true
+            isLoading = false
+            return@LaunchedEffect
+        }
         if (offlineFile.exists()) {
             hlsUrl = offlineFile.absolutePath
             isLoading = false
@@ -200,8 +238,8 @@ fun RutubeVideoPlayer(
                             "Accept" to "*/*",
                             "Referer" to "https://rutube.ru/"
                         ))
-                        .setConnectTimeoutMs(15000)
-                        .setReadTimeoutMs(15000)
+                        .setConnectTimeoutMs(5000)
+                        .setReadTimeoutMs(5000)
                         .setAllowCrossProtocolRedirects(true)
                     val mediaSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
                         .createMediaSource(androidx.media3.common.MediaItem.fromUri(uri))
@@ -227,18 +265,25 @@ fun RutubeVideoPlayer(
         }
     }
 
+    var isBufferingState by remember { mutableStateOf(false) }
+    var playbackSpeed by remember { mutableStateOf(1.0f) }
+
+    LaunchedEffect(playbackSpeed, exoPlayer) {
+        exoPlayer?.setPlaybackSpeed(playbackSpeed)
+    }
+
     LaunchedEffect(isPlayingState, exoPlayer) {
         exoPlayer?.playWhenReady = isPlayingState
     }
 
     LaunchedEffect(exoPlayer) {
         exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                isBufferingState = playbackState == androidx.media3.common.Player.STATE_BUFFERING
+            }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                if (retryTrigger < 3) {
-                    retryTrigger++
-                } else {
-                    useEmbedPlayer = true
-                }
+                android.util.Log.e("VideoPlayer", "ExoPlayer error, falling back to embed", error)
+                useEmbedPlayer = true
             }
         })
     }
@@ -272,7 +317,7 @@ fun RutubeVideoPlayer(
                     if (dur > 0L) {
                         totalDuration = dur
                     }
-                    viewModel.saveVideoPosition(videoId, currentPos)
+                    viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                 }
             }
             kotlinx.coroutines.delay(250)
@@ -384,11 +429,142 @@ fun RutubeVideoPlayer(
                                 mediaPlaybackRequiresUserGesture = false
                                 databaseEnabled = true
                             }
-                            webViewClient = WebViewClient()
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    // Inject script that automatically triggers video playback and enforces responsive styling
+                                    view?.evaluateJavascript(
+                                        """
+                                        (function() {
+                                            var style = document.getElementById('force-fullscreen-style');
+                                            if (!style) {
+                                                style = document.createElement('style');
+                                                style.id = 'force-fullscreen-style';
+                                                document.head.appendChild(style);
+                                            }
+                                            style.innerHTML = `
+                                                html, body, iframe, video, object, embed, .player-container, .video-player, #player, [id*="player"], [class*="player"] {
+                                                    width: 100% !important;
+                                                    height: 100% !important;
+                                                    max-width: 100% !important;
+                                                    max-height: 100% !important;
+                                                    position: absolute !important;
+                                                    top: 0 !important;
+                                                    left: 0 !important;
+                                                    margin: 0 !important;
+                                                    padding: 0 !important;
+                                                }
+                                            `;
+                                            window.dispatchEvent(new Event('resize'));
+
+                                            var playAttempts = 0;
+                                            function tryPlay() {
+                                                var video = document.querySelector('video');
+                                                if (video && !video.paused) {
+                                                    console.log('Video is playing, stopping further autoplay attempts.');
+                                                    return;
+                                                }
+                                                if (video) {
+                                                    video.muted = false;
+                                                    var playPromise = video.play();
+                                                    if (playPromise !== undefined) {
+                                                        playPromise.then(function() {
+                                                            console.log('Autoplay started successfully');
+                                                        }).catch(function(error) {
+                                                            console.log('Autoplay playPromise failed: ' + error);
+                                                        });
+                                                    }
+                                                }
+                                                // Try to click any potential play buttons in the DOM (Rutube, VK, etc.)
+                                                var playBtn = document.querySelector('.wdp-play-button') ||
+                                                              document.querySelector('.video_box_prep') ||
+                                                              document.querySelector('[class*="play-button"]') ||
+                                                              document.querySelector('[class*="play_btn"]') ||
+                                                              document.querySelector('[class*="playButton"]') ||
+                                                              document.querySelector('[id*="play"]') ||
+                                                              document.querySelector('[class*="play"]');
+                                                if (playBtn) {
+                                                    var btnText = (playBtn.className + " " + playBtn.id).toLowerCase();
+                                                    if (btnText.indexOf('pause') === -1) {
+                                                        try {
+                                                            playBtn.click();
+                                                        } catch(e) {
+                                                            console.log('Click failed', e);
+                                                        }
+                                                    }
+                                                }
+                                                if (playAttempts < 15) {
+                                                    playAttempts++;
+                                                    setTimeout(tryPlay, 800);
+                                                }
+                                            }
+                                            setTimeout(tryPlay, 500);
+                                        })();
+                                        """.trimIndent(), null
+                                    )
+                                }
+                            }
                             webChromeClient = WebChromeClient()
                             keepScreenOn = true
-                            val embedUrl = "https://rutube.ru/play/embed/$videoId/?autoplay=1"
+                            val embedUrl = if (videoId.startsWith("vk_")) {
+                                val parts = videoId.substringAfter("vk_").split("_")
+                                if (parts.size >= 2) {
+                                    val ownerId = parts[0]
+                                    val vkId = parts[1]
+                                    "https://vk.com/video_ext.php?oid=$ownerId&id=$vkId&autoplay=1"
+                                } else {
+                                    "https://vk.com/video_ext.php?oid=$videoId&id=$videoId&autoplay=1"
+                                }
+                            } else {
+                                "https://rutube.ru/play/embed/$videoId/?autoplay=1"
+                            }
                             loadUrl(embedUrl)
+                        }
+                    },
+                    update = { webView ->
+                        // Force layout parameters and measurement triggers on update to handle transition/resize perfectly
+                        val parentGroup = webView.parent as? android.view.ViewGroup
+                        parentGroup?.requestLayout()
+                        
+                        webView.layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        webView.requestLayout()
+                        webView.invalidate()
+                        
+                        webView.post {
+                            webView.requestLayout()
+                            webView.invalidate()
+                            webView.evaluateJavascript(
+                                """
+                                (function() {
+                                    var style = document.getElementById('force-fullscreen-style');
+                                    if (!style) {
+                                        style = document.createElement('style');
+                                        style.id = 'force-fullscreen-style';
+                                        document.head.appendChild(style);
+                                    }
+                                    style.innerHTML = `
+                                        html, body, iframe, video, object, embed, .player-container, .video-player, #player, [id*="player"], [class*="player"] {
+                                            width: 100% !important;
+                                            height: 100% !important;
+                                            max-width: 100% !important;
+                                            max-height: 100% !important;
+                                            position: absolute !important;
+                                            top: 0 !important;
+                                            left: 0 !important;
+                                            margin: 0 !important;
+                                            padding: 0 !important;
+                                        }
+                                    `;
+                                    window.dispatchEvent(new Event('resize'));
+                                    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 100);
+                                    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 300);
+                                    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 600);
+                                })();
+                                """.trimIndent(), null
+                            )
                         }
                     },
                     modifier = Modifier.fillMaxSize()
@@ -506,41 +682,96 @@ fun RutubeVideoPlayer(
                             VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                             else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         }
+
+                        addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
+                            override fun onViewAttachedToWindow(v: android.view.View) {
+                                v.post {
+                                    forceFullResize(v)
+                                }
+                                v.postDelayed({
+                                    forceFullResize(v)
+                                }, 100)
+                                v.postDelayed({
+                                    forceFullResize(v)
+                                }, 300)
+                                v.postDelayed({
+                                    forceFullResize(v)
+                                }, 600)
+                            }
+                            override fun onViewDetachedFromWindow(v: android.view.View) {}
+                        })
                     }
                 },
                 update = { playerView ->
+                    // Explicitly reference states to ensure update block is executed when they change
+                    val mini = isMiniPlayer
+                    val full = isFullscreen
+                    val aspect = aspectMode
+
                     playerView.player = exoPlayer
                     playerView.keepScreenOn = true
-                    playerView.resizeMode = when (aspectMode) {
+                    playerView.resizeMode = when (aspect) {
                         VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                         VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
+
+                    forceFullResize(playerView)
+
+                    playerView.post {
+                        forceFullResize(playerView)
+                    }
+                    playerView.postDelayed({
+                        forceFullResize(playerView)
+                    }, 100)
+                    playerView.postDelayed({
+                        forceFullResize(playerView)
+                    }, 300)
+                    playerView.postDelayed({
+                        forceFullResize(playerView)
+                    }, 600)
                 },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Transparent overlay for Controls
-            androidx.compose.animation.AnimatedVisibility(
-                visible = controlsVisible,
-                enter = androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.fadeOut(),
-                modifier = Modifier.fillMaxSize()
-            ) {
+            // Buffering progress indicator
+            if (isBufferingState) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .focusGroup()
-                        .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            lastInteractionTime = System.currentTimeMillis()
-                            controlsVisible = false
-                        }
+                        .background(Color.Black.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
                 ) {
+                    CircularProgressIndicator(
+                        color = Primary,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+            }
+
+            // Transparent overlay for Controls
+            if (!isMiniPlayer) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .focusGroup()
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                lastInteractionTime = System.currentTimeMillis()
+                                controlsVisible = false
+                            }
+                    ) {
                     // Top Bar Controls
                     Row(
                         modifier = Modifier
@@ -565,7 +796,7 @@ fun RutubeVideoPlayer(
                                     onClick = {
                                         lastInteractionTime = System.currentTimeMillis()
                                         if (currentPos > 0) {
-                                            viewModel.saveVideoPosition(videoId, currentPos)
+                                            viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                                         }
                                         onToggleFullscreen()
                                     },
@@ -642,6 +873,58 @@ fun RutubeVideoPlayer(
                                                 modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
                                             )
                                         }
+                                    }
+                                }
+                            }
+
+                            // Speed selection
+                            var speedMenuExpanded by remember { mutableStateOf(false) }
+                            val availableSpeeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+
+                            Box {
+                                Button(
+                                    onClick = {
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        speedMenuExpanded = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp)).testTag("player_speed_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Speed,
+                                        contentDescription = "Скорость воспроизведения",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (playbackSpeed == 1.0f) "1x" else "${playbackSpeed}x", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                DropdownMenu(
+                                    expanded = speedMenuExpanded,
+                                    onDismissRequest = { speedMenuExpanded = false },
+                                    modifier = Modifier.background(Color(0xFF0F0F1A))
+                                ) {
+                                    availableSpeeds.forEach { speed ->
+                                        DropdownMenuItem(
+                                            text = { 
+                                                Text(
+                                                    text = if (speed == 1.0f) "Обычная" else "${speed}x", 
+                                                    color = if (playbackSpeed == speed) Primary else Color.White,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (playbackSpeed == speed) FontWeight.Bold else FontWeight.Normal
+                                                ) 
+                                            },
+                                            onClick = {
+                                                playbackSpeed = speed
+                                                speedMenuExpanded = false
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                hudMessage = "Скорость: ${speed}x"
+                                            },
+                                            modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                        )
                                     }
                                 }
                             }
@@ -832,7 +1115,7 @@ fun RutubeVideoPlayer(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
                                     if (currentPos > 0) {
-                                        viewModel.saveVideoPosition(videoId, currentPos)
+                                        viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                                     }
                                     onToggleFullscreen()
                                 },
@@ -848,6 +1131,7 @@ fun RutubeVideoPlayer(
                         }
                     }
                 }
+            }
             }
 
             // HUD notification for Aspect Ratio cycles, Volume, Brightness

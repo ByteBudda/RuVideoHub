@@ -8,6 +8,9 @@ interface SavedVideoDao {
     @Query("SELECT * FROM saved_videos ORDER BY savedAt DESC")
     fun getAllSavedVideos(): Flow<List<SavedVideo>>
 
+    @Query("SELECT * FROM saved_videos WHERE lastProgress > 0 AND lastProgress < (lastDuration - 5000) ORDER BY savedAt DESC")
+    fun getContinueWatchingVideos(): Flow<List<SavedVideo>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(video: SavedVideo)
 

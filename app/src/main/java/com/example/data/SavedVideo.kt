@@ -17,5 +17,7 @@ data class SavedVideo(
     val isBookmarked: Boolean,
     val thumbnailUrl: String? = null,
     val savedAt: Long = System.currentTimeMillis(),
-    val isWatched: Boolean = true
+    val isWatched: Boolean = true,
+    val lastProgress: Long = 0L,
+    val lastDuration: Long = 0L
 )

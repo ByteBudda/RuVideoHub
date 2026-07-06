@@ -85,6 +85,7 @@ fun SleekVideoHubApp(
 ) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val currentSelectedVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
+    val isMiniPlayer by viewModel.isMiniPlayer.collectAsStateWithLifecycle()
     val isTermsAgreed by viewModel.isTermsAgreed.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
@@ -115,6 +116,23 @@ fun SleekVideoHubApp(
 
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+    val isInPipMode by viewModel.isInPipMode.collectAsStateWithLifecycle()
+
+    if (isInPipMode) {
+        currentSelectedVideo?.let { video ->
+            SleekPlayerDetailOverlay(
+                video = video,
+                viewModel = viewModel,
+                isDark = isDarkTheme,
+                isTvOptimized = isTvOptimized,
+                isMiniPlayer = false,
+                isInPipMode = true,
+                onDismiss = { viewModel.selectVideo(null) },
+                onRestore = {}
+            )
+        }
+        return
+    }
 
     AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
         if (isTvOptimized) {
@@ -220,9 +238,17 @@ fun SleekVideoHubApp(
         ) {
             currentSelectedVideo?.let { video ->
                 SleekPlayerDetailOverlay(
-                    video = video,
-                    viewModel = viewModel,
-                    onDismiss = { viewModel.selectVideo(null) }
+                        video = video,
+                        viewModel = viewModel,
+                        isDark = isDarkTheme,
+                        isTvOptimized = isTvOptimized,
+                        isMiniPlayer = isMiniPlayer,
+                        isInPipMode = false,
+                        onDismiss = {
+                            if (isMiniPlayer) viewModel.selectVideo(null)
+                            else viewModel.setMiniPlayer(true)
+                        },
+                        onRestore = { viewModel.setMiniPlayer(false) }
                 )
             }
         }
@@ -445,3 +471,4 @@ fun SleekTvNavigationRail(
         }
     }
 }
+

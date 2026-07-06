@@ -1,0 +1,7 @@
+                        Text(
+                            text = "${video.category} • Воспроизведение",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Primary,
+                            letterSpacing = 0.5.sp
+                        )

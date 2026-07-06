@@ -14,7 +14,7 @@ interface RutubeApiService {
         @Query("content_type") contentType: String? = null
     ): ResponseBody
 
-    @GET("api/search/combined/video_playlist/")
+    @GET("api/search/combined/video_playlist")
     suspend fun searchCombined(
         @Query("query") query: String,
         @Query("page") page: Int = 1,

@@ -44,6 +44,31 @@ class MainActivity : ComponentActivity() {
     intent?.data?.toString()?.let { url ->
         viewModel.loadVideoByUrlOrId(url)
     }
+    intent?.getStringExtra("restore_video_id")?.let { id ->
+        viewModel.loadVideoByUrlOrId(id)
+    }
+  }
+
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    if (viewModel.currentSelectedVideo.value != null) {
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        try {
+          val params = android.app.PictureInPictureParams.Builder().build()
+          enterPictureInPictureMode(params)
+        } catch (e: Exception) {
+          android.util.Log.e("MainActivity", "Error entering PiP mode in onUserLeaveHint", e)
+        }
+      }
+    }
+  }
+
+  override fun onPictureInPictureModeChanged(
+      isInPictureInPictureMode: Boolean,
+      newConfig: android.content.res.Configuration
+  ) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    viewModel.setInPipMode(isInPictureInPictureMode)
   }
 
   override fun onNewIntent(intent: android.content.Intent) {
@@ -51,6 +76,9 @@ class MainActivity : ComponentActivity() {
     setIntent(intent)
     intent.data?.toString()?.let { url ->
         viewModel.loadVideoByUrlOrId(url)
+    }
+    intent.getStringExtra("restore_video_id")?.let { id ->
+        viewModel.loadVideoByUrlOrId(id)
     }
   }
 }

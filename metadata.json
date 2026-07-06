@@ -1,6 +1,6 @@
 {
-  "name": "Sleek Video Hub",
-  "description": "Sleek video hub client search under a sleek interface theme.",
+  "name": "RuVideoHub",
+  "description": "RuVideoHub client search under a sleek interface theme.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

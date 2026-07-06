@@ -29,6 +29,7 @@ import com.example.ui.theme.SecondaryBackground
 import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
+import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 
@@ -454,6 +455,32 @@ fun DownloadsTabScreen(
     }
 }
 
+enum class BookmarkSort(val label: String) {
+    DATE_ADDED("Сначала новые"),
+    TITLE("По названию"),
+    DURATION("По длительности")
+}
+
+private fun parseDurationToSeconds(duration: String): Int {
+    val parts = duration.split(":")
+    return try {
+        if (parts.size == 2) {
+            val minutes = parts[0].toIntOrNull() ?: 0
+            val seconds = parts[1].toIntOrNull() ?: 0
+            minutes * 60 + seconds
+        } else if (parts.size == 3) {
+            val hours = parts[0].toIntOrNull() ?: 0
+            val minutes = parts[1].toIntOrNull() ?: 0
+            val seconds = parts[2].toIntOrNull() ?: 0
+            hours * 3600 + minutes * 60 + seconds
+        } else {
+            0
+        }
+    } catch (e: Exception) {
+        0
+    }
+}
+
 @Composable
 fun LibraryTabScreen(
     viewModel: VideoViewModel,
@@ -463,42 +490,16 @@ fun LibraryTabScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
-    // Состояния раскрытия секций
-    var isVideosExpanded by remember { mutableStateOf(true) }
-    var isChannelsExpanded by remember { mutableStateOf(true) }
-    var isSubcategoriesExpanded by remember { mutableStateOf(true) }
-    var isPlaylistsExpanded by remember { mutableStateOf(true) }
-
-    // Группировка элементов
-    val videos = remember(bookmarkedVideos) {
-        bookmarkedVideos.filter { 
-            it.duration != "КАНАЛ" && 
-            it.duration != "ПАПКА" && 
-            it.duration != "КАТАЛОГ" && 
-            it.duration != "СЕРИАЛ" && 
-            it.duration != "ПЛЕЙЛИСТ" 
-        }
-    }
-    val channels = remember(bookmarkedVideos) {
-        bookmarkedVideos.filter { it.duration == "КАНАЛ" }
-    }
-    val subcategories = remember(bookmarkedVideos) {
-        bookmarkedVideos.filter { 
-            it.duration == "ПАПКА" || 
-            it.duration == "КАТАЛОГ" || 
-            it.duration == "СЕРИАЛ" 
-        }
-    }
-    val playlists = remember(bookmarkedVideos) {
-        bookmarkedVideos.filter { it.duration == "ПЛЕЙЛИСТ" }
-    }
+    var searchQuery by remember { mutableStateOf("") }
+    var sortOrder by remember { mutableStateOf(BookmarkSort.DATE_ADDED) }
+    var showSortMenu by remember { mutableStateOf(false) }
+    var showBackupDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Заголовок и кнопки управления
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -525,6 +526,25 @@ fun LibraryTabScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Backup/Restore button
+                IconButton(
+                    onClick = { showBackupDialog = true },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape)
+                        .sleekTvFocus(CircleShape)
+                        .testTag("backup_restore_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ImportExport,
+                        contentDescription = "Резервная копия закладок",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // TV Optimization Toggle button
                 IconButton(
                     onClick = { viewModel.toggleTvOptimized() },
                     modifier = Modifier
@@ -570,7 +590,7 @@ fun LibraryTabScreen(
             }
         }
 
-        // Статистика
+        // Simple Stats Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -645,7 +665,108 @@ fun LibraryTabScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Search & Filter Panel
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Поиск в избранном...", fontSize = 12.sp, color = GreyText) },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = GreyText,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Очистить",
+                                tint = GreyText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .testTag("bookmark_search_input")
+            )
+
+            Box {
+                Button(
+                    onClick = { showSortMenu = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    modifier = Modifier
+                        .height(48.dp)
+                        .sleekTvFocus(RoundedCornerShape(12.dp))
+                        .testTag("bookmark_sort_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = "Сортировка",
+                        tint = Primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = sortOrder.label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    BookmarkSort.values().forEach { order ->
+                        DropdownMenuItem(
+                            text = { Text(order.label, fontSize = 13.sp) },
+                            onClick = {
+                                sortOrder = order
+                                showSortMenu = false
+                            },
+                            leadingIcon = {
+                                if (sortOrder == order) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (bookmarkedVideos.isEmpty()) {
             EmptyStateContainer(
@@ -653,23 +774,68 @@ fun LibraryTabScreen(
                 hint = "Вы можете добавить медиа в этот список, нажав на кнопку закладок на карточке видео."
             )
         } else {
+            val filteredAndSorted = remember(bookmarkedVideos, searchQuery, sortOrder) {
+                val filtered = if (searchQuery.isBlank()) {
+                    bookmarkedVideos
+                } else {
+                    bookmarkedVideos.filter {
+                        it.title.contains(searchQuery, ignoreCase = true) ||
+                        it.channel.contains(searchQuery, ignoreCase = true)
+                    }
+                }
+                
+                when (sortOrder) {
+                    BookmarkSort.DATE_ADDED -> filtered.sortedByDescending { it.savedAt }
+                    BookmarkSort.TITLE -> filtered.sortedBy { it.title.lowercase() }
+                    BookmarkSort.DURATION -> filtered.sortedByDescending { parseDurationToSeconds(it.duration) }
+                }
+            }
+
+            val videos = remember(filteredAndSorted) {
+                filteredAndSorted.filter { 
+                    it.duration != "КАНАЛ" && 
+                    it.duration != "ПАПКА" && 
+                    it.duration != "КАТАЛОГ" && 
+                    it.duration != "СЕРИАЛ" && 
+                    it.duration != "ПЛЕЙЛИСТ" 
+                }
+            }
+            val channels = remember(filteredAndSorted) {
+                filteredAndSorted.filter { it.duration == "КАНАЛ" }
+            }
+            val subcategories = remember(filteredAndSorted) {
+                filteredAndSorted.filter { 
+                    it.duration == "ПАПКА" || 
+                    it.duration == "КАТАЛОГ" || 
+                    it.duration == "СЕРИАЛ" 
+                }
+            }
+            val playlists = remember(filteredAndSorted) {
+                filteredAndSorted.filter { it.duration == "ПЛЕЙЛИСТ" }
+            }
+
+            var videosExpanded by remember { mutableStateOf(true) }
+            var channelsExpanded by remember { mutableStateOf(true) }
+            var subcategoriesExpanded by remember { mutableStateOf(true) }
+            var playlistsExpanded by remember { mutableStateOf(true) }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 // 1. VIDEOS
                 if (videos.isNotEmpty()) {
                     item {
-                        CollapsibleSection(
+                        BookmarkSectionHeader(
                             title = "Видео",
                             count = videos.size,
                             icon = Icons.Default.VideoLibrary,
-                            isExpanded = isVideosExpanded,
-                            onToggle = { isVideosExpanded = !isVideosExpanded }
+                            isExpanded = videosExpanded,
+                            onClick = { videosExpanded = !videosExpanded }
                         )
                     }
-                    if (isVideosExpanded) {
+                    if (videosExpanded) {
                         items(videos, key = { "vid_" + it.id }) { saved ->
                             BookmarkItemRow(
                                 saved = saved,
@@ -693,15 +859,15 @@ fun LibraryTabScreen(
                 // 2. CHANNELS
                 if (channels.isNotEmpty()) {
                     item {
-                        CollapsibleSection(
+                        BookmarkSectionHeader(
                             title = "Каналы",
                             count = channels.size,
                             icon = Icons.Default.Tv,
-                            isExpanded = isChannelsExpanded,
-                            onToggle = { isChannelsExpanded = !isChannelsExpanded }
+                            isExpanded = channelsExpanded,
+                            onClick = { channelsExpanded = !channelsExpanded }
                         )
                     }
-                    if (isChannelsExpanded) {
+                    if (channelsExpanded) {
                         items(channels, key = { "chan_" + it.id }) { saved ->
                             BookmarkItemRow(
                                 saved = saved,
@@ -725,15 +891,15 @@ fun LibraryTabScreen(
                 // 3. SUBCATEGORIES
                 if (subcategories.isNotEmpty()) {
                     item {
-                        CollapsibleSection(
+                        BookmarkSectionHeader(
                             title = "Подкатегории",
                             count = subcategories.size,
                             icon = Icons.Default.Folder,
-                            isExpanded = isSubcategoriesExpanded,
-                            onToggle = { isSubcategoriesExpanded = !isSubcategoriesExpanded }
+                            isExpanded = subcategoriesExpanded,
+                            onClick = { subcategoriesExpanded = !subcategoriesExpanded }
                         )
                     }
-                    if (isSubcategoriesExpanded) {
+                    if (subcategoriesExpanded) {
                         items(subcategories, key = { "sub_" + it.id }) { saved ->
                             BookmarkItemRow(
                                 saved = saved,
@@ -757,15 +923,15 @@ fun LibraryTabScreen(
                 // 4. PLAYLISTS
                 if (playlists.isNotEmpty()) {
                     item {
-                        CollapsibleSection(
+                        BookmarkSectionHeader(
                             title = "Плейлисты",
                             count = playlists.size,
                             icon = Icons.Default.PlaylistPlay,
-                            isExpanded = isPlaylistsExpanded,
-                            onToggle = { isPlaylistsExpanded = !isPlaylistsExpanded }
+                            isExpanded = playlistsExpanded,
+                            onClick = { playlistsExpanded = !playlistsExpanded }
                         )
                     }
-                    if (isPlaylistsExpanded) {
+                    if (playlistsExpanded) {
                         items(playlists, key = { "play_" + it.id }) { saved ->
                             BookmarkItemRow(
                                 saved = saved,
@@ -787,61 +953,237 @@ fun LibraryTabScreen(
                 }
             }
         }
+
+        if (showBackupDialog) {
+            val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var importText by remember { mutableStateOf("") }
+            var statusMessage by remember { mutableStateOf<String?>(null) }
+            val scope = rememberCoroutineScope()
+
+            AlertDialog(
+                onDismissRequest = { showBackupDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ImportExport,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Резервная копия закладок",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Вы можете экспортировать свои закладки в буфер обмена для бэкапа, либо вставить ранее сохраненный JSON для импорта.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // EXPORT SECTION
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "Экспорт закладок (${bookmarkedVideos.size} шт.)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val json = viewModel.exportBookmarksToJson()
+                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(json))
+                                    statusMessage = "JSON скопирован в буфер обмена! Сохраните его в надежном месте."
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("export_copy_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Копировать в буфер обмена", fontSize = 12.sp)
+                            }
+                        }
+
+                        // IMPORT SECTION
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "Импорт закладок",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            TextField(
+                                value = importText,
+                                onValueChange = { importText = it },
+                                placeholder = { Text("Вставьте JSON строку сюда или нажмите кнопку вставки ниже...", fontSize = 11.sp, color = GreyText) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                                    .testTag("import_text_input"),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val clipText = clipboardManager.getText()?.text ?: ""
+                                        if (clipText.isNotBlank()) {
+                                            importText = clipText
+                                            statusMessage = "Текст успешно вставлен!"
+                                        } else {
+                                            statusMessage = "Буфер обмена пуст"
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f).testTag("import_paste_button")
+                                ) {
+                                    Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Вставить", fontSize = 12.sp)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        if (importText.isBlank()) {
+                                            statusMessage = "Пожалуйста, сначала вставьте JSON"
+                                            return@Button
+                                        }
+                                        scope.launch {
+                                            viewModel.importBookmarksFromJson(importText)
+                                                .onSuccess { count ->
+                                                    statusMessage = "Успешно импортировано закладок: $count!"
+                                                    importText = ""
+                                                }
+                                                .onFailure { error ->
+                                                    statusMessage = "Ошибка импорта: ${error.localizedMessage ?: "некорректный JSON"}"
+                                                }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f).testTag("import_confirm_button")
+                                ) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Импорт", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        statusMessage?.let { msg ->
+                            Text(
+                                text = msg,
+                                fontSize = 12.sp,
+                                color = Primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { showBackupDialog = false },
+                        modifier = Modifier.testTag("backup_close_button")
+                    ) {
+                        Text("Закрыть", color = Primary)
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.background,
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
     }
 }
 
 @Composable
-fun CollapsibleSection(
+fun BookmarkSectionHeader(
     title: String,
     count: Int,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     isExpanded: Boolean,
-    onToggle: () -> Unit
+    onClick: () -> Unit
 ) {
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .sleekTvFocus(RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$count",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = GreyText,
             modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onToggle() }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "$count",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = GreyText,
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            )
-            Icon(
-                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
-                tint = GreyText,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        )
+        Icon(
+            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = "Развернуть/Свернуть",
+            tint = GreyText,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 

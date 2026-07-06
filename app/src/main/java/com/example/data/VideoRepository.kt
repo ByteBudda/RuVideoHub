@@ -323,7 +323,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         try {
             val responseBody = com.example.data.rutube.RutubeRetrofitClient.apiService.searchCombined(q, page = page)
             val bodyString = responseBody.string()
-            val url = "https://rutube.ru/api/search/combined/video_playlist/?query=$q&page=$page"
+            val url = "https://rutube.ru/api/search/combined/video_playlist?query=$q&page=$page"
             resultsList.addAll(parseAnyResponse(bodyString, "Поиск: $q", url))
         } catch (ioEx: java.io.IOException) {
             isNetworkError = true
@@ -650,8 +650,27 @@ class VideoRepository(private val dao: SavedVideoDao) {
     }
 
     suspend fun deleteVideoById(id: String) = dao.deleteById(id)
-
+    suspend fun insertOrUpdate(video: SavedVideo) = dao.insertOrUpdate(video)
     suspend fun getVideoById(id: String): SavedVideo? = dao.getVideoById(id)
+
+    fun getContinueWatchingVideos(): Flow<List<SavedVideo>> = dao.getContinueWatchingVideos()
+
+    suspend fun saveVideoProgress(video: Video, position: Long, durationMs: Long) {
+        val saved = dao.getVideoById(video.id)
+        val termDownload = saved?.isDownloaded ?: false
+        val termBookmark = saved?.isBookmarked ?: false
+        
+        dao.insertOrUpdate(SavedVideo(
+            id = video.id, title = video.title, channel = video.channel,
+            views = video.views, timeAgo = video.timeAgo, duration = video.duration,
+            isPro = video.isPro, category = video.category,
+            isDownloaded = termDownload, isBookmarked = termBookmark,
+            thumbnailUrl = video.thumbnailUrl, isWatched = true,
+            savedAt = System.currentTimeMillis(),
+            lastProgress = position,
+            lastDuration = durationMs
+        ))
+    }
 
     // ==================== СОВМЕСТИМОСТЬ ====================
 

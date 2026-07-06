@@ -83,12 +83,20 @@ fun TvMiniPlayerScreen(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            val currentVid = currentVideo
+            val isLiveStream = currentVid != null && (currentVid.duration == "ЭФИР" || 
+                              currentVid.duration == "00:00" || 
+                              currentVid.duration.isBlank() || 
+                              currentVid.duration.contains(":") == false ||
+                              currentVid.duration.equals("трансляция", ignoreCase = true) || 
+                              currentVid.duration.equals("live", ignoreCase = true))
             RutubeVideoPlayer(
                 videoId = currentVideo!!.id,
                 viewModel = viewModel,
                 videoTitle = currentVideo!!.title,
                 aspectMode = selectedAspectRatio,
                 isFullscreen = true,
+                isLive = isLiveStream,
                 onToggleFullscreen = { viewModel.setTvMiniFullscreen(false) },
                 onChangeAspectRatio = { selectedAspectRatio = it },
                 onShare = { shareVideo(context, currentVideo!!) },
@@ -234,12 +242,20 @@ fun TvMiniPlayerScreen(
                             .border(2.dp, Primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
+                        val currentVid = currentVideo
+                        val isLiveStream = currentVid != null && (currentVid.duration == "ЭФИР" || 
+                                          currentVid.duration == "00:00" || 
+                                          currentVid.duration.isBlank() || 
+                                          currentVid.duration.contains(":") == false ||
+                                          currentVid.duration.equals("трансляция", ignoreCase = true) || 
+                                          currentVid.duration.equals("live", ignoreCase = true))
                         RutubeVideoPlayer(
                             videoId = currentVideo!!.id,
                             viewModel = viewModel,
                             videoTitle = currentVideo!!.title,
                             aspectMode = selectedAspectRatio,
                             isFullscreen = false,
+                            isLive = isLiveStream,
                             onToggleFullscreen = { viewModel.setTvMiniFullscreen(true) },
                             onChangeAspectRatio = { selectedAspectRatio = it },
                             onShare = { shareVideo(context, currentVideo!!) },

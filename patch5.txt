@@ -1,0 +1,10 @@
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isFullscreen) 0.dp else 56.dp)
+            ) {
