@@ -1682,36 +1682,15 @@ fun SleekPlaylistCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = if (video.channel.isNotBlank()) video.channel else "Плейлист",
-                        color = GreyText,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(end = 4.dp)
-                    )
-                    IconButton(
-                        onClick = onBookmarkToggle,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryContainer.copy(alpha = 0.6f))
-                            .sleekTvFocus(CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = "В избранное",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = if (video.channel.isNotBlank()) video.channel else "Плейлист",
+                    color = GreyText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -1819,36 +1798,15 @@ fun SleekSeriesCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = if (video.channel.isNotBlank()) video.channel else "Сериал",
-                        color = GreyText,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(end = 4.dp)
-                    )
-                    IconButton(
-                        onClick = onBookmarkToggle,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryContainer.copy(alpha = 0.6f))
-                            .sleekTvFocus(CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = "В избранное",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = if (video.channel.isNotBlank()) video.channel else "Сериал",
+                    color = GreyText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
