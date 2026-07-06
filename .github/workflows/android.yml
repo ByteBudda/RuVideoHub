@@ -1,36 +1,52 @@
-name: Android CI
+name: Android Release Sign with Repo Key
 
 on:
   push:
-    branches: [ "main", "master", "dev" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main", "master", "dev" ]
+    branches: [ "main", "master" ]
 
 jobs:
   build:
-    name: Build & Verify Android App
     runs-on: ubuntu-latest
 
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-        cache: 'gradle'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
 
-    - name: Grant Execute Permission to Gradlew
-      run: chmod +x gradlew
-      continue-on-error: true
+      # 1. Распаковываем твой оригинальный ключ из репозитория
+      - name: Decode Keystore to Root
+        run: |
+          base64 --decode debug.keystore.base64 > my-upload-key.jks
 
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug --no-daemon
+      # 2. Собираем релиз и принудительно переопределяем свойства подписи прямо в команде!
+      # Флаги -Pandroid.injected.signing... заставят Gradle забить на строку "upload" в gradle.kts
+      # и использовать правильные параметры твоего дебаг-ключа.
+      - name: Build with Gradle (Release)
+        run: |
+          gradle assembleRelease \
+            -Pandroid.injected.signing.store.file="../my-upload-key.jks" \
+            -Pandroid.injected.signing.store.password="android" \
+            -Pandroid.injected.signing.key.alias="androiddebugkey" \
+            -Pandroid.injected.signing.key.password="android" \
+            --no-daemon --no-configuration-cache
+        working-directory: ./app
 
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+      # 3. Вытаскиваем уже полностью собранный и валидно подписанный APK в артефакты
+      - name: Upload Signed APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RutubeApp-Release-Signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
