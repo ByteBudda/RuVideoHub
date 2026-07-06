@@ -803,11 +803,13 @@ fun LibraryTabScreen(
             val channels = remember(filteredAndSorted) {
                 filteredAndSorted.filter { it.duration == "КАНАЛ" }
             }
+            val tvSeries = remember(filteredAndSorted) {
+                filteredAndSorted.filter { it.duration == "СЕРИАЛ" }
+            }
             val subcategories = remember(filteredAndSorted) {
                 filteredAndSorted.filter { 
                     it.duration == "ПАПКА" || 
-                    it.duration == "КАТАЛОГ" || 
-                    it.duration == "СЕРИАЛ" 
+                    it.duration == "КАТАЛОГ"
                 }
             }
             val playlists = remember(filteredAndSorted) {
@@ -816,6 +818,7 @@ fun LibraryTabScreen(
 
             var videosExpanded by remember { mutableStateOf(true) }
             var channelsExpanded by remember { mutableStateOf(true) }
+            var tvSeriesExpanded by remember { mutableStateOf(true) }
             var subcategoriesExpanded by remember { mutableStateOf(true) }
             var playlistsExpanded by remember { mutableStateOf(true) }
 
@@ -888,7 +891,39 @@ fun LibraryTabScreen(
                     }
                 }
 
-                // 3. SUBCATEGORIES
+                // 3. TV SERIES
+                if (tvSeries.isNotEmpty()) {
+                    item {
+                        BookmarkSectionHeader(
+                            title = "Сериалы",
+                            count = tvSeries.size,
+                            icon = Icons.Default.Tv,
+                            isExpanded = tvSeriesExpanded,
+                            onClick = { tvSeriesExpanded = !tvSeriesExpanded }
+                        )
+                    }
+                    if (tvSeriesExpanded) {
+                        items(tvSeries, key = { "series_" + it.id }) { saved ->
+                            BookmarkItemRow(
+                                saved = saved,
+                                viewModel = viewModel,
+                                isDarkTheme = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                onDelete = {
+                                    val videoRuntime = Video(
+                                        id = saved.id, title = saved.title, channel = saved.channel,
+                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
+                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                    )
+                                    viewModel.toggleBookmark(videoRuntime)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // 4. SUBCATEGORIES
                 if (subcategories.isNotEmpty()) {
                     item {
                         BookmarkSectionHeader(
@@ -920,7 +955,7 @@ fun LibraryTabScreen(
                     }
                 }
 
-                // 4. PLAYLISTS
+                // 5. PLAYLISTS
                 if (playlists.isNotEmpty()) {
                     item {
                         BookmarkSectionHeader(
@@ -1196,7 +1231,8 @@ fun BookmarkItemRow(
     onDelete: () -> Unit
 ) {
     val isChannel = saved.duration == "КАНАЛ"
-    val isSubcategory = saved.duration == "ПАПКА" || saved.duration == "КАТАЛОГ" || saved.duration == "СЕРИАЛ"
+    val isTvSeries = saved.duration == "СЕРИАЛ"
+    val isSubcategory = saved.duration == "ПАПКА" || saved.duration == "КАТАЛОГ"
     val isPlaylist = saved.duration == "ПЛЕЙЛИСТ"
 
     val videoRuntime = remember(saved) {
@@ -1283,6 +1319,31 @@ fun BookmarkItemRow(
                             modifier = Modifier.size(24.dp)
                         )
                     }
+                } else if (isTvSeries) {
+                    if (!saved.thumbnailUrl.isNullOrBlank()) {
+                        VideoThumbnail(
+                            id = saved.id,
+                            duration = saved.duration,
+                            thumbnailUrl = saved.thumbnailUrl,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f))
+                                .border(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tv,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                 } else if (isSubcategory) {
                     Box(
                         modifier = Modifier
@@ -1326,9 +1387,9 @@ fun BookmarkItemRow(
                     val typeLabel = when {
                         isChannel -> "Канал"
                         isPlaylist -> "Плейлист"
+                        isTvSeries -> "Сериал"
                         isSubcategory -> {
                             when (saved.duration) {
-                                "СЕРИАЛ" -> "Сериал"
                                 "КАТАЛОГ" -> "Каталог"
                                 else -> "Подкатегория"
                             }
