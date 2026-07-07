@@ -225,7 +225,7 @@ fun SleekVideoHubApp(
 
         // Expanded video player detail overlay - slides from bottom
         AnimatedVisibility(
-            visible = currentSelectedVideo != null && currentTab != "tv_mini",
+            visible = currentSelectedVideo != null && currentTab != "tv_mini" && !isTvOptimized,
             enter = slideInVertically(
                 initialOffsetY = { it },
                 animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)
@@ -245,8 +245,13 @@ fun SleekVideoHubApp(
                         isMiniPlayer = isMiniPlayer,
                         isInPipMode = false,
                         onDismiss = {
-                            if (isMiniPlayer) viewModel.selectVideo(null)
-                            else viewModel.setMiniPlayer(true)
+                            if (isTvOptimized) {
+                                viewModel.selectTab("tv_mini")
+                                viewModel.setMiniPlayer(false)
+                            } else {
+                                if (isMiniPlayer) viewModel.selectVideo(null)
+                                else viewModel.setMiniPlayer(true)
+                            }
                         },
                         onRestore = { viewModel.setMiniPlayer(false) }
                 )
