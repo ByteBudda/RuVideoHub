@@ -353,12 +353,16 @@ fun RutubeVideoPlayer(
                         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                             if (!wasVisible) {
                                 controlsVisible = true
+                                exoPlayer?.let {
+                                    if (it.isPlaying) it.pause() else it.play()
+                                    isPlayingState = it.isPlaying
+                                }
                                 true
                             } else {
                                 false // let it pass to focused button if any
                             }
                         }
-                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
                             exoPlayer?.let {
                                 if (it.isPlaying) it.pause() else it.play()
                                 isPlayingState = it.isPlaying
