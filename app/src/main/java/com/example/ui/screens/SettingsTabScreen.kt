@@ -803,6 +803,18 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Section: Updates
+        Text(
+            text = "Обновление",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        UpdateSection(isDarkTheme, isTvOptimized)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Section: Information
         Text(
             text = "Информация",
