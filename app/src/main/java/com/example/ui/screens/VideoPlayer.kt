@@ -827,6 +827,7 @@ fun RutubeVideoPlayer(
                             if (!offlineFile.exists()) {
                                 var qualityMenuExpanded by remember { mutableStateOf(false) }
                                 val availableQualities by viewModel.currentAvailableQualities.collectAsStateWithLifecycle()
+                                val activeVideoQuality by viewModel.activeVideoQuality.collectAsStateWithLifecycle()
 
                                 Box {
                                     Button(
@@ -846,7 +847,7 @@ fun RutubeVideoPlayer(
                                             modifier = Modifier.size(14.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text(selectedQuality, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(activeVideoQuality, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
 
                                     DropdownMenu(
@@ -859,9 +860,9 @@ fun RutubeVideoPlayer(
                                                 text = { 
                                                     Text(
                                                         text = q, 
-                                                        color = if (selectedQuality == q) Primary else Color.White,
+                                                        color = if (activeVideoQuality == q || selectedQuality == q) Primary else Color.White,
                                                         fontSize = 11.sp,
-                                                        fontWeight = if (selectedQuality == q) FontWeight.Bold else FontWeight.Normal
+                                                        fontWeight = if (activeVideoQuality == q || selectedQuality == q) FontWeight.Bold else FontWeight.Normal
                                                     ) 
                                                 },
                                                 onClick = {
