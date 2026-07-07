@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onUserLeaveHint() {
     super.onUserLeaveHint()
-    if (viewModel.currentSelectedVideo.value != null) {
+    if (viewModel.currentSelectedVideo.value != null && !viewModel.isTvOptimized.value) {
       if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
         try {
           val params = android.app.PictureInPictureParams.Builder().build()
