@@ -18,6 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import android.view.KeyEvent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusGroup
@@ -152,8 +159,15 @@ fun RutubeVideoPlayer(
     var currentPos by remember { mutableLongStateOf(0L) }
     var totalDuration by remember { mutableLongStateOf(0L) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val playerFocusRequester = remember { FocusRequester() }
     var controlsVisible by remember { mutableStateOf(true) }
-
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        if (isTvOptimized) {
+            controlsVisible = false
+                                try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
+        }
+    }
     val playPauseFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
     LaunchedEffect(controlsVisible) {
@@ -294,6 +308,8 @@ fun RutubeVideoPlayer(
             kotlinx.coroutines.delay(4000)
             if (System.currentTimeMillis() - lastInteractionTime >= 4000) {
                 controlsVisible = false
+                controlsVisible = false
+                                try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
             }
         }
     }
@@ -326,8 +342,54 @@ fun RutubeVideoPlayer(
 
     Box(
         modifier = modifier
+            .focusRequester(playerFocusRequester)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    lastInteractionTime = System.currentTimeMillis()
+                    val wasVisible = controlsVisible
+                    controlsVisible = true
+                    when (event.nativeKeyEvent.keyCode) {
+                        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                            if (!wasVisible) {
+                                controlsVisible = true
+                                true
+                            } else {
+                                false // let it pass to focused button if any
+                            }
+                        }
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                            exoPlayer?.let {
+                                if (it.isPlaying) it.pause() else it.play()
+                                isPlayingState = it.isPlaying
+                            }
+                            true
+                        }
+                        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                            exoPlayer?.let {
+                                val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
+                                it.seekTo(newPos)
+                                currentPos = newPos
+                                hudMessage = "-10 сек"
+                            }
+                            true
+                        }
+                        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                            exoPlayer?.let {
+                                val newPos = (it.currentPosition + 10000).coerceAtMost(it.duration.takeIf { d -> d > 0 } ?: Long.MAX_VALUE)
+                                it.seekTo(newPos)
+                                currentPos = newPos
+                                hudMessage = "+10 сек"
+                            }
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .background(Color.Black)
             .pointerInput(Unit) {
+                val pWidth = size.width.toFloat()
                 detectTapGestures(
                     onTap = {
                         lastInteractionTime = System.currentTimeMillis()
@@ -335,15 +397,14 @@ fun RutubeVideoPlayer(
                     },
                     onDoubleTap = { offset ->
                         lastInteractionTime = System.currentTimeMillis()
-                        val width = size.width
-                        if (offset.x < width / 3) {
+                        if (offset.x < pWidth / 3) {
                             exoPlayer?.let { player ->
                                 val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
                                 player.seekTo(newPos)
                                 currentPos = newPos
                                 hudMessage = "-10 сек"
                             }
-                        } else if (offset.x > width * 2 / 3) {
+                        } else if (offset.x > pWidth * 2 / 3) {
                             exoPlayer?.let { player ->
                                 val newPos = (player.currentPosition + 10000).coerceAtMost(player.duration ?: 0)
                                 player.seekTo(newPos)
@@ -355,6 +416,8 @@ fun RutubeVideoPlayer(
                 )
             }
             .pointerInput(isFullscreen) {
+                val pWidth = size.width.toFloat()
+                val pHeight = size.height.toFloat()
                 if (isFullscreen) {
                     detectVerticalDragGestures(
                         onDragStart = { _ ->
@@ -363,9 +426,7 @@ fun RutubeVideoPlayer(
                         onDragEnd = { },
                         onVerticalDrag = { change, dragAmount ->
                             lastInteractionTime = System.currentTimeMillis()
-                            val width = size.width.toFloat()
-                            val height = size.height.toFloat()
-                            val isRightSide = change.position.x > width / 2f
+                            val isRightSide = change.position.x > pWidth / 2f
                             
                             val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
                             val activity = context.findActivity()
@@ -373,7 +434,7 @@ fun RutubeVideoPlayer(
                             if (isRightSide) {
                                 val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
                                 val currentVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
-                                val diff = -(dragAmount / height) * maxVol * 1.5f
+                                val diff = -(dragAmount / pHeight) * maxVol * 1.5f
                                 val newVol = (currentVol + diff).coerceIn(0f, maxVol)
                                 audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, newVol.toInt(), 0)
                                 hudMessage = "Громкость: ${((newVol / maxVol) * 100).toInt()}%"
@@ -381,7 +442,7 @@ fun RutubeVideoPlayer(
                                 activity?.window?.let { window ->
                                     val attrs = window.attributes
                                     val currentBrightness = if (attrs.screenBrightness < 0) 0.5f else attrs.screenBrightness
-                                    val diff = -(dragAmount / height) * 1.5f
+                                    val diff = -(dragAmount / pHeight) * 1.5f
                                     val newBrightness = (currentBrightness + diff).coerceIn(0f, 1f)
                                     attrs.screenBrightness = newBrightness
                                     window.attributes = attrs
@@ -769,7 +830,8 @@ fun RutubeVideoPlayer(
                                 indication = null
                             ) {
                                 lastInteractionTime = System.currentTimeMillis()
-                                controlsVisible = false
+                controlsVisible = false
+                                try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
                             }
                     ) {
                     // Top Bar Controls
@@ -833,7 +895,7 @@ fun RutubeVideoPlayer(
                                     Button(
                                         onClick = {
                                             lastInteractionTime = System.currentTimeMillis()
-                                            qualityMenuExpanded = true
+                                        qualityMenuExpanded = true
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -869,7 +931,6 @@ fun RutubeVideoPlayer(
                                                     selectedQuality = q
                                                     qualityMenuExpanded = false
                                                     lastInteractionTime = System.currentTimeMillis()
-                                                    hudMessage = "Качество: $q"
                                                 },
                                                 modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
                                             )
@@ -922,7 +983,6 @@ fun RutubeVideoPlayer(
                                                 playbackSpeed = speed
                                                 speedMenuExpanded = false
                                                 lastInteractionTime = System.currentTimeMillis()
-                                                hudMessage = "Скорость: ${speed}x"
                                             },
                                             modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
                                         )
@@ -957,7 +1017,7 @@ fun RutubeVideoPlayer(
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
-                                    onShare()
+                                    onToggleFullscreen()
                                 },
                                 modifier = Modifier.size(32.dp).sleekTvFocus(CircleShape)
                             ) {
@@ -1089,7 +1149,6 @@ fun RutubeVideoPlayer(
                                 value = currentPos.toFloat().coerceIn(0f, totalDuration.toFloat().coerceAtLeast(1f)),
                                 onValueChange = { newValue ->
                                     lastInteractionTime = System.currentTimeMillis()
-                                    currentPos = newValue.toLong()
                                     exoPlayer?.seekTo(newValue.toLong())
                                 },
                                 valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
@@ -1115,7 +1174,7 @@ fun RutubeVideoPlayer(
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
-                                    if (currentPos > 0) {
+                                        if (currentPos > 0) {
                                         viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                                     }
                                     onToggleFullscreen()
