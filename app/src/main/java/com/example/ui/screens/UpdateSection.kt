@@ -14,11 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
 import com.example.manager.UpdateInfo
 import com.example.manager.UpdateManager
+import com.example.manager.DownloadState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.liquidGlass
 import kotlinx.coroutines.launch
@@ -29,7 +32,10 @@ fun UpdateSection(isDarkTheme: Boolean, isTvOptimized: Boolean) {
     val coroutineScope = rememberCoroutineScope()
     var isChecking by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    
     var showDialog by remember { mutableStateOf(false) }
+    val downloadState by UpdateManager.downloadState.collectAsStateWithLifecycle()
+
 
     Column(
         modifier = Modifier
@@ -100,6 +106,36 @@ fun UpdateSection(isDarkTheme: Boolean, isTvOptimized: Boolean) {
                 }
             }
         }
+    }
+
+    
+    if (downloadState is DownloadState.Downloading) {
+        val progress = (downloadState as DownloadState.Downloading).progress
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Скачивание обновления") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    LinearProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                }
+            },
+            confirmButton = {}
+        )
+    } else if (downloadState is DownloadState.Error) {
+        val errorMsg = (downloadState as DownloadState.Error).message
+        AlertDialog(
+            onDismissRequest = { UpdateManager.downloadState.value = DownloadState.Idle },
+            title = { Text("Ошибка") },
+            text = { Text(errorMsg) },
+            confirmButton = {
+                TextButton(onClick = { UpdateManager.downloadState.value = DownloadState.Idle }) { Text("OK") }
+            }
+        )
     }
 
     if (showDialog && updateInfo != null) {
