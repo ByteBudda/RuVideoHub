@@ -90,6 +90,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val isPlaying = playerManager.isPlaying
     val playProgress = playerManager.playProgress
     val currentAvailableQualities = playerManager.currentAvailableQualities
+    val activeVideoQuality = playerManager.activeVideoQuality
+
     val playerQuality = settingsManager.playerQuality
     val downloadQuality = settingsManager.downloadQuality
     val activeDownloads = downloadManager.activeDownloads
@@ -1411,12 +1413,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     // Ignore
                 }
             }
+            playerManager.setActiveVideoQuality("Авто")
             return masterUrl
         }
 
         // Specific quality requested
         val streams = getOrFetchParsedStreams(masterUrl)
         if (streams.isEmpty()) {
+            playerManager.setActiveVideoQuality("Авто")
             return masterUrl
         }
 
@@ -1425,6 +1429,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             ?: streams.firstOrNull { it.resolution.contains("480") }
             ?: streams.first()
 
+        playerManager.setActiveVideoQuality(selectedStream.resolution)
         return selectedStream.url
     }
 
