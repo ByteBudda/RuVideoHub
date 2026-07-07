@@ -5,8 +5,12 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -19,7 +23,17 @@ data class UpdateInfo(
     val releaseNotes: String
 )
 
+
+sealed class DownloadState {
+    object Idle : DownloadState()
+    data class Downloading(val progress: Float) : DownloadState()
+    object Finished : DownloadState()
+    data class Error(val message: String) : DownloadState()
+}
+
 object UpdateManager {
+    val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+
     private const val GITHUB_API_URL = "https://api.github.com/repos/ByteBudda/RuVideoHub/releases/latest"
     private const val TAG = "UpdateManager"
 
@@ -97,7 +111,47 @@ object UpdateManager {
                 setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "RuVideoHub_v$version.apk")
                 setMimeType("application/vnd.android.package-archive")
             }
-            downloadManager.enqueue(request)
+            
+            val downloadId = downloadManager.enqueue(request)
+            
+            CoroutineScope(Dispatchers.IO).launch {
+                var isDownloading = true
+                while (isDownloading) {
+                    val query = DownloadManager.Query().setFilterById(downloadId)
+                    val cursor = downloadManager.query(query)
+                    if (cursor != null && cursor.moveToFirst()) {
+                        val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                        val bytesDownloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        val bytesTotalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                        
+                        if (statusIndex != -1 && bytesDownloadedIndex != -1 && bytesTotalIndex != -1) {
+                            val status = cursor.getInt(statusIndex)
+                            val bytesDownloaded = cursor.getLong(bytesDownloadedIndex)
+                            val bytesTotal = cursor.getLong(bytesTotalIndex)
+                            
+                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                isDownloading = false
+                                downloadState.value = DownloadState.Finished
+                                delay(2000)
+                                downloadState.value = DownloadState.Idle
+                            } else if (status == DownloadManager.STATUS_FAILED) {
+                                isDownloading = false
+                                downloadState.value = DownloadState.Error("Download failed")
+                                delay(3000)
+                                downloadState.value = DownloadState.Idle
+                            } else {
+                                if (bytesTotal > 0) {
+                                    val progress = bytesDownloaded.toFloat() / bytesTotal.toFloat()
+                                    downloadState.value = DownloadState.Downloading(progress)
+                                }
+                            }
+                        }
+                    }
+                    cursor?.close()
+                    delay(100)
+                }
+            }
+
             // System DownloadManager handles the broadcast to open the APK automatically via the mime type,
             // but we might need to listen to ACTION_DOWNLOAD_COMPLETE to trigger intent.
         } catch (e: Exception) {
