@@ -17,6 +17,9 @@ class PlayerManager {
     private val _currentAvailableQualities = MutableStateFlow<List<String>>(listOf("Авто"))
     val currentAvailableQualities = _currentAvailableQualities.asStateFlow()
 
+    private val _activeVideoQuality = MutableStateFlow("Авто")
+    val activeVideoQuality = _activeVideoQuality.asStateFlow()
+
     private val _isTvMiniFullscreen = MutableStateFlow(false)
     val isTvMiniFullscreen = _isTvMiniFullscreen.asStateFlow()
 
@@ -66,6 +69,10 @@ class PlayerManager {
 
     fun setAvailableQualities(qualities: List<String>) {
         _currentAvailableQualities.value = qualities
+    }
+
+    fun setActiveVideoQuality(quality: String) {
+        _activeVideoQuality.value = quality
     }
 
     fun setTvMiniFullscreen(fullscreen: Boolean) {
