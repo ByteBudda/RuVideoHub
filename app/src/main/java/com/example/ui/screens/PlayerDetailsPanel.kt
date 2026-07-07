@@ -213,6 +213,7 @@ fun PlayerDetailsPanel(
             // Quality Selection Pill
             if (!video.isDownloaded) {
                 var qualityMenuExpanded by remember { mutableStateOf(false) }
+                val activeVideoQuality by viewModel.activeVideoQuality.collectAsStateWithLifecycle()
                 val currentQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
                 val availableQualities by viewModel.currentAvailableQualities.collectAsStateWithLifecycle()
 
@@ -238,7 +239,7 @@ fun PlayerDetailsPanel(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = currentQuality,
+                            text = activeVideoQuality,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -252,13 +253,14 @@ fun PlayerDetailsPanel(
                         modifier = Modifier.background(Color(0xFF0F0F1A))
                     ) {
                         availableQualities.forEach { q ->
+                            val isSelected = activeVideoQuality == q || (activeVideoQuality == "Авто" && currentQuality == "Авто" && q == "Авто") || (activeVideoQuality != "Авто" && currentQuality == q)
                             DropdownMenuItem(
                                 text = {
                                     Text(
                                         text = q,
-                                        color = if (currentQuality == q) Primary else Color.White,
+                                        color = if (activeVideoQuality == q || currentQuality == q) Primary else Color.White,
                                         fontSize = 11.sp,
-                                        fontWeight = if (currentQuality == q) FontWeight.Bold else FontWeight.Normal
+                                        fontWeight = if (activeVideoQuality == q || currentQuality == q) FontWeight.Bold else FontWeight.Normal
                                     )
                                 },
                                 onClick = {
