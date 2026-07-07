@@ -52,10 +52,9 @@ object UpdateManager {
                 }
                 
                 if (downloadUrl.isNotEmpty()) {
-                    val currentVersionFloat = currentVersion.replace("[^0-9.]".toRegex(), "").toFloatOrNull() ?: 1.0f
-                    val latestVersionFloat = latestVersion.replace("[^0-9.]".toRegex(), "").toFloatOrNull() ?: 1.0f
+                    val isNewer = isVersionNewer(currentVersion, latestVersion)
                     
-                    if (latestVersionFloat > currentVersionFloat) {
+                    if (isNewer) {
                         return@withContext UpdateInfo(true, latestVersion, downloadUrl, releaseNotes)
                     } else {
                         return@withContext UpdateInfo(false, latestVersion, "", "")
@@ -68,6 +67,23 @@ object UpdateManager {
             Log.e(TAG, "Error checking for updates", e)
         }
         null
+    }
+
+    private fun isVersionNewer(current: String, latest: String): Boolean {
+        try {
+            val currParts = current.replace(Regex("[^0-9.]"), "").split(".").map { it.toIntOrNull() ?: 0 }
+            val latestParts = latest.replace(Regex("[^0-9.]"), "").split(".").map { it.toIntOrNull() ?: 0 }
+            val maxLen = maxOf(currParts.size, latestParts.size)
+            for (i in 0 until maxLen) {
+                val pCurr = currParts.getOrElse(i) { 0 }
+                val pLatest = latestParts.getOrElse(i) { 0 }
+                if (pLatest > pCurr) return true
+                if (pLatest < pCurr) return false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error comparing versions", e)
+        }
+        return false
     }
 
     fun startDownloadAndInstall(context: Context, url: String, version: String) {
