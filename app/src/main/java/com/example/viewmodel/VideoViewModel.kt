@@ -1127,6 +1127,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 playerManager.selectVideo(video)
                 addToRecentHistory(video)
+                
+                if (isTvOptimized.value) {
+                    navigationManager.selectTab("tv_mini")
+                }
             }
         } else {
             playerManager.selectVideo(null)
