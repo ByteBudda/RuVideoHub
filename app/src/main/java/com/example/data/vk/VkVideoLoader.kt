@@ -137,7 +137,7 @@ object VkVideoLoader {
                         if (videoUrl.startsWith("//")) videoUrl = "https:$videoUrl"
                     } else {
                         // Пробуем MP4
-                        val mp4Keys = listOf("mp4_1080", "mp4_720", "mp4_480", "mp4_360")
+                        val mp4Keys = listOf("mp4_2160", "mp4_1440", "mp4_1080", "mp4_720", "mp4_480", "mp4_360", "mp4_240")
                         for (key in mp4Keys) {
                             if (files.has(key)) {
                                 videoUrl = files.getString(key)
