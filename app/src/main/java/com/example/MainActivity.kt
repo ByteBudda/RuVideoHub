@@ -17,6 +17,35 @@ class MainActivity : ComponentActivity() {
     VideoViewModel.Factory(application)
   }
 
+  private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+  private val exitRunnable = Runnable { finishAndRemoveTask() }
+  private val toastRunnable = Runnable {
+    android.widget.Toast.makeText(this, "Удерживайте кнопку НАЗАД 3 секунды для выхода", android.widget.Toast.LENGTH_SHORT).show()
+  }
+
+  override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+      if (event?.repeatCount == 0) {
+        handler.postDelayed(toastRunnable, 1000)
+        handler.postDelayed(exitRunnable, 3000)
+      }
+      return true
+    }
+    return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+      handler.removeCallbacks(toastRunnable)
+      handler.removeCallbacks(exitRunnable)
+      if (!isFinishing && !isDestroyed) {
+        onBackPressedDispatcher.onBackPressed()
+      }
+      return true
+    }
+    return super.onKeyUp(keyCode, event)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     window.setFlags(
