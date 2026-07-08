@@ -474,6 +474,42 @@ fun SleekTvNavigationRail(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        val context = LocalContext.current
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .sleekTvFocus(shape = RoundedCornerShape(10.dp), onEnter = { context.findActivity()?.finishAndRemoveTask() })
+                .clickable { context.findActivity()?.finishAndRemoveTask() }
+                .padding(vertical = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Red.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExitToApp,
+                    contentDescription = "Выход",
+                    tint = Color.Red,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Выход",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Red,
+                maxLines = 1
+            )
+        }
     }
 }
 
