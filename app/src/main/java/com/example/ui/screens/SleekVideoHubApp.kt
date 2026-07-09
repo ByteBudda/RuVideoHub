@@ -44,11 +44,14 @@ import kotlinx.coroutines.launch
 fun Modifier.sleekTvFocus(
     shape: Shape = RoundedCornerShape(12.dp),
     focusColor: Color = MaterialTheme.colorScheme.primary,
-    onEnter: (() -> Unit)? = null
+    onEnter: (() -> Unit)? = null,
+    onLongEnter: (() -> Unit)? = null
 ): Modifier = this.composed {
     var isFocused by remember { mutableStateOf(false) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
+    var keyDownTime by remember { mutableStateOf(0L) }
+    var longPressTriggered by remember { mutableStateOf(false) }
 
     this
         .bringIntoViewRequester(bringIntoViewRequester)
@@ -59,11 +62,26 @@ fun Modifier.sleekTvFocus(
             }
         }
         .onKeyEvent { event ->
-            if (event.type == KeyEventType.KeyUp && 
-                (event.key == Key.Enter || event.key == Key.DirectionCenter || event.key == Key.NumPadEnter)
-            ) {
-                onEnter?.invoke()
-                true
+            if (event.key == Key.Enter || event.key == Key.DirectionCenter || event.key == Key.NumPadEnter) {
+                if (event.type == KeyEventType.KeyDown) {
+                    if (keyDownTime == 0L) {
+                        keyDownTime = System.currentTimeMillis()
+                        longPressTriggered = false
+                    } else if (onLongEnter != null && !longPressTriggered && System.currentTimeMillis() - keyDownTime > 500) {
+                        longPressTriggered = true
+                        onLongEnter.invoke()
+                    }
+                    true
+                } else if (event.type == KeyEventType.KeyUp) {
+                    if (!longPressTriggered) {
+                        onEnter?.invoke()
+                    }
+                    keyDownTime = 0L
+                    longPressTriggered = false
+                    true
+                } else {
+                    false
+                }
             } else {
                 false
             }
@@ -137,7 +155,7 @@ fun SleekVideoHubApp(
     AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
         if (isTvOptimized) {
             Row(modifier = Modifier.fillMaxSize()) {
-                val shouldShowSidebar = currentSelectedVideo == null && currentTab != "tv_mini"
+                val shouldShowSidebar = currentSelectedVideo == null
                 if (shouldShowSidebar) {
                     SleekTvNavigationRail(
                         selectedTab = currentTab,
@@ -166,7 +184,6 @@ fun SleekVideoHubApp(
                             "recents" -> RecentsTabScreen(viewModel = viewModel)
                             "downloads" -> DownloadsTabScreen(viewModel = viewModel)
                             "library" -> LibraryTabScreen(viewModel = viewModel)
-                            "tv_mini" -> TvMiniPlayerScreen(viewModel = viewModel)
                             "settings" -> SettingsTabScreen(viewModel = viewModel)
                         }
                     }
@@ -225,7 +242,7 @@ fun SleekVideoHubApp(
 
         // Expanded video player detail overlay - slides from bottom
         AnimatedVisibility(
-            visible = currentSelectedVideo != null && currentTab != "tv_mini" && !isTvOptimized,
+            visible = currentSelectedVideo != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
                 animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)
@@ -237,7 +254,10 @@ fun SleekVideoHubApp(
             modifier = Modifier.fillMaxSize()
         ) {
             currentSelectedVideo?.let { video ->
-                SleekPlayerDetailOverlay(
+                if (isTvOptimized) {
+                    TvMiniPlayerScreen(viewModel = viewModel)
+                } else {
+                    SleekPlayerDetailOverlay(
                         video = video,
                         viewModel = viewModel,
                         isDark = isDarkTheme,
@@ -245,16 +265,12 @@ fun SleekVideoHubApp(
                         isMiniPlayer = isMiniPlayer,
                         isInPipMode = false,
                         onDismiss = {
-                            if (isTvOptimized) {
-                                viewModel.selectTab("tv_mini")
-                                viewModel.setMiniPlayer(false)
-                            } else {
-                                if (isMiniPlayer) viewModel.selectVideo(null)
-                                else viewModel.setMiniPlayer(true)
-                            }
+                            if (isMiniPlayer) viewModel.selectVideo(null)
+                            else viewModel.setMiniPlayer(true)
                         },
                         onRestore = { viewModel.setMiniPlayer(false) }
-                )
+                    )
+                }
             }
         }
     }
@@ -433,7 +449,6 @@ fun SleekTvNavigationRail(
             listOf(
                 Triple("home", Icons.Default.Home, "Главная"),
                 Triple("explore", Icons.Default.Explore, "Обзор"),
-                Triple("tv_mini", Icons.Default.Tv, "ТВ Плеер"),
                 Triple("recents", Icons.Default.History, "Недавние"),
                 Triple("downloads", Icons.Default.Download, "Загрузки"),
                 Triple("library", Icons.Default.Favorite, "Избранное"),
