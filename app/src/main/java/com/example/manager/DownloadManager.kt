@@ -1,72 +1,79 @@
 package com.example.manager
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Environment
 import com.example.data.Video
 import com.example.data.VideoRepository
+import com.example.DownloadService
 import com.example.viewmodel.YtDlpDownload
-import com.example.viewmodel.YtDlpDownloader
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 
 class DownloadManager(
     private val application: Application,
     private val repository: VideoRepository,
     private val scope: CoroutineScope
 ) {
-    private val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
-    val activeDownloads = _activeDownloads.asStateFlow()
-
-    private val downloadJobs = ConcurrentHashMap<String, Job>()
+    val activeDownloads = DownloadManager.activeDownloads
 
     fun startDownload(video: Video, quality: String, onCompleted: (String) -> Unit) {
-        val job = scope.launch {
-            try {
-                if (video.id.startsWith("vk_")) {
-                    downloadVkVideoDirect(video, onCompleted)
-                } else {
-                    YtDlpDownloader.startYtDlpDownload(
-                        application,
-                        video,
-                        repository,
-                        _activeDownloads,
-                        quality
-                    ) { completedId ->
-                        onCompleted(completedId)
-                    }
-                }
-            } finally {
-                downloadJobs.remove(video.id)
-                withContext(NonCancellable) {
-                    _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(video.id) }
-                }
+        // Save to persistent queue
+        val currentQueue = loadQueue(application).toMutableList()
+        if (currentQueue.none { it.first.id == video.id }) {
+            currentQueue.add(video to quality)
+            saveQueue(application, currentQueue)
+        }
+
+        // Setup the complete listener
+        onDownloadCompletedListener = { completedId ->
+            if (completedId == video.id) {
+                onCompleted(completedId)
             }
         }
-        downloadJobs[video.id] = job
+
+        // Start background service
+        val intent = Intent(application, DownloadService::class.java).apply {
+            action = DownloadService.ACTION_START_DOWNLOAD
+            putExtra("extra_video", video)
+            putExtra("extra_quality", quality)
+        }
+        
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                application.startForegroundService(intent)
+            } else {
+                application.startService(intent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DownloadManager", "Failed to start foreground service", e)
+            application.startService(intent)
+        }
     }
 
     fun cancelDownload(videoId: String) {
-        downloadJobs[videoId]?.cancel()
-        downloadJobs.remove(videoId)
+        // Remove from persistent queue
+        val currentQueue = loadQueue(application).toMutableList()
+        currentQueue.removeAll { it.first.id == videoId }
+        saveQueue(application, currentQueue)
 
-        _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-            remove(videoId)
+        // Stop in background service
+        val intent = Intent(application, DownloadService::class.java).apply {
+            action = DownloadService.ACTION_CANCEL_DOWNLOAD
+            putExtra("extra_video_id", videoId)
         }
-
-        val downloadFolder = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "$videoId.mp4")
-        if (targetFile.exists()) {
-            targetFile.delete()
-        }
+        application.startService(intent)
     }
 
     fun deleteDownload(video: Video) {
@@ -77,14 +84,14 @@ class DownloadManager(
         }
     }
 
-    fun saveToDevice(video: Video, context: android.content.Context, onResult: (Boolean, String) -> Unit) {
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+    fun saveToDevice(video: Video, context: Context, onResult: (Boolean, String) -> Unit) {
+        scope.launch(Dispatchers.IO) {
             try {
                 val downloadFolder = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                 val sourceFile = File(downloadFolder, "${video.id}.mp4")
                 
                 if (!sourceFile.exists()) {
-                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    withContext(Dispatchers.Main) {
                         onResult(false, "Файл не найден. Сначала скачайте видео.")
                     }
                     return@launch
@@ -101,95 +108,118 @@ class DownloadManager(
                     }
                 }
 
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     onResult(true, "Файл успешно сохранен в папку Загрузки: ${destFile.name}")
                 }
             } catch (e: Exception) {
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     onResult(false, "Ошибка сохранения: ${e.message}")
                 }
             }
         }
     }
 
-    private suspend fun downloadVkVideoDirect(video: Video, onCompleted: (String) -> Unit) {
-        val id = video.id
-        val logs = CopyOnWriteArrayList<String>().apply {
-            add("[VK Загрузчик] Начат прямой сбор потока VK...")
-        }
+    companion object {
+        val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
+        val activeDownloads = _activeDownloads.asStateFlow()
+        val downloadJobs = ConcurrentHashMap<String, Job>()
 
-        fun updateDl(progress: Float, speed: String, etaStr: String, status: String) {
-            val currentDl = YtDlpDownload(
-                id = id,
-                title = video.title,
-                channel = video.channel,
-                thumbnailUrl = video.thumbnailUrl,
-                progress = progress,
-                speed = speed,
-                eta = etaStr,
-                status = status,
-                logs = logs.toList()
-            )
+        fun updateActiveDownload(id: String, download: YtDlpDownload) {
             _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
-                this[id] = currentDl
+                this[id] = download
             }
         }
 
-        updateDl(0f, "0 B/s", "--:--", "Downloading")
-
-        // We'll need access to masterUrlCache if we want to reuse it, or just re-fetch.
-        // For now, let's re-fetch as this manager is supposed to be somewhat independent.
-        logs.add("[VK Загрузчик] Разрешение URL трансляции для $id...")
-        val vkId = id.substringAfter("vk_")
-        val info = com.example.data.vk.VkVideoLoader.getVideoInfo("https://vk.com/video$vkId")
-        val videoUrl = info?.videoUrl ?: ""
-
-        if (videoUrl.isBlank()) {
-            logs.add("[VK Загрузчик] Ошибка: ссылка на поток не найдена!")
-            updateDl(0f, "0 B/s", "--:--", "Error")
-            delay(5000)
-            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
-            return
+        fun removeActiveDownload(id: String) {
+            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply {
+                remove(id)
+            }
         }
 
-        logs.add("[VK Загрузчик] Начинается скачивание...")
-        updateDl(0.01f, "0 B/s", "--:--", "Downloading")
+        @Volatile
+        var onDownloadCompletedListener: ((String) -> Unit)? = null
 
-        val downloadFolder = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val targetFile = File(downloadFolder, "$id.mp4")
-
-        val success = com.example.data.vk.VkVideoLoader.downloadVideo(
-            videoUrl = videoUrl,
-            targetFile = targetFile,
-            onProgress = { progress, speed, etaStr ->
-                if ((progress * 100).toInt() % 10 == 0) {
-                    logs.add("[VK Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed) ETA: $etaStr")
-                }
-                updateDl(progress, speed, etaStr, "Downloading")
-            }
-        )
-
-        if (success) {
+        fun saveQueue(context: Context, queue: List<Pair<Video, String>>) {
             try {
-                logs.add("[VK Загрузчик] Файл сохранен в ${targetFile.absolutePath}")
-                updateDl(1f, "0 B/s", "00:00", "Finished")
-
-                repository.toggleDownload(video)
-                onCompleted(id)
-
-                delay(3000)
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
+                val array = JSONArray()
+                for (item in queue) {
+                    val obj = JSONObject()
+                    obj.put("id", item.first.id)
+                    obj.put("title", item.first.title)
+                    obj.put("channel", item.first.channel)
+                    obj.put("views", item.first.views)
+                    obj.put("timeAgo", item.first.timeAgo)
+                    obj.put("duration", item.first.duration)
+                    obj.put("isPro", item.first.isPro)
+                    obj.put("category", item.first.category)
+                    obj.put("description", item.first.description)
+                    obj.put("thumbnailUrl", item.first.thumbnailUrl ?: "")
+                    obj.put("isDownloaded", item.first.isDownloaded)
+                    obj.put("isBookmarked", item.first.isBookmarked)
+                    obj.put("authorId", item.first.authorId ?: "")
+                    obj.put("authorActionUrl", item.first.authorActionUrl ?: "")
+                    obj.put("authorAvatarUrl", item.first.authorAvatarUrl ?: "")
+                    obj.put("quality", item.second)
+                    array.put(obj)
+                }
+                val prefs = context.getSharedPreferences("download_queue_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putString("download_queue", array.toString()).apply()
             } catch (e: Exception) {
-                logs.add("[VK Загрузчик] Ошибка сохранения файла: ${e.message}")
-                updateDl(0f, "0 B/s", "--:--", "Error")
-                delay(5000)
-                _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
+                android.util.Log.e("DownloadManager", "Error saving queue", e)
             }
-        } else {
-            logs.add("[VK Загрузчик] Ошибка скачивания видео!")
-            updateDl(0f, "0 B/s", "--:--", "Error")
-            delay(5000)
-            _activeDownloads.value = _activeDownloads.value.toMutableMap().apply { remove(id) }
+        }
+
+        fun loadQueue(context: Context): List<Pair<Video, String>> {
+            val list = mutableListOf<Pair<Video, String>>()
+            try {
+                val prefs = context.getSharedPreferences("download_queue_prefs", Context.MODE_PRIVATE)
+                val jsonStr = prefs.getString("download_queue", null) ?: return list
+                val array = JSONArray(jsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val video = Video(
+                        id = obj.getString("id"),
+                        title = obj.getString("title"),
+                        channel = obj.getString("channel"),
+                        views = obj.getString("views"),
+                        timeAgo = obj.getString("timeAgo"),
+                        duration = obj.getString("duration"),
+                        isPro = obj.optBoolean("isPro", false),
+                        category = obj.getString("category"),
+                        description = obj.getString("description"),
+                        thumbnailUrl = obj.optString("thumbnailUrl", "").takeIf { it.isNotBlank() },
+                        isDownloaded = obj.optBoolean("isDownloaded", false),
+                        isBookmarked = obj.optBoolean("isBookmarked", false),
+                        authorId = obj.optString("authorId", "").takeIf { it.isNotBlank() },
+                        authorActionUrl = obj.optString("authorActionUrl", "").takeIf { it.isNotBlank() },
+                        authorAvatarUrl = obj.optString("authorAvatarUrl", "").takeIf { it.isNotBlank() }
+                    )
+                    val quality = obj.optString("quality", "720p")
+                    list.add(video to quality)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DownloadManager", "Error loading queue", e)
+            }
+            return list
+        }
+
+        fun resumeAll(context: Context) {
+            val queue = loadQueue(context)
+            if (queue.isNotEmpty()) {
+                val intent = Intent(context, DownloadService::class.java).apply {
+                    action = DownloadService.ACTION_RESUME_ALL
+                }
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("DownloadManager", "Failed to resume foreground service", e)
+                    context.startService(intent)
+                }
+            }
         }
     }
 }
