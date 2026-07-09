@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -29,6 +31,16 @@ import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.PrimaryContainer
 import com.example.viewmodel.VideoViewModel
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.Key
+
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun TvMiniPlayerScreen(
     viewModel: VideoViewModel,
@@ -38,6 +50,16 @@ fun TvMiniPlayerScreen(
     val currentVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val dynamicVideos by viewModel.dynamicVideos.collectAsStateWithLifecycle()
+    
+    val firstItemFocusRequester = remember { FocusRequester() }
+    
+    LaunchedEffect(currentVideo) {
+        if (currentVideo != null) {
+            try {
+                firstItemFocusRequester.requestFocus()
+            } catch(e: Exception) {}
+        }
+    }
     
     // Filter out non-playable items like folders/channels/playlists
     val playableVideos = remember(dynamicVideos) {
@@ -70,9 +92,6 @@ fun TvMiniPlayerScreen(
             viewModel.setTvMiniFullscreen(false)
         } else {
             viewModel.selectVideo(null)
-            if (!viewModel.navigateBack()) {
-                viewModel.selectTab("home")
-            }
         }
     }
 
@@ -90,7 +109,7 @@ fun TvMiniPlayerScreen(
                               currentVid.duration.contains(":") == false ||
                               currentVid.duration.equals("трансляция", ignoreCase = true) || 
                               currentVid.duration.equals("live", ignoreCase = true))
-            RutubeVideoPlayer(
+            TvRutubeVideoPlayer(
                 videoId = currentVideo!!.id,
                 viewModel = viewModel,
                 videoTitle = currentVideo!!.title,
@@ -109,6 +128,9 @@ fun TvMiniPlayerScreen(
             modifier = modifier
                 .fillMaxSize()
                 .background(Color(0xFF0F0F1A))
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {})
+                }
                 .padding(16.dp)
         ) {
             // Left Column: Video feed list (D-pad focusable)
@@ -145,10 +167,13 @@ fun TvMiniPlayerScreen(
                         items(playableVideos.size) { index ->
                             val video = playableVideos[index]
                             val isCurrent = currentVideo?.id == video.id
+                            val isFirst = index == 0
+                            val shouldAttachRequester = isCurrent || (currentVideo == null && isFirst)
                             
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .then(if (shouldAttachRequester) Modifier.focusRequester(firstItemFocusRequester) else Modifier)
                                     .sleekTvFocus(
                                         shape = RoundedCornerShape(12.dp),
                                         focusColor = Primary,
@@ -224,6 +249,9 @@ fun TvMiniPlayerScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (currentVideo != null) {
+                    val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+                    val activeDownload = remember(activeDownloads, currentVideo) { currentVideo?.let { activeDownloads[it.id] } }
+
                     Text(
                         text = "ТВ Мини-плеер (Управление пультом)",
                         fontSize = 18.sp,
@@ -249,12 +277,13 @@ fun TvMiniPlayerScreen(
                                           currentVid.duration.contains(":") == false ||
                                           currentVid.duration.equals("трансляция", ignoreCase = true) || 
                                           currentVid.duration.equals("live", ignoreCase = true))
-                        RutubeVideoPlayer(
+                        TvRutubeVideoPlayer(
                             videoId = currentVideo!!.id,
                             viewModel = viewModel,
                             videoTitle = currentVideo!!.title,
                             aspectMode = selectedAspectRatio,
                             isFullscreen = false,
+                            isMiniPlayer = true,
                             isLive = isLiveStream,
                             onToggleFullscreen = { viewModel.setTvMiniFullscreen(true) },
                             onChangeAspectRatio = { selectedAspectRatio = it },
@@ -277,9 +306,9 @@ fun TvMiniPlayerScreen(
                             ),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(0.9f)
                                 .height(44.dp)
-                                .sleekTvFocus(RoundedCornerShape(20.dp))
+                                .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = { viewModel.togglePlayPause() })
                         ) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -299,9 +328,9 @@ fun TvMiniPlayerScreen(
                             ),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier
-                                .weight(1.2f)
+                                .weight(1.1f)
                                 .height(44.dp)
-                                .sleekTvFocus(RoundedCornerShape(20.dp))
+                                .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = { viewModel.setTvMiniFullscreen(true) })
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Fullscreen,
@@ -309,7 +338,77 @@ fun TvMiniPlayerScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "Во весь экран", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Развернуть", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Download Button
+                        Button(
+                            onClick = {
+                                val video = currentVideo
+                                if (video != null) {
+                                    if (video.isDownloaded) {
+                                        viewModel.toggleDownload(video)
+                                    } else {
+                                        if (activeDownload == null) {
+                                            viewModel.toggleDownload(video)
+                                        } else {
+                                            viewModel.cancelDownload(video.id)
+                                        }
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = when {
+                                    currentVideo?.isDownloaded == true -> Color(0xFF10B981)
+                                    activeDownload != null -> Color.Red.copy(alpha = 0.2f)
+                                    else -> Color(0xFF2C2A3A)
+                                },
+                                contentColor = when {
+                                    currentVideo?.isDownloaded == true -> Color.White
+                                    activeDownload != null -> Color.Red
+                                    else -> Color.White
+                                }
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .weight(1.0f)
+                                .height(44.dp)
+                                .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = {
+                                    val video = currentVideo
+                                    if (video != null) {
+                                        if (video.isDownloaded) {
+                                            viewModel.toggleDownload(video)
+                                        } else {
+                                            if (activeDownload == null) {
+                                                viewModel.toggleDownload(video)
+                                            } else {
+                                                viewModel.cancelDownload(video.id)
+                                            }
+                                        }
+                                    }
+                                })
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    activeDownload != null -> Icons.Default.Close
+                                    currentVideo?.isDownloaded == true -> Icons.Default.DownloadDone
+                                    else -> Icons.Default.Download
+                                },
+                                contentDescription = "Скачать",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = when {
+                                    currentVideo?.isDownloaded == true -> "Скачано"
+                                    activeDownload != null -> "${(activeDownload.progress * 100).toInt()}%"
+                                    else -> "Скачать"
+                                },
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
 
                         // Close Player Button
@@ -321,9 +420,9 @@ fun TvMiniPlayerScreen(
                             ),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier
-                                .weight(0.9f)
+                                .weight(0.8f)
                                 .height(44.dp)
-                                .sleekTvFocus(RoundedCornerShape(20.dp))
+                                .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = { viewModel.selectVideo(null) })
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
