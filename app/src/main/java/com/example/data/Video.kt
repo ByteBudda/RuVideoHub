@@ -1,5 +1,7 @@
 package com.example.data
 
+import java.io.Serializable
+
 data class Video(
     val id: String,
     val title: String,
@@ -16,4 +18,4 @@ data class Video(
     val authorId: String? = null,
     val authorActionUrl: String? = null,
     val authorAvatarUrl: String? = null
-)
+) : Serializable
