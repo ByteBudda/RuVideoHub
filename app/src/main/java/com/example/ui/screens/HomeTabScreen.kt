@@ -1,4 +1,6 @@
 package com.example.ui.screens
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -1425,6 +1427,7 @@ fun CircularChannelItem(
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun HeroVideoCard(
     video: Video,
     onVideoClick: () -> Unit,
@@ -1435,6 +1438,8 @@ fun HeroVideoCard(
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Card(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
@@ -1442,9 +1447,16 @@ fun HeroVideoCard(
             .fillMaxWidth()
             .widthIn(max = 560.dp)
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .sleekTvFocus(shape = RoundedCornerShape(28.dp), onEnter = onVideoClick)
+            .sleekTvFocus(
+                shape = RoundedCornerShape(28.dp),
+                onEnter = onVideoClick,
+                onLongEnter = { showMenu = true }
+            )
             .liquidGlass(RoundedCornerShape(28.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
-            .clickable(onClick = onVideoClick)
+            .combinedClickable(
+                onClick = onVideoClick,
+                onLongClick = { showMenu = true }
+            )
     ) {
         Column {
             // Thumbnail
@@ -1499,12 +1511,18 @@ fun HeroVideoCard(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .sleekTvFocus(shape = RoundedCornerShape(8.dp), onEnter = onChannelClick)
+                            var channelModifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                            
+                            if (!isTvOptimized) {
+                                channelModifier = Modifier
                                     .clickable(onClick = onChannelClick)
-                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                    .then(channelModifier)
+                            }
+                            
+                            Row(
+                                modifier = channelModifier,
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
@@ -1546,25 +1564,77 @@ fun HeroVideoCard(
                 }
 
                 // Action buttons right
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onDownloadToggle,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryContainer)
-                            .sleekTvFocus(CircleShape)
-                            .testTag("download_button_${video.id}")
+                if (!isTvOptimized) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                            contentDescription = "Скачать",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        IconButton(
+                            onClick = onDownloadToggle,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(PrimaryContainer)
+                                .testTag("download_button_${video.id}")
+                        ) {
+                            Icon(
+                                imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                contentDescription = "Скачать",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (showMenu) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.widthIn(min = 280.dp, max = 320.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = "Опции", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
+                    
+                    val btnModifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                    
+                    if (onChannelClick != null) {
+                        androidx.compose.material3.Button(
+                            onClick = { 
+                                showMenu = false
+                                onChannelClick()
+                            },
+                            modifier = btnModifier,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                        ) {
+                            Text("Перейти в канал")
+                        }
+                    }
+                    
+                    androidx.compose.material3.Button(
+                        onClick = { 
+                            showMenu = false
+                            onBookmarkToggle()
+                        },
+                        modifier = btnModifier,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    ) {
+                        Text(if (video.isBookmarked) "Убрать из избранного" else "В избранное")
+                    }
+                    
+                    androidx.compose.material3.Button(
+                        onClick = { 
+                            showMenu = false
+                            onDownloadToggle()
+                        },
+                        modifier = btnModifier,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    ) {
+                        Text(if (video.isDownloaded) "Удалить" else "Скачать")
                     }
                 }
             }
