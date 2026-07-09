@@ -50,11 +50,13 @@ fun TvMiniPlayerScreen(
     val currentVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val dynamicVideos by viewModel.dynamicVideos.collectAsStateWithLifecycle()
+    val localIsFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
     
     val firstItemFocusRequester = remember { FocusRequester() }
     
-    LaunchedEffect(currentVideo) {
-        if (currentVideo != null) {
+    LaunchedEffect(currentVideo, localIsFullscreen) {
+        if (currentVideo != null && !localIsFullscreen) {
+            kotlinx.coroutines.delay(200)
             try {
                 firstItemFocusRequester.requestFocus()
             } catch(e: Exception) {}
@@ -78,7 +80,6 @@ fun TvMiniPlayerScreen(
     }
 
     var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
-    val localIsFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
 
     DisposableEffect(Unit) {
         onDispose {
