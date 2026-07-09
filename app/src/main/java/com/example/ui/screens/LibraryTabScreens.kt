@@ -147,9 +147,16 @@ fun RecentsTabScreen(
                         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+                            .sleekTvFocus(
+                                shape = RoundedCornerShape(16.dp), 
+                                onEnter = { viewModel.selectVideo(videoRuntime) },
+                                onLongEnter = { viewModel.deleteRecentItem(videoRuntime) }
+                            )
                             .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                            .clickable { viewModel.selectVideo(videoRuntime) }
+                            .then(
+                                if (isTvOptimized) Modifier
+                                else Modifier.clickable { viewModel.selectVideo(videoRuntime) }
+                            )
                     ) {
                         Row(
                             modifier = Modifier
@@ -396,9 +403,16 @@ fun DownloadsTabScreen(
                         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+                            .sleekTvFocus(
+                                shape = RoundedCornerShape(16.dp), 
+                                onEnter = { viewModel.selectVideo(videoRuntime) },
+                                onLongEnter = { viewModel.deleteRecentItem(videoRuntime) }
+                            )
                             .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                            .clickable { viewModel.selectVideo(videoRuntime) }
+                            .then(
+                                if (isTvOptimized) Modifier
+                                else Modifier.clickable { viewModel.selectVideo(videoRuntime) }
+                            )
                     ) {
                         Row(
                             modifier = Modifier
