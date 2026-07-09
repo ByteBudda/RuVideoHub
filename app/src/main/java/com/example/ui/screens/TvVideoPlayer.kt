@@ -138,6 +138,7 @@ fun TvRutubeVideoPlayer(
     var currentPos by remember { mutableStateOf(0L) }
     var totalDuration by remember { mutableStateOf(0L) }
     val playPauseFocusRequester = remember { FocusRequester() }
+    val playerFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(controlsVisible, lastInteractionTime, isPlayingState) {
         if (controlsVisible && isPlayingState && !isMiniPlayer) {
@@ -256,8 +257,21 @@ fun TvRutubeVideoPlayer(
     }
     
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible && !isMiniPlayer) {
-            try { playPauseFocusRequester.requestFocus() } catch (e: Exception) {}
+        if (!isMiniPlayer) {
+            delay(150)
+            if (controlsVisible) {
+                try {
+                    playPauseFocusRequester.requestFocus()
+                } catch (e: Exception) {
+                    try {
+                        playerFocusRequester.requestFocus()
+                    } catch (ex: Exception) {}
+                }
+            } else {
+                try {
+                    playerFocusRequester.requestFocus()
+                } catch (e: Exception) {}
+            }
         }
     }
 
@@ -280,6 +294,7 @@ fun TvRutubeVideoPlayer(
             .then(
                 if (!isMiniPlayer) {
                     Modifier
+                        .focusRequester(playerFocusRequester)
                         .focusable()
                         .onKeyEvent { event ->
                             if (event.type == KeyEventType.KeyDown) {
@@ -287,7 +302,9 @@ fun TvRutubeVideoPlayer(
                                 val wasVisible = controlsVisible
                                 
                                 when (event.nativeKeyEvent.keyCode) {
-                                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                                         if (!wasVisible) {
                                             controlsVisible = true
                                             true
