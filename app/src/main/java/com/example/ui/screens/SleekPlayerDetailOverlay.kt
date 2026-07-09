@@ -143,19 +143,35 @@ fun SleekPlayerDetailOverlay(
                               video.duration.contains(":") == false ||
                               video.duration.equals("трансляция", ignoreCase = true) || 
                               video.duration.equals("live", ignoreCase = true)
-            RutubeVideoPlayer(
-                videoId = video.id,
-                viewModel = viewModel,
-                videoTitle = video.title,
-                aspectMode = aspect,
-                isFullscreen = isFull,
-                isMiniPlayer = isMini,
-                isLive = isLiveStream,
-                onToggleFullscreen = { isFullscreen = !isFullscreen },
-                onShare = { shareVideoOverlay(context, video) },
-                onChangeAspectRatio = { selectedAspectRatio = it },
-                modifier = Modifier.fillMaxSize()
-            )
+            if (isTvOptimized) {
+                TvRutubeVideoPlayer(
+                    videoId = video.id,
+                    viewModel = viewModel,
+                    videoTitle = video.title,
+                    aspectMode = aspect,
+                    isFullscreen = isFull,
+                    isMiniPlayer = isMini,
+                    isLive = isLiveStream,
+                    onToggleFullscreen = { isFullscreen = !isFullscreen },
+                    onShare = { shareVideoOverlay(context, video) },
+                    onChangeAspectRatio = { selectedAspectRatio = it },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                RutubeVideoPlayer(
+                    videoId = video.id,
+                    viewModel = viewModel,
+                    videoTitle = video.title,
+                    aspectMode = aspect,
+                    isFullscreen = isFull,
+                    isMiniPlayer = isMini,
+                    isLive = isLiveStream,
+                    onToggleFullscreen = { isFullscreen = !isFullscreen },
+                    onShare = { shareVideoOverlay(context, video) },
+                    onChangeAspectRatio = { selectedAspectRatio = it },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 
