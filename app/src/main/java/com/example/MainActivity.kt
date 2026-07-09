@@ -76,6 +76,9 @@ class MainActivity : ComponentActivity() {
     intent?.getStringExtra("restore_video_id")?.let { id ->
         viewModel.loadVideoByUrlOrId(id)
     }
+
+    // Automatically resume any interrupted/pending downloads in the background
+    com.example.manager.DownloadManager.resumeAll(this)
   }
 
   override fun onUserLeaveHint() {
