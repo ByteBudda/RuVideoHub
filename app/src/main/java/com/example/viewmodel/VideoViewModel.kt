@@ -67,6 +67,16 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val libraryManager = LibraryManager(repository, viewModelScope)
     val downloadManager = DownloadManager(application, repository, viewModelScope)
 
+    init {
+        com.example.manager.DownloadManager.onDownloadCompletedListener = { completedId ->
+            viewModelScope.launch {
+                if (playerManager.currentSelectedVideo.value?.id == completedId) {
+                    playerManager.selectVideo(playerManager.currentSelectedVideo.value?.copy(isDownloaded = true))
+                }
+            }
+        }
+    }
+
     // Proxies for backward compatibility and UI convenience
     val currentTab = navigationManager.currentTab
     val isDarkTheme = settingsManager.isDarkTheme
@@ -1127,10 +1137,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 playerManager.selectVideo(video)
                 addToRecentHistory(video)
-                
-                if (isTvOptimized.value) {
-                    navigationManager.selectTab("tv_mini")
-                }
             }
         } else {
             playerManager.selectVideo(null)
