@@ -1,0 +1,55 @@
+name: Android Release Sign with Repo Key
+
+on:
+  push:
+    tags:
+      - 'v*'  # Запускается при пуше тега v1.0.0, v2.1 и т.д.
+  # Можно оставить и на push в main, но тогда будет создаваться/обновляться draft-релиз
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    permissions:
+      contents: write  # Нужно для загрузки в релиз
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      # 1. Распаковываем ключ из репозитория
+      - name: Decode Keystore to Root
+        run: |
+          base64 --decode debug.keystore.base64 > my-upload-key.jks
+
+      # 2. Собираем подписанный релиз
+      - name: Build with Gradle (Release)
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file="../my-upload-key.jks" \
+            -Pandroid.injected.signing.store.password="android" \
+            -Pandroid.injected.signing.key.alias="androiddebugkey" \
+            -Pandroid.injected.signing.key.password="android" \
+            --no-daemon --no-configuration-cache
+
+      # 3. Загружаем APK в релиз (вместо артефактов)
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true  # Автоматически генерирует описание релиза
+          draft: false  # Сразу публикует релиз (можно true, если хочешь сначала проверить)
+          prerelease: false  # Ставим true, если это тестовая версия
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
