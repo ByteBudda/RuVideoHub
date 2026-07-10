@@ -511,6 +511,7 @@ fun TvMiniPlayerScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color.Black)
                             .border(2.dp, Primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .focusProperties { canFocus = false }
                     }
                 } else {
                     Modifier.size(0.dp)
