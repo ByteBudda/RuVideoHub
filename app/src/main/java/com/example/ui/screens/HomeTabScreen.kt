@@ -2233,35 +2233,6 @@ fun SleekSeriesCard(
                     }
                 }
 
-                // TV / Series badge in top-left
-                Box(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .align(Alignment.TopStart)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tv,
-                            contentDescription = "Сериал",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "СЕРИАЛ",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
-            }
-
             // Info details
             Column(
                 modifier = Modifier
