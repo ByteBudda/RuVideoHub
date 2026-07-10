@@ -54,21 +54,22 @@ fun TvMiniPlayerScreen(
     
     val firstItemFocusRequester = remember { FocusRequester() }
     
-    LaunchedEffect(currentVideo, localIsFullscreen) {
-        if (currentVideo != null && !localIsFullscreen) {
-            kotlinx.coroutines.delay(200)
-            try {
-                firstItemFocusRequester.requestFocus()
-            } catch(e: Exception) {}
-        }
-    }
-    
     // Filter out non-playable items like folders/channels/playlists
     val playableVideos = remember(dynamicVideos) {
         dynamicVideos.filter {
             it.duration != "ПАПКА" && it.duration != "СЕРИАЛ" && 
             it.duration != "КАНАЛ" && it.duration != "ПЛЕЙЛИСТ" && 
             it.duration != "ПРОМО" && it.duration != "КАТАЛОГ"
+        }
+    }
+    
+    val playableVideosCount = playableVideos.size
+    LaunchedEffect(currentVideo, localIsFullscreen, playableVideosCount) {
+        if (currentVideo != null && !localIsFullscreen) {
+            kotlinx.coroutines.delay(350)
+            try {
+                firstItemFocusRequester.requestFocus()
+            } catch(e: Exception) {}
         }
     }
     
@@ -96,51 +97,24 @@ fun TvMiniPlayerScreen(
         }
     }
 
-    if (localIsFullscreen && currentVideo != null) {
-        // Full screen view
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            val currentVid = currentVideo
-            val isLiveStream = currentVid != null && (currentVid.duration == "ЭФИР" || 
-                              currentVid.duration == "00:00" || 
-                              currentVid.duration.isBlank() || 
-                              currentVid.duration.contains(":") == false ||
-                              currentVid.duration.equals("трансляция", ignoreCase = true) || 
-                              currentVid.duration.equals("live", ignoreCase = true))
-            TvRutubeVideoPlayer(
-                videoId = currentVideo!!.id,
-                viewModel = viewModel,
-                videoTitle = currentVideo!!.title,
-                aspectMode = selectedAspectRatio,
-                isFullscreen = true,
-                isLive = isLiveStream,
-                onToggleFullscreen = { viewModel.setTvMiniFullscreen(false) },
-                onChangeAspectRatio = { selectedAspectRatio = it },
-                onShare = { shareVideo(context, currentVideo!!) },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    } else {
-        // Split screen: Left is Video List, Right is Mini Player & Info
-        Row(
-            modifier = modifier
-                .fillMaxSize()
-                .background(Color(0xFF0F0F1A))
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = {})
-                }
-                .padding(16.dp)
-        ) {
-            // Left Column: Video feed list (D-pad focusable)
-            Column(
-                modifier = Modifier
-                    .weight(1.2f)
-                    .fillMaxHeight()
-                    .padding(end = 16.dp)
-            ) {
+    // Split screen / Full screen layout using the same VideoPlayer node to prevent destruction and reloading
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F0F1A))
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {})
+            }
+            .then(if (localIsFullscreen) Modifier else Modifier.padding(16.dp))
+    ) {
+            if (!localIsFullscreen) {
+                // Left Column: Video feed list (D-pad focusable)
+                Column(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight()
+                        .padding(end = 16.dp)
+                ) {
                 Text(
                     text = "ТВ Плейлист",
                     fontSize = 18.sp,
@@ -244,31 +218,41 @@ fun TvMiniPlayerScreen(
             
             // Right Column: Mini Player box & Controls
             Column(
-                modifier = Modifier
-                    .weight(1.8f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = if (localIsFullscreen) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier
+                        .weight(1.8f)
+                        .fillMaxHeight()
+                },
+                verticalArrangement = if (localIsFullscreen) Arrangement.Top else Arrangement.spacedBy(12.dp)
             ) {
                 if (currentVideo != null) {
                     val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
                     val activeDownload = remember(activeDownloads, currentVideo) { currentVideo?.let { activeDownloads[it.id] } }
 
-                    Text(
-                        text = "ТВ Мини-плеер (Управление пультом)",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Primary,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
+                    if (!localIsFullscreen) {
+                        Text(
+                            text = "ТВ Мини-плеер (Управление пультом)",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Primary,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
                     
-                    // Mini Player container (16:9 Aspect Ratio)
+                    // Player container (16:9 Aspect Ratio when windowed, full screen when fullscreen)
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.Black)
-                            .border(2.dp, Primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+                        modifier = if (localIsFullscreen) {
+                            Modifier.fillMaxSize()
+                        } else {
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.Black)
+                                .border(2.dp, Primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        },
                         contentAlignment = Alignment.Center
                     ) {
                         val currentVid = currentVideo
@@ -283,18 +267,19 @@ fun TvMiniPlayerScreen(
                             viewModel = viewModel,
                             videoTitle = currentVideo!!.title,
                             aspectMode = selectedAspectRatio,
-                            isFullscreen = false,
-                            isMiniPlayer = true,
+                            isFullscreen = localIsFullscreen,
+                            isMiniPlayer = !localIsFullscreen,
                             isLive = isLiveStream,
-                            onToggleFullscreen = { viewModel.setTvMiniFullscreen(true) },
+                            onToggleFullscreen = { viewModel.setTvMiniFullscreen(!localIsFullscreen) },
                             onChangeAspectRatio = { selectedAspectRatio = it },
                             onShare = { shareVideo(context, currentVideo!!) },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                     
-                    // TV Optimized Control Buttons
-                    Row(
+                    if (!localIsFullscreen) {
+                        // TV Optimized Control Buttons
+                        Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -465,6 +450,7 @@ fun TvMiniPlayerScreen(
                             color = Color.White.copy(alpha = 0.8f),
                             lineHeight = 16.sp
                         )
+                    }
                     }
                 } else {
                     // Placeholder card when no video is selected/playing
