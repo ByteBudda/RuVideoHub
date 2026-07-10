@@ -105,6 +105,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val playerQuality = settingsManager.playerQuality
     val downloadQuality = settingsManager.downloadQuality
     val activeDownloads = downloadManager.activeDownloads
+
+    val tvGridColumns = settingsManager.tvGridColumns
+    val mobileGridColumns = settingsManager.mobileGridColumns
+    val focusStyle = settingsManager.focusStyle
     
     fun toggleTheme() = settingsManager.toggleTheme()
     fun toggleTvOptimized() = settingsManager.toggleTvOptimized()
@@ -116,6 +120,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setStartPageFavorite(id: String, title: String) = settingsManager.setStartPageFavorite(id, title)
     fun setPlayerQuality(quality: String) = settingsManager.setPlayerQuality(quality)
     fun setDownloadQuality(quality: String) = settingsManager.setDownloadQuality(quality)
+    fun setTvGridColumns(cols: Int) = settingsManager.setTvGridColumns(cols)
+    fun setMobileGridColumns(cols: Int) = settingsManager.setMobileGridColumns(cols)
+    fun setFocusStyle(style: String) = settingsManager.setFocusStyle(style)
     
     fun selectTab(tab: String) = navigationManager.selectTab(tab)
     fun setSearchQuery(query: String) {
@@ -869,6 +876,194 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportBookmarksToJson(): String = libraryManager.exportBookmarksToJson()
     suspend fun importBookmarksFromJson(jsonStr: String): Result<Int> = libraryManager.importBookmarksFromJson(jsonStr)
+
+    fun exportBackupToJson(): String {
+        try {
+            val root = org.json.JSONObject()
+
+            // 1. Settings
+            val settingsObj = org.json.JSONObject()
+            settingsObj.put("is_dark_theme", settingsManager.isDarkTheme.value)
+            settingsObj.put("is_tv_optimized", settingsManager.isTvOptimized.value)
+            settingsObj.put("is_large_cards_mode", settingsManager.isLargeCardsMode.value)
+            settingsObj.put("start_page_type", settingsManager.startPageType.value)
+            settingsObj.put("start_page_category", settingsManager.startPageCategory.value)
+            settingsObj.put("start_page_custom_url", settingsManager.startPageCustomUrl.value)
+            settingsObj.put("player_quality", settingsManager.playerQuality.value)
+            settingsObj.put("download_quality", settingsManager.downloadQuality.value)
+            settingsObj.put("tv_grid_columns", settingsManager.tvGridColumns.value)
+            settingsObj.put("mobile_grid_columns", settingsManager.mobileGridColumns.value)
+            settingsObj.put("focus_style", settingsManager.focusStyle.value)
+            root.put("settings", settingsObj)
+
+            // 2. Bookmarks
+            val bookmarksArray = org.json.JSONArray()
+            for (video in libraryManager.bookmarkedVideos.value) {
+                val obj = org.json.JSONObject()
+                obj.put("id", video.id)
+                obj.put("title", video.title)
+                obj.put("channel", video.channel)
+                obj.put("views", video.views)
+                obj.put("timeAgo", video.timeAgo)
+                obj.put("duration", video.duration)
+                obj.put("isPro", video.isPro)
+                obj.put("category", video.category)
+                obj.put("thumbnailUrl", video.thumbnailUrl ?: "")
+                obj.put("savedAt", video.savedAt)
+                bookmarksArray.put(obj)
+            }
+            root.put("bookmarks", bookmarksArray)
+
+            // 3. Recents
+            val recentsArray = org.json.JSONArray()
+            for (video in libraryManager.recentVideos.value) {
+                val obj = org.json.JSONObject()
+                obj.put("id", video.id)
+                obj.put("title", video.title)
+                obj.put("channel", video.channel)
+                obj.put("views", video.views)
+                obj.put("timeAgo", video.timeAgo)
+                obj.put("duration", video.duration)
+                obj.put("isPro", video.isPro)
+                obj.put("category", video.category)
+                obj.put("thumbnailUrl", video.thumbnailUrl ?: "")
+                obj.put("savedAt", video.savedAt)
+                recentsArray.put(obj)
+            }
+            root.put("recents", recentsArray)
+
+            return root.toString(4)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return "{}"
+        }
+    }
+
+    suspend fun importBackupFromJson(jsonStr: String): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val trimmed = jsonStr.trim()
+            if (trimmed.isBlank()) return@withContext Result.failure(Exception("Пустая строка"))
+            
+            val root = org.json.JSONObject(trimmed)
+            
+            // 1. Settings
+            val settingsObj = root.optJSONObject("settings")
+            var importedSettingsCount = 0
+            if (settingsObj != null) {
+                if (settingsObj.has("is_dark_theme")) {
+                    val dark = settingsObj.getBoolean("is_dark_theme")
+                    if (dark != settingsManager.isDarkTheme.value) settingsManager.toggleTheme()
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("is_tv_optimized")) {
+                    val tv = settingsObj.getBoolean("is_tv_optimized")
+                    if (tv != settingsManager.isTvOptimized.value) settingsManager.toggleTvOptimized()
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("is_large_cards_mode")) {
+                    val large = settingsObj.getBoolean("is_large_cards_mode")
+                    if (large != settingsManager.isLargeCardsMode.value) settingsManager.toggleLargeCardsMode()
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("start_page_type")) {
+                    settingsManager.setStartPageType(settingsObj.getString("start_page_type"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("start_page_category")) {
+                    settingsManager.setStartPageCategory(settingsObj.getString("start_page_category"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("start_page_custom_url")) {
+                    settingsManager.setStartPageCustomUrl(settingsObj.getString("start_page_custom_url"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("player_quality")) {
+                    settingsManager.setPlayerQuality(settingsObj.getString("player_quality"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("download_quality")) {
+                    settingsManager.setDownloadQuality(settingsObj.getString("download_quality"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("tv_grid_columns")) {
+                    settingsManager.setTvGridColumns(settingsObj.getInt("tv_grid_columns"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("mobile_grid_columns")) {
+                    settingsManager.setMobileGridColumns(settingsObj.getInt("mobile_grid_columns"))
+                    importedSettingsCount++
+                }
+                if (settingsObj.has("focus_style")) {
+                    settingsManager.setFocusStyle(settingsObj.getString("focus_style"))
+                    importedSettingsCount++
+                }
+            }
+
+            // 2. Bookmarks
+            val bookmarksArray = root.optJSONArray("bookmarks")
+            var importedBookmarksCount = 0
+            if (bookmarksArray != null) {
+                for (i in 0 until bookmarksArray.length()) {
+                    val obj = bookmarksArray.getJSONObject(i)
+                    val id = obj.optString("id") ?: continue
+                    if (id.isBlank()) continue
+                    
+                    val existing = repository.getVideoById(id)
+                    val imported = com.example.data.SavedVideo(
+                        id = id,
+                        title = obj.optString("title", "Без названия"),
+                        channel = obj.optString("channel", "Rutube"),
+                        views = obj.optString("views", ""),
+                        timeAgo = obj.optString("timeAgo", ""),
+                        duration = obj.optString("duration", "00:00"),
+                        isPro = obj.optBoolean("isPro", false),
+                        category = obj.optString("category", "Разное"),
+                        thumbnailUrl = obj.optString("thumbnailUrl").takeIf { it.isNotBlank() },
+                        isBookmarked = true,
+                        isDownloaded = existing?.isDownloaded ?: false,
+                        isWatched = existing?.isWatched ?: false,
+                        savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+                    )
+                    repository.insertOrUpdate(imported)
+                    importedBookmarksCount++
+                }
+            }
+
+            // 3. Recents
+            val recentsArray = root.optJSONArray("recents")
+            var importedRecentsCount = 0
+            if (recentsArray != null) {
+                for (i in 0 until recentsArray.length()) {
+                    val obj = recentsArray.getJSONObject(i)
+                    val id = obj.optString("id") ?: continue
+                    if (id.isBlank()) continue
+                    
+                    val existing = repository.getVideoById(id)
+                    val imported = com.example.data.SavedVideo(
+                        id = id,
+                        title = obj.optString("title", "Без названия"),
+                        channel = obj.optString("channel", "Rutube"),
+                        views = obj.optString("views", ""),
+                        timeAgo = obj.optString("timeAgo", ""),
+                        duration = obj.optString("duration", "00:00"),
+                        isPro = obj.optBoolean("isPro", false),
+                        category = obj.optString("category", "Разное"),
+                        thumbnailUrl = obj.optString("thumbnailUrl").takeIf { it.isNotBlank() },
+                        isBookmarked = existing?.isBookmarked ?: false,
+                        isDownloaded = existing?.isDownloaded ?: false,
+                        isWatched = true,
+                        savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+                    )
+                    repository.insertOrUpdate(imported)
+                    importedRecentsCount++
+                }
+            }
+
+            Result.success("Импортировано: настроек - $importedSettingsCount, закладок - $importedBookmarksCount, истории - $importedRecentsCount")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     private suspend fun fetchVideosResolvingTabs(apiUrl: String, defaultCategory: String): List<Video> {
         val finalUrl = if (apiUrl.contains("?")) {
