@@ -27,6 +27,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.ripple
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.theme.GreyText
@@ -272,10 +273,10 @@ fun TvRutubeVideoPlayer(
         }
     }
     
-    LaunchedEffect(controlsVisible) {
+    LaunchedEffect(controlsVisible, isMiniPlayer, exoPlayer, isLoading) {
         if (!isMiniPlayer) {
             delay(150)
-            if (controlsVisible) {
+            if (controlsVisible && !isLoading) {
                 try {
                     playPauseFocusRequester.requestFocus()
                 } catch (e: Exception) {
@@ -283,7 +284,7 @@ fun TvRutubeVideoPlayer(
                         playerFocusRequester.requestFocus()
                     } catch (ex: Exception) {}
                 }
-            } else {
+            } else if (!controlsVisible) {
                 try {
                     playerFocusRequester.requestFocus()
                 } catch (e: Exception) {}
@@ -488,12 +489,17 @@ fun TvRutubeVideoPlayer(
                                 if (currentPos > 0) viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                                 onToggleFullscreen() 
                             }
-                            IconButton(
-                                onClick = onBackClick,
+                            Box(
                                 modifier = Modifier
-                                    .background(Color.DarkGray, CircleShape)
                                     .size(48.dp)
+                                    .background(Color.DarkGray, CircleShape)
                                     .sleekTvFocus(CircleShape, onEnter = onBackClick)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onBackClick
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.ArrowBack, "Назад", tint = Color.White, modifier = Modifier.size(28.dp))
                             }
@@ -516,10 +522,17 @@ fun TvRutubeVideoPlayer(
                             selectedQuality = qualities[nextIdx]
                             viewModel.setPlayerQuality(selectedQuality)
                         }
-                        Button(
-                            onClick = onQualityClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                            modifier = Modifier.sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
+                        Box(
+                            modifier = Modifier
+                                .background(Color.DarkGray, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onQualityClick
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(selectedQuality, color = Color.White, fontSize = 16.sp)
                         }
@@ -531,24 +544,34 @@ fun TvRutubeVideoPlayer(
                             val next = modes[(aspectMode.ordinal + 1) % modes.size]
                             onChangeAspectRatio(next)
                         }
-                        IconButton(
-                            onClick = onAspectClick,
+                        Box(
                             modifier = Modifier
-                                .background(Color.DarkGray, CircleShape)
                                 .size(48.dp)
+                                .background(Color.DarkGray, CircleShape)
                                 .sleekTvFocus(CircleShape, onEnter = onAspectClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onAspectClick
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.AspectRatio, "Формат", tint = Color.White, modifier = Modifier.size(24.dp))
                         }
                         
                         if (!isFullscreen) {
                             Spacer(modifier = Modifier.width(16.dp))
-                            IconButton(
-                                onClick = onToggleFullscreen,
+                            Box(
                                 modifier = Modifier
-                                    .background(Color.DarkGray, CircleShape)
                                     .size(48.dp)
+                                    .background(Color.DarkGray, CircleShape)
                                     .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onToggleFullscreen
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Fullscreen, "Полный экран", tint = Color.White, modifier = Modifier.size(24.dp))
                             }
@@ -569,12 +592,17 @@ fun TvRutubeVideoPlayer(
                                 currentPos = newPos
                             }
                         }
-                        IconButton(
-                            onClick = onRewindClick,
+                        Box(
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
                                 .sleekTvFocus(CircleShape, onEnter = onRewindClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onRewindClick
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.FastRewind, "Назад", tint = Color.White, modifier = Modifier.size(36.dp))
                         }
@@ -591,19 +619,25 @@ fun TvRutubeVideoPlayer(
                                 }
                             }
                         }
-                        IconButton(
-                            onClick = onPlayPauseClick,
+                        Box(
                             modifier = Modifier
                                 .size(96.dp)
                                 .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
                                 .focusRequester(playPauseFocusRequester)
                                 .sleekTvFocus(CircleShape, onEnter = onPlayPauseClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onPlayPauseClick
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = if (isPlayingState) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = "Play/Pause",
                                 tint = Color.White,
                                 modifier = Modifier.size(56.dp)
+                                    .align(Alignment.Center)
                             )
                         }
 
@@ -615,12 +649,17 @@ fun TvRutubeVideoPlayer(
                                 currentPos = newPos
                             }
                         }
-                        IconButton(
-                            onClick = onForwardClick,
+                        Box(
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
                                 .sleekTvFocus(CircleShape, onEnter = onForwardClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onForwardClick
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.FastForward, "Вперед", tint = Color.White, modifier = Modifier.size(36.dp))
                         }
