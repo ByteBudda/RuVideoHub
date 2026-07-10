@@ -44,6 +44,15 @@ class SettingsManager(private val application: Application) {
     private val _downloadQuality = MutableStateFlow("720p")
     val downloadQuality = _downloadQuality.asStateFlow()
 
+    private val _tvGridColumns = MutableStateFlow(4)
+    val tvGridColumns = _tvGridColumns.asStateFlow()
+
+    private val _mobileGridColumns = MutableStateFlow(2)
+    val mobileGridColumns = _mobileGridColumns.asStateFlow()
+
+    private val _focusStyle = MutableStateFlow("glow")
+    val focusStyle = _focusStyle.asStateFlow()
+
     init {
         _isDarkTheme.value = sharedPrefs.getBoolean("is_dark_theme", true)
         _isTermsAgreed.value = sharedPrefs.getBoolean("terms_agreed", false)
@@ -61,6 +70,10 @@ class SettingsManager(private val application: Application) {
         _startPageCustomUrl.value = sharedPrefs.getString("start_page_custom_url", "") ?: ""
         _startPageFavoriteId.value = sharedPrefs.getString("start_page_favorite_id", "") ?: ""
         _startPageFavoriteTitle.value = sharedPrefs.getString("start_page_favorite_title", "") ?: ""
+
+        _tvGridColumns.value = sharedPrefs.getInt("tv_grid_columns", 4)
+        _mobileGridColumns.value = sharedPrefs.getInt("mobile_grid_columns", 2)
+        _focusStyle.value = sharedPrefs.getString("focus_style", "glow") ?: "glow"
     }
 
     fun toggleTheme() {
@@ -118,5 +131,20 @@ class SettingsManager(private val application: Application) {
     fun setDownloadQuality(quality: String) {
         _downloadQuality.value = quality
         sharedPrefs.edit().putString("download_quality", quality).apply()
+    }
+
+    fun setTvGridColumns(cols: Int) {
+        _tvGridColumns.value = cols
+        sharedPrefs.edit().putInt("tv_grid_columns", cols).apply()
+    }
+
+    fun setMobileGridColumns(cols: Int) {
+        _mobileGridColumns.value = cols
+        sharedPrefs.edit().putInt("mobile_grid_columns", cols).apply()
+    }
+
+    fun setFocusStyle(style: String) {
+        _focusStyle.value = style
+        sharedPrefs.edit().putString("focus_style", style).apply()
     }
 }
