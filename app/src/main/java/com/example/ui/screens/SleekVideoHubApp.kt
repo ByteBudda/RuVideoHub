@@ -62,6 +62,9 @@ fun Modifier.sleekTvFocus(
             }
         }
         .onKeyEvent { event ->
+            if (onEnter == null && onLongEnter == null) {
+                return@onKeyEvent false
+            }
             if (event.key == Key.Enter || event.key == Key.DirectionCenter || event.key == Key.NumPadEnter) {
                 if (event.type == KeyEventType.KeyDown) {
                     if (keyDownTime == 0L) {
