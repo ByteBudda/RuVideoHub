@@ -22,6 +22,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
@@ -403,11 +405,17 @@ fun TvRutubeVideoPlayer(
                         settings.mediaPlaybackRequiresUserGesture = false
                         webChromeClient = WebChromeClient()
                         webViewClient = WebViewClient()
+                        if (isMiniPlayer) {
+                            isFocusable = false
+                            isFocusableInTouchMode = false
+                        }
                         val url = "https://rutube.ru/play/embed/$videoId/"
                         loadUrl(url)
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
             )
             AnimatedVisibility(
                 visible = controlsVisible && !isMiniPlayer,
@@ -445,6 +453,10 @@ fun TvRutubeVideoPlayer(
                         useController = false
                         player = exoPlayer
                         keepScreenOn = true
+                        if (isMiniPlayer) {
+                            isFocusable = false
+                            isFocusableInTouchMode = false
+                        }
                     }
                 },
                 update = { playerView ->
@@ -456,8 +468,14 @@ fun TvRutubeVideoPlayer(
                         VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
+                    if (isMiniPlayer) {
+                        playerView.isFocusable = false
+                        playerView.isFocusableInTouchMode = false
+                    }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
             )
             
             if (isBufferingState) {
@@ -666,6 +684,7 @@ fun TvRutubeVideoPlayer(
                     }
 
                     // Bottom Bar (Timeline)
+                    var isTimelineFocused by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -681,20 +700,77 @@ fun TvRutubeVideoPlayer(
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         
-                        Box(
+                        BoxWithConstraints(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color.Gray.copy(alpha = 0.5f))
+                                .height(32.dp)
+                                .onFocusChanged { isTimelineFocused = it.isFocused }
+                                .focusable()
+                                .onKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown) {
+                                        when (event.key) {
+                                            Key.DirectionLeft -> {
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                exoPlayer?.let { player ->
+                                                    val seekStep = if (player.duration > 0) (player.duration / 100).coerceIn(5000L, 30000L) else 10000L
+                                                    val newPos = (player.currentPosition - seekStep).coerceAtLeast(0L)
+                                                    player.seekTo(newPos)
+                                                    currentPos = newPos
+                                                }
+                                                true
+                                            }
+                                            Key.DirectionRight -> {
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                exoPlayer?.let { player ->
+                                                    val seekStep = if (player.duration > 0) (player.duration / 100).coerceIn(5000L, 30000L) else 10000L
+                                                    val newPos = (player.currentPosition + seekStep).coerceAtMost(player.duration)
+                                                    player.seekTo(newPos)
+                                                    currentPos = newPos
+                                                }
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                }
+                                .padding(horizontal = 4.dp),
+                            contentAlignment = Alignment.CenterStart
                         ) {
                             val progress = if (totalDuration > 0) currentPos.toFloat() / totalDuration else 0f
+                            
+                            // Background track
                             Box(
                                 modifier = Modifier
-                                    .fillMaxHeight()
+                                    .fillMaxWidth()
+                                    .height(if (isTimelineFocused) 8.dp else 4.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.Gray.copy(alpha = 0.5f))
+                            )
+                            
+                            // Active progress track
+                            Box(
+                                modifier = Modifier
                                     .fillMaxWidth(progress)
+                                    .height(if (isTimelineFocused) 8.dp else 4.dp)
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(Primary)
                             )
+                            
+                            // Glowing circle thumb when focused
+                            if (isTimelineFocused) {
+                                val thumbOffset = maxWidth * progress - 8.dp
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .offset(x = thumbOffset.coerceAtLeast(0.dp))
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .border(2.dp, Primary, CircleShape)
+                                )
+                            }
                         }
                         
                         Spacer(modifier = Modifier.width(16.dp))
