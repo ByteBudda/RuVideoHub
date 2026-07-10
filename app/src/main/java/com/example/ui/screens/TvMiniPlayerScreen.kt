@@ -303,12 +303,14 @@ fun TvMiniPlayerScreen(
                         Button(
                             onClick = { viewModel.togglePlayPause() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPlaying) Color.DarkGray else Primary
+                                containerColor = Color(0xFF2C2A3A),
+                                contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier
                                 .weight(0.9f)
                                 .height(44.dp)
+                                .then(if (playableVideos.isEmpty()) Modifier.focusRequester(firstItemFocusRequester) else Modifier)
                                 .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = { viewModel.togglePlayPause() })
                         ) {
                             Icon(
