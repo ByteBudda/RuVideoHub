@@ -39,6 +39,12 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
+import androidx.compose.ui.graphics.graphicsLayer
+
+val LocalFocusStyle = androidx.compose.runtime.compositionLocalOf { "glow" }
+val LocalTvGridColumns = androidx.compose.runtime.compositionLocalOf { 4 }
+val LocalMobileGridColumns = androidx.compose.runtime.compositionLocalOf { 2 }
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.sleekTvFocus(
@@ -50,14 +56,48 @@ fun Modifier.sleekTvFocus(
     var isFocused by remember { mutableStateOf(false) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
-    var keyDownTime by remember { mutableStateOf(0L) }
+    var longPressJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var longPressTriggered by remember { mutableStateOf(false) }
+
+    val focusStyle = LocalFocusStyle.current
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused) {
+            if (focusStyle == "scale" || focusStyle == "scale_glow") 1.06f else 1.00f
+        } else {
+            1.0f
+        },
+        animationSpec = androidx.compose.animation.core.tween(150),
+        label = "focus_scale"
+    )
+
+    val focusModifier = Modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .then(
+            if (isFocused) {
+                when (focusStyle) {
+                    "scale" -> Modifier
+                    "scale_glow" -> Modifier.border(2.5.dp, focusColor, shape)
+                    "classic" -> Modifier.border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f), shape)
+                    "tint" -> Modifier.background(focusColor.copy(alpha = 0.12f), shape).border(1.5.dp, focusColor.copy(alpha = 0.6f), shape)
+                    else -> Modifier.border(2.5.dp, focusColor.copy(alpha = 0.85f), shape)
+                }
+            } else {
+                Modifier
+            }
+        )
 
     this
         .bringIntoViewRequester(bringIntoViewRequester)
         .onFocusChanged { state ->
             isFocused = state.isFocused
-            if (state.isFocused) {
+            if (!state.isFocused) {
+                longPressJob?.cancel()
+                longPressJob = null
+                longPressTriggered = false
+            } else {
                 scope.launch { bringIntoViewRequester.bringIntoView() }
             }
         }
@@ -67,19 +107,22 @@ fun Modifier.sleekTvFocus(
             }
             if (event.key == Key.Enter || event.key == Key.DirectionCenter || event.key == Key.NumPadEnter) {
                 if (event.type == KeyEventType.KeyDown) {
-                    if (keyDownTime == 0L) {
-                        keyDownTime = System.currentTimeMillis()
-                        longPressTriggered = false
-                    } else if (onLongEnter != null && !longPressTriggered && System.currentTimeMillis() - keyDownTime > 500) {
-                        longPressTriggered = true
-                        onLongEnter.invoke()
+                    if (longPressJob == null && !longPressTriggered) {
+                        longPressJob = scope.launch {
+                            kotlinx.coroutines.delay(500)
+                            if (onLongEnter != null) {
+                                longPressTriggered = true
+                                onLongEnter.invoke()
+                            }
+                        }
                     }
                     true
                 } else if (event.type == KeyEventType.KeyUp) {
+                    longPressJob?.cancel()
+                    longPressJob = null
                     if (!longPressTriggered) {
                         onEnter?.invoke()
                     }
-                    keyDownTime = 0L
                     longPressTriggered = false
                     true
                 } else {
@@ -90,13 +133,7 @@ fun Modifier.sleekTvFocus(
             }
         }
         .focusable()
-        .then(
-            if (isFocused) {
-                Modifier.border(2.dp, focusColor.copy(alpha = 0.8f), shape)
-            } else {
-                Modifier
-            }
-        )
+        .then(focusModifier)
 }
 
 @Composable
@@ -104,56 +141,65 @@ fun SleekVideoHubApp(
     viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
-    val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
-    val currentSelectedVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
-    val isMiniPlayer by viewModel.isMiniPlayer.collectAsStateWithLifecycle()
-    val isTermsAgreed by viewModel.isTermsAgreed.collectAsStateWithLifecycle()
+    val focusStyle by viewModel.focusStyle.collectAsStateWithLifecycle()
+    val tvGridColumns by viewModel.tvGridColumns.collectAsStateWithLifecycle()
+    val mobileGridColumns by viewModel.mobileGridColumns.collectAsStateWithLifecycle()
 
-    val context = LocalContext.current
+    CompositionLocalProvider(
+        LocalFocusStyle provides focusStyle,
+        LocalTvGridColumns provides tvGridColumns,
+        LocalMobileGridColumns provides mobileGridColumns
+    ) {
+        val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+        val currentSelectedVideo by viewModel.currentSelectedVideo.collectAsStateWithLifecycle()
+        val isMiniPlayer by viewModel.isMiniPlayer.collectAsStateWithLifecycle()
+        val isTermsAgreed by viewModel.isTermsAgreed.collectAsStateWithLifecycle()
 
-    if (!isTermsAgreed) {
-        TermsAgreementScreen(
-            onAgree = { viewModel.agreeToTerms() },
-            onDecline = { context.findActivity()?.finish() }
-        )
-        return
-    }
+        val context = LocalContext.current
 
-    var lastBackPressTime by remember { mutableStateOf(0L) }
+        if (!isTermsAgreed) {
+            TermsAgreementScreen(
+                onAgree = { viewModel.agreeToTerms() },
+                onDecline = { context.findActivity()?.finish() }
+            )
+            return@CompositionLocalProvider
+        }
 
-    androidx.activity.compose.BackHandler(enabled = currentSelectedVideo == null) {
-        if (viewModel.canNavigateBack()) {
-            viewModel.navigateBack()
-        } else {
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastBackPressTime < 2000L) {
-                context.findActivity()?.finish()
+        var lastBackPressTime by remember { mutableStateOf(0L) }
+
+        androidx.activity.compose.BackHandler(enabled = currentSelectedVideo == null) {
+            if (viewModel.canNavigateBack()) {
+                viewModel.navigateBack()
             } else {
-                lastBackPressTime = currentTime
-                android.widget.Toast.makeText(context, "Нажмите назад ещё раз для выхода", android.widget.Toast.LENGTH_SHORT).show()
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastBackPressTime < 2000L) {
+                    context.findActivity()?.finish()
+                } else {
+                    lastBackPressTime = currentTime
+                    android.widget.Toast.makeText(context, "Нажмите назад ещё раз для выхода", android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
         }
-    }
 
-    val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
-    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
-    val isInPipMode by viewModel.isInPipMode.collectAsStateWithLifecycle()
+        val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+        val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+        val isInPipMode by viewModel.isInPipMode.collectAsStateWithLifecycle()
 
-    if (isInPipMode) {
-        currentSelectedVideo?.let { video ->
-            SleekPlayerDetailOverlay(
-                video = video,
-                viewModel = viewModel,
-                isDark = isDarkTheme,
-                isTvOptimized = isTvOptimized,
-                isMiniPlayer = false,
-                isInPipMode = true,
-                onDismiss = { viewModel.selectVideo(null) },
-                onRestore = {}
-            )
+        if (isInPipMode) {
+            currentSelectedVideo?.let { video ->
+                SleekPlayerDetailOverlay(
+                    video = video,
+                    viewModel = viewModel,
+                    isDark = isDarkTheme,
+                    isTvOptimized = isTvOptimized,
+                    isMiniPlayer = false,
+                    isInPipMode = true,
+                    onDismiss = { viewModel.selectVideo(null) },
+                    onRestore = {}
+                )
+            }
+            return@CompositionLocalProvider
         }
-        return
-    }
 
     AmbientGlassBackground(isDark = isDarkTheme, isTvOptimized = isTvOptimized, modifier = modifier) {
         if (isTvOptimized) {
@@ -277,6 +323,7 @@ fun SleekVideoHubApp(
             }
         }
     }
+}
 }
 
 @Composable
