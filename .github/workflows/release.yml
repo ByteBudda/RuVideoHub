@@ -1,9 +1,9 @@
-name: Build and Upload APK to Release
+name: Android Release Sign with Repo Key
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'  # Запускается при пуше тега v1.0.0, v2.1 и т.д.
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     permissions:
-      contents: write
+      contents: write  # Нужно для загрузки в релиз
 
     steps:
       - name: Checkout repository
@@ -26,11 +26,13 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Decode Keystore
+      # 1. Распаковываем ключ из репозитория
+      - name: Decode Keystore to Root
         run: |
           base64 --decode debug.keystore.base64 > my-upload-key.jks
 
-      - name: Build Signed Release APK
+      # 2. Собираем подписанный релиз
+      - name: Build with Gradle (Release)
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease \
@@ -40,10 +42,13 @@ jobs:
             -Pandroid.injected.signing.key.password="android" \
             --no-daemon --no-configuration-cache
 
+      # 3. Загружаем APK в релиз (вместо артефактов)
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
