@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -53,6 +54,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.focusGroup
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeTabScreen(
@@ -77,6 +79,8 @@ fun HomeTabScreen(
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
     val continueWatchingVideos by viewModel.continueWatchingVideos.collectAsStateWithLifecycle()
 
+    val initialFocusRequester = remember { FocusRequester() }
+
     Column(modifier = modifier.fillMaxSize()) {
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
         val selectedFeedTab by viewModel.selectedFeedTab.collectAsStateWithLifecycle()
@@ -90,6 +94,15 @@ fun HomeTabScreen(
             if (channelActiveTab == "Видео") isLoading else isLoadingPlaylists
         } else {
             isLoading
+        }
+
+        LaunchedEffect(isTvOptimized, isCurrentTabLoading, selectedFeedTab, selectedSubfolderName, isChannelView) {
+            if (isTvOptimized && !isCurrentTabLoading) {
+                delay(250)
+                try {
+                    initialFocusRequester.requestFocus()
+                } catch (e: Exception) {}
+            }
         }
 
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -192,6 +205,11 @@ fun HomeTabScreen(
             }
 
             // 2. Feed tabs
+            val shouldFocusSubfolderBack = selectedSubfolderName != null
+            val shouldFocusFeedTab = feedTabs.isNotEmpty() && !shouldFocusSubfolderBack && !isChannelView
+            val shouldFocusContinueWatching = !shouldFocusFeedTab && !shouldFocusSubfolderBack && searchQuery.isBlank() && !isChannelView && selectedSubfolderName == null && continueWatchingVideos.isNotEmpty()
+            val shouldFocusHeroCard = !shouldFocusFeedTab && !shouldFocusSubfolderBack && !shouldFocusContinueWatching && currentVideos.isNotEmpty()
+
             if (feedTabs.isNotEmpty()) {
                 item {
                     FeedTabRow(
@@ -199,7 +217,8 @@ fun HomeTabScreen(
                         selectedTab = selectedFeedTab,
                         onTabSelected = { viewModel.selectFeedTab(it) },
                         isDark = isDarkTheme,
-                        isTvOptimized = isTvOptimized
+                        isTvOptimized = isTvOptimized,
+                        focusRequester = if (shouldFocusFeedTab) initialFocusRequester else null
                     )
                 }
             }
@@ -219,7 +238,8 @@ fun HomeTabScreen(
                             viewModel.selectVideo(videoRuntime)
                         },
                         isDark = isDarkTheme,
-                        isTvOptimized = isTvOptimized
+                        isTvOptimized = isTvOptimized,
+                        focusRequester = if (shouldFocusContinueWatching) initialFocusRequester else null
                     )
                 }
             }
@@ -237,6 +257,9 @@ fun HomeTabScreen(
                         Row(
                             modifier = Modifier
                                 .weight(1f)
+                                .then(
+                                    if (shouldFocusSubfolderBack) Modifier.focusRequester(initialFocusRequester) else Modifier
+                                )
                                 .sleekTvFocus(shape = RoundedCornerShape(12.dp), onEnter = { viewModel.navigateBack() })
                                 .clickable { viewModel.navigateBack() }
                                 .liquidGlass(RoundedCornerShape(12.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
@@ -290,7 +313,8 @@ fun HomeTabScreen(
                             viewModel.toggleBookmark(channelVideo)
                         },
                         isDark = isDarkTheme,
-                        isTvOptimized = isTvOptimized
+                        isTvOptimized = isTvOptimized,
+                        focusRequester = if (isChannelView) initialFocusRequester else null
                     )
                 }
             }
@@ -555,7 +579,8 @@ fun HomeTabScreen(
                                             viewModel.selectVideo(channelDummy)
                                         }
                                     } else null,
-                                    isTvOptimized = isTvOptimized
+                                    isTvOptimized = isTvOptimized,
+                                    modifier = if (shouldFocusHeroCard) Modifier.focusRequester(initialFocusRequester) else Modifier
                                 )
                             }
                         }
@@ -664,7 +689,8 @@ fun HomeTabScreen(
                                         viewModel.selectVideo(channelDummy)
                                     }
                                 } else null,
-                                isTvOptimized = isTvOptimized
+                                isTvOptimized = isTvOptimized,
+                                modifier = if (shouldFocusHeroCard) Modifier.focusRequester(initialFocusRequester) else Modifier
                             )
                         }
                     }
@@ -1211,7 +1237,8 @@ fun FeedTabRow(
     onTabSelected: (com.example.data.rutube.SmartRutubeParser.TabInfo) -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null
 ) {
     if (tabs.isEmpty()) return
     
@@ -1227,6 +1254,13 @@ fun FeedTabRow(
             
             Box(
                 modifier = Modifier
+                    .then(
+                        if (isSelected && focusRequester != null) {
+                            Modifier.focusRequester(focusRequester)
+                        } else {
+                            Modifier
+                        }
+                    )
                     .then(
                         if (isSelected) {
                             Modifier
@@ -2396,7 +2430,8 @@ fun ChannelHeader(
     onFavoriteToggle: (Video) -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null
 ) {
     if (channel == null) return
 
@@ -2507,7 +2542,10 @@ fun ChannelHeader(
                 onClick = { onFavoriteToggle(channel) },
                 modifier = Modifier
                     .weight(1f)
-                    .height(44.dp),
+                    .height(44.dp)
+                    .then(
+                        if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (channel.isBookmarked) {
@@ -2700,7 +2738,8 @@ fun ContinueWatchingSection(
     videos: List<SavedVideo>,
     onVideoClick: (SavedVideo) -> Unit,
     isDark: Boolean,
-    isTvOptimized: Boolean
+    isTvOptimized: Boolean,
+    focusRequester: FocusRequester? = null
 ) {
     Column(
         modifier = Modifier
@@ -2736,7 +2775,7 @@ fun ContinueWatchingSection(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 4.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(videos, key = { it.id }) { saved ->
+            itemsIndexed(videos, key = { _, v -> v.id }) { index, saved ->
                 val progressPercent = if (saved.lastDuration > 0) {
                     saved.lastProgress.toFloat() / saved.lastDuration.toFloat()
                 } else {
@@ -2746,6 +2785,13 @@ fun ContinueWatchingSection(
                 Card(
                     onClick = { onVideoClick(saved) },
                     modifier = Modifier
+                        .then(
+                            if (index == 0 && focusRequester != null) {
+                                Modifier.focusRequester(focusRequester)
+                            } else {
+                                Modifier
+                            }
+                        )
                         .width(160.dp)
                         .height(135.dp)
                         .sleekTvFocus(RoundedCornerShape(12.dp))
