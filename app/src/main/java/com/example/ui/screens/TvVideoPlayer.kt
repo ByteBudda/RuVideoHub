@@ -125,13 +125,21 @@ fun TvRutubeVideoPlayer(
     val globalQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
     var selectedQuality by remember(globalQuality) { mutableStateOf(globalQuality) }
 
-    var hlsUrl by remember(videoId, selectedQuality) { mutableStateOf<String?>(null) }
-    var isLoading by remember(videoId, selectedQuality) { mutableStateOf(true) }
-    var loadError by remember(videoId, selectedQuality) { mutableStateOf<String?>(null) }
-    var useEmbedPlayer by remember(videoId, selectedQuality) { mutableStateOf(false) }
+    var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
+    var isLoading by remember(videoId) { mutableStateOf(true) }
+    var loadError by remember(videoId) { mutableStateOf<String?>(null) }
+    var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
     
     val isPlayingFromViewModel by viewModel.isPlaying.collectAsStateWithLifecycle()
     var isPlayingState by remember { mutableStateOf(viewModel.isPlaying.value) }
+
+    LaunchedEffect(isPlayingFromViewModel) {
+        isPlayingState = isPlayingFromViewModel
+    }
+
+    LaunchedEffect(isPlayingState) {
+        viewModel.setPlayingState(isPlayingState)
+    }
     var controlsVisible by remember { mutableStateOf(!isMiniPlayer) }
     var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
@@ -158,7 +166,9 @@ fun TvRutubeVideoPlayer(
             hlsUrl = offlineFile.absolutePath
             isLoading = false
         } else {
-            isLoading = true
+            if (hlsUrl == null) {
+                isLoading = true
+            }
             loadError = null
             useEmbedPlayer = false
             
@@ -231,15 +241,21 @@ fun TvRutubeVideoPlayer(
     }
 
     LaunchedEffect(exoPlayer) {
-        exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                isBufferingState = playbackState == androidx.media3.common.Player.STATE_BUFFERING
-            }
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                android.util.Log.e("TvVideoPlayer", "ExoPlayer error", error)
-                useEmbedPlayer = true
-            }
-        })
+        if (exoPlayer != null) {
+            isBufferingState = true
+            exoPlayer.addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    isBufferingState = playbackState == androidx.media3.common.Player.STATE_BUFFERING ||
+                                       playbackState == androidx.media3.common.Player.STATE_IDLE
+                }
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    android.util.Log.e("TvVideoPlayer", "ExoPlayer error", error)
+                    useEmbedPlayer = true
+                }
+            })
+        } else {
+            isBufferingState = false
+        }
     }
 
     LaunchedEffect(exoPlayer, isPlayingState) {
@@ -406,7 +422,7 @@ fun TvRutubeVideoPlayer(
                             .padding(24.dp)
                             .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                             .size(56.dp)
-                            .sleekTvFocus(CircleShape)
+                            .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
                     ) {
                         Icon(
                             imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
@@ -468,15 +484,16 @@ fun TvRutubeVideoPlayer(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isFullscreen) {
+                            val onBackClick = { 
+                                if (currentPos > 0) viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
+                                onToggleFullscreen() 
+                            }
                             IconButton(
-                                onClick = { 
-                                    if (currentPos > 0) viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
-                                    onToggleFullscreen() 
-                                },
+                                onClick = onBackClick,
                                 modifier = Modifier
                                     .background(Color.DarkGray, CircleShape)
                                     .size(48.dp)
-                                    .sleekTvFocus(CircleShape)
+                                    .sleekTvFocus(CircleShape, onEnter = onBackClick)
                             ) {
                                 Icon(Icons.Default.ArrowBack, "Назад", tint = Color.White, modifier = Modifier.size(28.dp))
                             }
@@ -492,32 +509,34 @@ fun TvRutubeVideoPlayer(
                             modifier = Modifier.weight(1f)
                         )
                         
+                        val onQualityClick = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            val qualities = listOf("Авто", "1080p", "720p", "480p")
+                            val nextIdx = (qualities.indexOf(selectedQuality) + 1) % qualities.size
+                            selectedQuality = qualities[nextIdx]
+                            viewModel.setPlayerQuality(selectedQuality)
+                        }
                         Button(
-                            onClick = {
-                                lastInteractionTime = System.currentTimeMillis()
-                                val qualities = listOf("Авто", "1080p", "720p", "480p")
-                                val nextIdx = (qualities.indexOf(selectedQuality) + 1) % qualities.size
-                                selectedQuality = qualities[nextIdx]
-                                viewModel.setPlayerQuality(selectedQuality)
-                            },
+                            onClick = onQualityClick,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                            modifier = Modifier.sleekTvFocus(RoundedCornerShape(8.dp))
+                            modifier = Modifier.sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
                         ) {
                             Text(selectedQuality, color = Color.White, fontSize = 16.sp)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         
+                        val onAspectClick = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            val modes = VlcAspectRatio.values()
+                            val next = modes[(aspectMode.ordinal + 1) % modes.size]
+                            onChangeAspectRatio(next)
+                        }
                         IconButton(
-                            onClick = {
-                                lastInteractionTime = System.currentTimeMillis()
-                                val modes = VlcAspectRatio.values()
-                                val next = modes[(aspectMode.ordinal + 1) % modes.size]
-                                onChangeAspectRatio(next)
-                            },
+                            onClick = onAspectClick,
                             modifier = Modifier
                                 .background(Color.DarkGray, CircleShape)
                                 .size(48.dp)
-                                .sleekTvFocus(CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onAspectClick)
                         ) {
                             Icon(Icons.Default.AspectRatio, "Формат", tint = Color.White, modifier = Modifier.size(24.dp))
                         }
@@ -529,7 +548,7 @@ fun TvRutubeVideoPlayer(
                                 modifier = Modifier
                                     .background(Color.DarkGray, CircleShape)
                                     .size(48.dp)
-                                    .sleekTvFocus(CircleShape)
+                                    .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
                             ) {
                                 Icon(Icons.Default.Fullscreen, "Полный экран", tint = Color.White, modifier = Modifier.size(24.dp))
                             }
@@ -542,41 +561,43 @@ fun TvRutubeVideoPlayer(
                         horizontalArrangement = Arrangement.spacedBy(48.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val onRewindClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            exoPlayer?.let {
+                                val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
+                                it.seekTo(newPos)
+                                currentPos = newPos
+                            }
+                        }
                         IconButton(
-                            onClick = {
-                                lastInteractionTime = System.currentTimeMillis()
-                                exoPlayer?.let {
-                                    val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
-                                    it.seekTo(newPos)
-                                    currentPos = newPos
-                                }
-                            },
+                            onClick = onRewindClick,
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
-                                .sleekTvFocus(CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onRewindClick)
                         ) {
                             Icon(Icons.Default.FastRewind, "Назад", tint = Color.White, modifier = Modifier.size(36.dp))
                         }
 
-                        IconButton(
-                            onClick = {
-                                lastInteractionTime = System.currentTimeMillis()
-                                exoPlayer?.let {
-                                    if (it.isPlaying) {
-                                        it.pause()
-                                        isPlayingState = false
-                                    } else {
-                                        it.play()
-                                        isPlayingState = true
-                                    }
+                        val onPlayPauseClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            exoPlayer?.let {
+                                if (it.isPlaying) {
+                                    it.pause()
+                                    isPlayingState = false
+                                } else {
+                                    it.play()
+                                    isPlayingState = true
                                 }
-                            },
+                            }
+                        }
+                        IconButton(
+                            onClick = onPlayPauseClick,
                             modifier = Modifier
                                 .size(96.dp)
-                                .background(Primary, CircleShape)
+                                .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
                                 .focusRequester(playPauseFocusRequester)
-                                .sleekTvFocus(CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onPlayPauseClick)
                         ) {
                             Icon(
                                 imageVector = if (isPlayingState) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -586,19 +607,20 @@ fun TvRutubeVideoPlayer(
                             )
                         }
 
+                        val onForwardClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            exoPlayer?.let {
+                                val newPos = (it.currentPosition + 10000).coerceAtMost(it.duration)
+                                it.seekTo(newPos)
+                                currentPos = newPos
+                            }
+                        }
                         IconButton(
-                            onClick = {
-                                lastInteractionTime = System.currentTimeMillis()
-                                exoPlayer?.let {
-                                    val newPos = (it.currentPosition + 10000).coerceAtMost(it.duration)
-                                    it.seekTo(newPos)
-                                    currentPos = newPos
-                                }
-                            },
+                            onClick = onForwardClick,
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
-                                .sleekTvFocus(CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onForwardClick)
                         ) {
                             Icon(Icons.Default.FastForward, "Вперед", tint = Color.White, modifier = Modifier.size(36.dp))
                         }
