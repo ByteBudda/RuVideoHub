@@ -33,11 +33,13 @@ import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun RecentsTabScreen(
     viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val recentVideos by viewModel.recentSavedVideos.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
@@ -150,12 +152,21 @@ fun RecentsTabScreen(
                             .sleekTvFocus(
                                 shape = RoundedCornerShape(16.dp), 
                                 onEnter = { viewModel.selectVideo(videoRuntime) },
-                                onLongEnter = { viewModel.deleteRecentItem(videoRuntime) }
+                                onLongEnter = { 
+                                    viewModel.deleteRecentItem(videoRuntime)
+                                    android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
+                                }
                             )
                             .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                             .then(
                                 if (isTvOptimized) Modifier
-                                else Modifier.clickable { viewModel.selectVideo(videoRuntime) }
+                                else Modifier.combinedClickable(
+                                    onClick = { viewModel.selectVideo(videoRuntime) },
+                                    onLongClick = { 
+                                        viewModel.deleteRecentItem(videoRuntime)
+                                        android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                )
                             )
                     ) {
                         Row(
@@ -193,6 +204,7 @@ fun RecentsTabScreen(
                             IconButton(
                                 onClick = { 
                                     viewModel.deleteRecentItem(videoRuntime)
+                                    android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.size(32.dp)
                                     .sleekTvFocus(CircleShape)
@@ -213,6 +225,7 @@ fun RecentsTabScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DownloadsTabScreen(
     viewModel: VideoViewModel,
@@ -406,12 +419,15 @@ fun DownloadsTabScreen(
                             .sleekTvFocus(
                                 shape = RoundedCornerShape(16.dp), 
                                 onEnter = { viewModel.selectVideo(videoRuntime) },
-                                onLongEnter = { viewModel.deleteRecentItem(videoRuntime) }
+                                onLongEnter = { viewModel.toggleDownload(videoRuntime) }
                             )
                             .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                             .then(
                                 if (isTvOptimized) Modifier
-                                else Modifier.clickable { viewModel.selectVideo(videoRuntime) }
+                                else Modifier.combinedClickable(
+                                    onClick = { viewModel.selectVideo(videoRuntime) },
+                                    onLongClick = { viewModel.toggleDownload(videoRuntime) }
+                                )
                             )
                     ) {
                         Row(
@@ -1236,6 +1252,7 @@ fun BookmarkSectionHeader(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun BookmarkItemRow(
     saved: SavedVideo,
@@ -1271,9 +1288,19 @@ fun BookmarkItemRow(
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
-            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = { viewModel.selectVideo(videoRuntime) })
+            .sleekTvFocus(
+                shape = RoundedCornerShape(16.dp), 
+                onEnter = { viewModel.selectVideo(videoRuntime) },
+                onLongEnter = onDelete
+            )
             .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-            .clickable { viewModel.selectVideo(videoRuntime) }
+            .then(
+                if (isTvOptimized) Modifier
+                else Modifier.combinedClickable(
+                    onClick = { viewModel.selectVideo(videoRuntime) },
+                    onLongClick = onDelete
+                )
+            )
     ) {
         Row(
             modifier = Modifier
