@@ -1135,6 +1135,41 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 if (dbVideo != null && dbVideo.lastProgress > 0) {
                     playerManager.saveVideoPosition(video.id, dbVideo.lastProgress)
                 }
+
+                // Intelligently populate dynamicVideos list so that the TV mini player has a valid, interactive playlist
+                val currentList = _dynamicVideos.value
+                val containsVideo = currentList.any { it.id == video.id }
+                if (!containsVideo) {
+                    val cwList = continueWatchingVideos.value
+                    val existsInCw = cwList.any { it.id == video.id }
+                    if (existsInCw) {
+                        _dynamicVideos.value = cwList.map { savedVideo ->
+                            Video(
+                                id = savedVideo.id, title = savedVideo.title, channel = savedVideo.channel,
+                                views = savedVideo.views, timeAgo = savedVideo.timeAgo, duration = savedVideo.duration,
+                                isPro = savedVideo.isPro, category = savedVideo.category, description = "Продолжить просмотр",
+                                thumbnailUrl = savedVideo.thumbnailUrl, isDownloaded = savedVideo.isDownloaded, isBookmarked = savedVideo.isBookmarked
+                            )
+                        }
+                    } else {
+                        val recentsList = recentSavedVideos.value
+                        val existsInRecents = recentsList.any { it.id == video.id }
+                        if (existsInRecents) {
+                            _dynamicVideos.value = recentsList.map { saved ->
+                                Video(
+                                    id = saved.id, title = saved.title, channel = saved.channel,
+                                    views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
+                                    isPro = saved.isPro, category = saved.category, description = "Просмотрено недавно",
+                                    thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = saved.isBookmarked
+                                )
+                            }
+                        } else {
+                            // Default fallback: ensure playlist is not empty by including at least the selected video
+                            _dynamicVideos.value = listOf(video)
+                        }
+                    }
+                }
+
                 playerManager.selectVideo(video)
                 addToRecentHistory(video)
             }
