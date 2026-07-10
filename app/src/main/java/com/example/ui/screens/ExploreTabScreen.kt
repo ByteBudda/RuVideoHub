@@ -27,6 +27,7 @@ fun ExploreTabScreen(
 ) {
     val realCategories by viewModel.realCategories.collectAsStateWithLifecycle()
     val isCategoriesLoading by viewModel.isCategoriesLoading.collectAsStateWithLifecycle()
+    val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
     val getCategoryGradient = { title: String ->
         val colors = listOf(
@@ -73,76 +74,24 @@ fun ExploreTabScreen(
                 )
             }
         } else {
+            val cols = if (isTvOptimized) LocalTvGridColumns.current else LocalMobileGridColumns.current
+            val chunkedCategories = remember(realCategories, cols) { realCategories.chunked(cols) }
+
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                for (i in realCategories.indices step 2) {
+                for (rowItems in chunkedCategories) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(11.dp)
                     ) {
-                        val firstItem = realCategories[i]
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(115.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(getCategoryGradient(firstItem.title))
-                                .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
-                                    viewModel.selectCategory(firstItem.title, firstItem.target)
-                                    viewModel.selectTab("home")
-                                })
-                                .border(
-                                    width = 1.dp,
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            Color.White.copy(alpha = 0.45f),
-                                            Color.White.copy(alpha = 0.1f),
-                                            Color.Black.copy(alpha = 0.25f)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .clickable {
-                                    viewModel.selectCategory(firstItem.title, firstItem.target)
-                                    viewModel.selectTab("home")
-                                }
-                        ) {
-                            AsyncImage(
-                                model = firstItem.picture,
-                                contentDescription = firstItem.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                                            startY = 50f
-                                        )
-                                    )
-                            )
-                            Text(
-                                text = firstItem.title,
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(horizontal = 12.dp, vertical = 10.dp)
-                            )
-                        }
-
-                        if (i + 1 < realCategories.size) {
-                            val secondItem = realCategories[i + 1]
+                        rowItems.forEach { item ->
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(115.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(getCategoryGradient(secondItem.title))
+                                    .background(getCategoryGradient(item.title))
                                     .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
-                                        viewModel.selectCategory(secondItem.title, secondItem.target)
+                                        viewModel.selectCategory(item.title, item.target)
                                         viewModel.selectTab("home")
                                     })
                                     .border(
@@ -157,20 +106,20 @@ fun ExploreTabScreen(
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                     .clickable {
-                                        viewModel.selectCategory(secondItem.title, secondItem.target)
+                                        viewModel.selectCategory(item.title, item.target)
                                         viewModel.selectTab("home")
                                     }
                             ) {
                                 AsyncImage(
-                                    model = secondItem.picture,
-                                    contentDescription = secondItem.title,
+                                    model = item.picture,
+                                    contentDescription = item.title,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                    	.background(
+                                        .background(
                                             Brush.verticalGradient(
                                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
                                                 startY = 50f
@@ -178,7 +127,7 @@ fun ExploreTabScreen(
                                         )
                                 )
                                 Text(
-                                    text = secondItem.title,
+                                    text = item.title,
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
@@ -187,7 +136,8 @@ fun ExploreTabScreen(
                                         .padding(horizontal = 12.dp, vertical = 10.dp)
                                 )
                             }
-                        } else {
+                        }
+                        repeat(cols - rowItems.size) {
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     }
