@@ -164,8 +164,8 @@ fun SettingsTabScreen(
                         listOf(
                             "dark" to "Тёмная",
                             "light" to "Светлая",
-                            "slate" to "Тёмная нейтральная",
-                            "sepia" to "Светлая нейтральная"
+                            "slate" to "Серая",
+                            "sepia" to "Бежевая"
                         ).forEach { (id, label) ->
                             DropdownMenuItem(
                                 text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
