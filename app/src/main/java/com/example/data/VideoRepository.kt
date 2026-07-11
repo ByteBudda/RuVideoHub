@@ -692,6 +692,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
                lower.contains("amediateka") ||
                lower.contains("амедиатека") ||
                lower.contains("more.tv") ||
-               lower.contains("тв онлайн") ||
+               lower.contains("тв онлайн") 
     }
 }
