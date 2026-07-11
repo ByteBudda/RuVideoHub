@@ -54,7 +54,7 @@ object LegalContent {
     const val APP_NAME = "RuVideoHub"
     const val GITHUB_URL = "https://github.com/ByteBudda"
     const val LICENSE = "GNU General Public License v3.0"
-    const val VERSION = "3.5.66"
+    const val VERSION = "3.5.67"
     const val CONTACT_EMAIL = "Bytebudda"
     const val COPYRIGHT_YEAR = "2026"
 
