@@ -121,47 +121,48 @@ fun SettingsTabScreen(
                 else -> customThemes.find { it.id == appTheme }?.name ?: "Тёмная"
             }
 
-            SettingsSwitchItem(
+            SettingsItemWithValue(
                 icon = Icons.Default.Palette,
                 title = "Цветовая тема",
-                subtitle = "Выберите оформление интерфейса"
+                subtitle = "Выберите оформление интерфейса",
+                value = themeLabel,
+                onClick = { themeDropdownExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = themeDropdownExpanded,
+                onDismissRequest = { themeDropdownExpanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
-                DropdownButton(
-                    label = themeLabel,
-                    expanded = themeDropdownExpanded,
-                    onExpand = { themeDropdownExpanded = true },
-                    onDismiss = { themeDropdownExpanded = false }
-                ) {
-                    val baseThemes = listOf(
-                        "dark" to "Тёмная",
-                        "light" to "Светлая",
-                        "slate" to "Тёмная нейтральная",
-                        "sepia" to "Светлая нейтральная",
-                        "cyberpunk" to "Киберпанк (Неон)",
-                        "amoled" to "Pure Black (AMOLED)"
-                    )
-                    val allThemes = baseThemes + customThemes.map { it.id to it.name }
-                    allThemes.forEach { (id, label) ->
-                        DropdownMenuItem(
-                            text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = {
-                                viewModel.setAppTheme(id)
-                                themeDropdownExpanded = false
-                            },
-                            trailingIcon = {
-                                if (customThemes.any { it.id == id }) {
-                                    IconButton(onClick = { viewModel.removeCustomTheme(id) }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Удалить тему",
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                val baseThemes = listOf(
+                    "dark" to "Тёмная",
+                    "light" to "Светлая",
+                    "slate" to "Тёмная нейтральная",
+                    "sepia" to "Светлая нейтральная",
+                    "cyberpunk" to "Киберпанк (Неон)",
+                    "amoled" to "Pure Black (AMOLED)"
+                )
+                val allThemes = baseThemes + customThemes.map { it.id to it.name }
+                allThemes.forEach { (id, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            viewModel.setAppTheme(id)
+                            themeDropdownExpanded = false
+                        },
+                        trailingIcon = {
+                            if (customThemes.any { it.id == id }) {
+                                IconButton(onClick = { viewModel.removeCustomTheme(id) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Удалить тему",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
 
@@ -170,8 +171,8 @@ fun SettingsTabScreen(
             // Импорт темы
             SettingsItem(
                 icon = Icons.Default.Style,
-                title = "Импорт темы (.rvht)",
-                subtitle = if (themeStatusMessage.isNotBlank()) themeStatusMessage else "Загрузить пользовательскую тему из файла",
+                title = "Импорт темы",
+                subtitle = if (themeStatusMessage.isNotBlank()) themeStatusMessage else "Загрузить пользовательскую тему из файла .rvht",
                 subtitleColor = if (themeStatusMessage.isNotBlank()) MaterialTheme.colorScheme.primary else GreyText,
                 onClick = { openThemeLauncher.launch(arrayOf("*/*")) }
             )
@@ -182,14 +183,10 @@ fun SettingsTabScreen(
             SettingsSwitchItem(
                 icon = Icons.Default.Tv,
                 title = "ТВ-оптимизация",
-                subtitle = "Адаптировать интерфейс для управления пультом"
-            ) {
-                Switch(
-                    checked = isTvOptimized,
-                    onCheckedChange = { viewModel.toggleTvOptimized() },
-                    modifier = Modifier.testTag("setting_tv_switch")
-                )
-            }
+                subtitle = "Адаптировать интерфейс для управления пультом",
+                checked = isTvOptimized,
+                onCheckedChange = { viewModel.toggleTvOptimized() }
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -208,66 +205,64 @@ fun SettingsTabScreen(
                 SettingsSwitchItem(
                     icon = Icons.Default.ViewList,
                     title = "Крупные карточки",
-                    subtitle = "Использовать большой размер для видео в списках"
-                ) {
-                    Switch(
-                        checked = isLargeCardsMode,
-                        onCheckedChange = { viewModel.toggleLargeCardsMode() },
-                        modifier = Modifier.testTag("setting_large_cards_switch")
-                    )
-                }
+                    subtitle = "Использовать большой размер для видео в списках",
+                    checked = isLargeCardsMode,
+                    onCheckedChange = { viewModel.toggleLargeCardsMode() }
+                )
                 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
             }
 
             if (isTvOptimized) {
                 var tvGridDropdownExpanded by remember { mutableStateOf(false) }
-                SettingsItem(
+                SettingsItemWithValue(
                     icon = Icons.Default.GridOn,
                     title = "Колонок в сетке (ТВ)",
-                    subtitle = "Количество столбцов при ТВ-оптимизации"
+                    subtitle = "Количество столбцов при ТВ-оптимизации",
+                    value = "$tvGridColumns",
+                    onClick = { tvGridDropdownExpanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = tvGridDropdownExpanded,
+                    onDismissRequest = { tvGridDropdownExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
-                    DropdownButton(
-                        label = "$tvGridColumns",
-                        expanded = tvGridDropdownExpanded,
-                        onExpand = { tvGridDropdownExpanded = true },
-                        onDismiss = { tvGridDropdownExpanded = false }
-                    ) {
-                        listOf(3, 4, 5, 6).forEach { cols ->
-                            DropdownMenuItem(
-                                text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setTvGridColumns(cols)
-                                    tvGridDropdownExpanded = false
-                                }
-                            )
-                        }
+                    listOf(3, 4, 5, 6).forEach { cols ->
+                        DropdownMenuItem(
+                            text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                viewModel.setTvGridColumns(cols)
+                                tvGridDropdownExpanded = false
+                            }
+                        )
                     }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
                 var tvVideoGridDropdownExpanded by remember { mutableStateOf(false) }
-                SettingsItem(
+                SettingsItemWithValue(
                     icon = Icons.Default.OndemandVideo,
                     title = "Колонок в видео сетке (ТВ)",
-                    subtitle = "Количество столбцов для списка видео на ТВ"
+                    subtitle = "Количество столбцов для списка видео на ТВ",
+                    value = "$tvVideoGridColumns",
+                    onClick = { tvVideoGridDropdownExpanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = tvVideoGridDropdownExpanded,
+                    onDismissRequest = { tvVideoGridDropdownExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
-                    DropdownButton(
-                        label = "$tvVideoGridColumns",
-                        expanded = tvVideoGridDropdownExpanded,
-                        onExpand = { tvVideoGridDropdownExpanded = true },
-                        onDismiss = { tvVideoGridDropdownExpanded = false }
-                    ) {
-                        listOf(3, 4, 5, 6, 7, 8).forEach { cols ->
-                            DropdownMenuItem(
-                                text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setTvVideoGridColumns(cols)
-                                    tvVideoGridDropdownExpanded = false
-                                }
-                            )
-                        }
+                    listOf(3, 4, 5, 6, 7, 8).forEach { cols ->
+                        DropdownMenuItem(
+                            text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                viewModel.setTvVideoGridColumns(cols)
+                                tvVideoGridDropdownExpanded = false
+                            }
+                        )
                     }
                 }
 
@@ -276,26 +271,27 @@ fun SettingsTabScreen(
 
             if (!isTvOptimized) {
                 var mobileGridDropdownExpanded by remember { mutableStateOf(false) }
-                SettingsItem(
+                SettingsItemWithValue(
                     icon = Icons.Default.GridView,
                     title = "Колонок в сетке (Мобильный)",
-                    subtitle = "Количество столбцов на мобильных устройствах"
+                    subtitle = "Количество столбцов на мобильных устройствах",
+                    value = "$mobileGridColumns",
+                    onClick = { mobileGridDropdownExpanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = mobileGridDropdownExpanded,
+                    onDismissRequest = { mobileGridDropdownExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
-                    DropdownButton(
-                        label = "$mobileGridColumns",
-                        expanded = mobileGridDropdownExpanded,
-                        onExpand = { mobileGridDropdownExpanded = true },
-                        onDismiss = { mobileGridDropdownExpanded = false }
-                    ) {
-                        listOf(1, 2, 3).forEach { cols ->
-                            DropdownMenuItem(
-                                text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setMobileGridColumns(cols)
-                                    mobileGridDropdownExpanded = false
-                                }
-                            )
-                        }
+                    listOf(1, 2, 3).forEach { cols ->
+                        DropdownMenuItem(
+                            text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                viewModel.setMobileGridColumns(cols)
+                                mobileGridDropdownExpanded = false
+                            }
+                        )
                     }
                 }
                 
@@ -312,32 +308,33 @@ fun SettingsTabScreen(
                     else -> "Свечение границ"
                 }
 
-                SettingsItem(
+                SettingsItemWithValue(
                     icon = Icons.Default.CenterFocusStrong,
                     title = "Стиль фокуса ТВ",
-                    subtitle = "Эффект подсветки при наведении пультом"
+                    subtitle = "Эффект подсветки при наведении пультом",
+                    value = focusStyleLabel,
+                    onClick = { focusStyleDropdownExpanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = focusStyleDropdownExpanded,
+                    onDismissRequest = { focusStyleDropdownExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
-                    DropdownButton(
-                        label = focusStyleLabel,
-                        expanded = focusStyleDropdownExpanded,
-                        onExpand = { focusStyleDropdownExpanded = true },
-                        onDismiss = { focusStyleDropdownExpanded = false }
-                    ) {
-                        listOf(
-                            "glow" to "Свечение границ",
-                            "scale" to "Масштабирование",
-                            "scale_glow" to "Масштаб + Свечение",
-                            "classic" to "Простая рамка",
-                            "tint" to "Подсветка фона"
-                        ).forEach { (id, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setFocusStyle(id)
-                                    focusStyleDropdownExpanded = false
-                                }
-                            )
-                        }
+                    listOf(
+                        "glow" to "Свечение границ",
+                        "scale" to "Масштабирование",
+                        "scale_glow" to "Масштаб + Свечение",
+                        "classic" to "Простая рамка",
+                        "tint" to "Подсветка фона"
+                    ).forEach { (id, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                viewModel.setFocusStyle(id)
+                                focusStyleDropdownExpanded = false
+                            }
+                        )
                     }
                 }
             }
@@ -356,52 +353,54 @@ fun SettingsTabScreen(
 
         SettingsCard(isDarkTheme, isTvOptimized) {
             var dropdownExpanded by remember { mutableStateOf(false) }
-            SettingsItem(
+            SettingsItemWithValue(
                 icon = Icons.Default.VideoLibrary,
                 title = "Качество плеера",
-                subtitle = "Качество по умолчанию при запуске видео"
+                subtitle = "Качество по умолчанию при запуске видео",
+                value = playerQuality,
+                onClick = { dropdownExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = dropdownExpanded,
+                onDismissRequest = { dropdownExpanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
-                DropdownButton(
-                    label = playerQuality,
-                    expanded = dropdownExpanded,
-                    onExpand = { dropdownExpanded = true },
-                    onDismiss = { dropdownExpanded = false }
-                ) {
-                    listOf("Авто", "2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
-                        DropdownMenuItem(
-                            text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = {
-                                viewModel.setPlayerQuality(opt)
-                                dropdownExpanded = false
-                            }
-                        )
-                    }
+                listOf("Авто", "2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
+                    DropdownMenuItem(
+                        text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            viewModel.setPlayerQuality(opt)
+                            dropdownExpanded = false
+                        }
+                    )
                 }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
             var dlDropdownExpanded by remember { mutableStateOf(false) }
-            SettingsItem(
+            SettingsItemWithValue(
                 icon = Icons.Default.Download,
                 title = "Качество загрузки",
-                subtitle = "Желаемое качество при скачивании"
+                subtitle = "Желаемое качество при скачивании",
+                value = downloadQuality,
+                onClick = { dlDropdownExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = dlDropdownExpanded,
+                onDismissRequest = { dlDropdownExpanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
-                DropdownButton(
-                    label = downloadQuality,
-                    expanded = dlDropdownExpanded,
-                    onExpand = { dlDropdownExpanded = true },
-                    onDismiss = { dlDropdownExpanded = false }
-                ) {
-                    listOf("2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
-                        DropdownMenuItem(
-                            text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = {
-                                viewModel.setDownloadQuality(opt)
-                                dlDropdownExpanded = false
-                            }
-                        )
-                    }
+                listOf("2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
+                    DropdownMenuItem(
+                        text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            viewModel.setDownloadQuality(opt)
+                            dlDropdownExpanded = false
+                        }
+                    )
                 }
             }
         }
@@ -426,31 +425,32 @@ fun SettingsTabScreen(
                 else -> "По умолчанию (Фильмы)"
             }
 
-            SettingsItem(
+            SettingsItemWithValue(
                 icon = Icons.Default.Home,
                 title = "Тип стартовой страницы",
-                subtitle = "Что открывать при запуске приложения"
+                subtitle = "Что открывать при запуске приложения",
+                value = typeLabel,
+                onClick = { typeDropdownExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = typeDropdownExpanded,
+                onDismissRequest = { typeDropdownExpanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
-                DropdownButton(
-                    label = typeLabel,
-                    expanded = typeDropdownExpanded,
-                    onExpand = { typeDropdownExpanded = true },
-                    onDismiss = { typeDropdownExpanded = false }
-                ) {
-                    listOf(
-                        "default" to "По умолчанию (Фильмы)",
-                        "category" to "Выбрать категорию",
-                        "custom_url" to "Своя ссылка Rutube",
-                        "favorite" to "Элемент из избранного"
-                    ).forEach { (id, label) ->
-                        DropdownMenuItem(
-                            text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = {
-                                viewModel.setStartPageType(id)
-                                typeDropdownExpanded = false
-                            }
-                        )
-                    }
+                listOf(
+                    "default" to "По умолчанию (Фильмы)",
+                    "category" to "Выбрать категорию",
+                    "custom_url" to "Своя ссылка Rutube",
+                    "favorite" to "Элемент из избранного"
+                ).forEach { (id, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            viewModel.setStartPageType(id)
+                            typeDropdownExpanded = false
+                        }
+                    )
                 }
             }
 
@@ -465,48 +465,50 @@ fun SettingsTabScreen(
                 }
                 val startPageFavoriteTitle by viewModel.startPageFavoriteTitle.collectAsStateWithLifecycle()
 
-                SettingsItem(
+                SettingsItemWithValue(
                     icon = Icons.Default.Favorite,
                     title = "Элемент из избранного",
-                    subtitle = "Выберите плейлист, подкатегорию или канал"
+                    subtitle = "Выберите плейлист, подкатегорию или канал",
+                    value = if (startPageFavoriteTitle.isNotBlank()) startPageFavoriteTitle else "Не выбрано",
+                    onClick = { favDropdownExpanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = favDropdownExpanded,
+                    onDismissRequest = { favDropdownExpanded = false },
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surface)
+                        .heightIn(max = 280.dp)
                 ) {
-                    DropdownButton(
-                        label = if (startPageFavoriteTitle.isNotBlank()) startPageFavoriteTitle else "Не выбрано",
-                        expanded = favDropdownExpanded,
-                        onExpand = { favDropdownExpanded = true },
-                        onDismiss = { favDropdownExpanded = false },
-                        maxHeight = 280.dp
-                    ) {
-                        if (nonVideoBookmarks.isEmpty()) {
+                    if (nonVideoBookmarks.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Избранное пусто", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            onClick = { favDropdownExpanded = false },
+                            enabled = false
+                        )
+                    } else {
+                        nonVideoBookmarks.forEach { fav ->
                             DropdownMenuItem(
-                                text = { Text("Избранное пусто", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                onClick = { favDropdownExpanded = false },
-                                enabled = false
-                            )
-                        } else {
-                            nonVideoBookmarks.forEach { fav ->
-                                DropdownMenuItem(
-                                    text = {
-                                        val typeLabel = when (fav.duration) {
-                                            "ПАПКА", "КАТАЛОГ" -> "Подкатегория"
-                                            "СЕРИАЛ" -> "Сериал"
-                                            "КАНАЛ" -> "Канал"
-                                            "ПЛЕЙЛИСТ" -> "Плейлист"
-                                            else -> "Элемент"
-                                        }
-                                        Text(
-                                            "${fav.title} ($typeLabel)",
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.setStartPageFavorite(fav.id, fav.title)
-                                        favDropdownExpanded = false
+                                text = {
+                                    val typeLabel = when (fav.duration) {
+                                        "ПАПКА", "КАТАЛОГ" -> "Подкатегория"
+                                        "СЕРИАЛ" -> "Сериал"
+                                        "КАНАЛ" -> "Канал"
+                                        "ПЛЕЙЛИСТ" -> "Плейлист"
+                                        else -> "Элемент"
                                     }
-                                )
-                            }
+                                    Text(
+                                        "${fav.title} ($typeLabel)",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                onClick = {
+                                    viewModel.setStartPageFavorite(fav.id, fav.title)
+                                    favDropdownExpanded = false
+                                }
+                            )
                         }
                     }
                 }
@@ -522,27 +524,29 @@ fun SettingsTabScreen(
                     "Детям", "Авто-мото", "Обучение", "Путешествия", "Кулинария", "Аниме"
                 )
 
-                SettingsItem(
+                SettingsItemWithValue(
                     icon = Icons.Default.Category,
                     title = "Категория для старта",
-                    subtitle = "Каталог, загружаемый на первом экране"
+                    subtitle = "Каталог, загружаемый на первом экране",
+                    value = startPageCategory,
+                    onClick = { catDropdownExpanded = true }
+                )
+
+                DropdownMenu(
+                    expanded = catDropdownExpanded,
+                    onDismissRequest = { catDropdownExpanded = false },
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surface)
+                        .heightIn(max = 280.dp)
                 ) {
-                    DropdownButton(
-                        label = startPageCategory,
-                        expanded = catDropdownExpanded,
-                        onExpand = { catDropdownExpanded = true },
-                        onDismiss = { catDropdownExpanded = false },
-                        maxHeight = 280.dp
-                    ) {
-                        categoriesList.forEach { cat ->
-                            DropdownMenuItem(
-                                text = { Text(cat, color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    viewModel.setStartPageCategory(cat)
-                                    catDropdownExpanded = false
-                                }
-                            )
-                        }
+                    categoriesList.forEach { cat ->
+                        DropdownMenuItem(
+                            text = { Text(cat, color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                viewModel.setStartPageCategory(cat)
+                                catDropdownExpanded = false
+                            }
+                        )
                     }
                 }
             }
@@ -640,7 +644,7 @@ fun SettingsTabScreen(
 
             SettingsItem(
                 icon = Icons.Default.Backup,
-                title = "Экспорт и импорт (Все данные)",
+                title = "Экспорт и импорт",
                 subtitle = "Сохранение закладок, истории и настроек в JSON",
                 onClick = { showBackupDialog = true }
             )
@@ -708,8 +712,7 @@ private fun SettingsItem(
     title: String,
     subtitle: String,
     subtitleColor: Color = GreyText,
-    onClick: (() -> Unit)? = null,
-    trailingContent: @Composable (() -> Unit)? = null
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -759,8 +762,91 @@ private fun SettingsItem(
             }
         }
 
-        if (trailingContent != null) {
-            trailingContent()
+        // Стрелочка вправо как в Telegram
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = GreyText,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun SettingsItemWithValue(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    value: String,
+    onClick: () -> Unit,
+    subtitleColor: Color = GreyText
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 13.sp,
+                    color = subtitleColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Значение + стрелочка как в Telegram
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                color = GreyText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = GreyText,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -770,8 +856,9 @@ private fun SettingsSwitchItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
-    subtitleColor: Color = GreyText,
-    trailingContent: @Composable (() -> Unit)? = null
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    subtitleColor: Color = GreyText
 ) {
     Row(
         modifier = Modifier
@@ -820,61 +907,14 @@ private fun SettingsSwitchItem(
             }
         }
 
-        if (trailingContent != null) {
-            trailingContent()
-        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
     }
 }
 
-@Composable
-private fun DropdownButton(
-    label: String,
-    expanded: Boolean,
-    onExpand: () -> Unit,
-    onDismiss: () -> Unit,
-    maxHeight: androidx.compose.ui.unit.Dp = 400.dp,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Box {
-        Button(
-            onClick = onExpand,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                contentColor = MaterialTheme.colorScheme.onSurface
-            ),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.height(32.dp)
-        ) {
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surface)
-                .heightIn(max = maxHeight)
-        ) {
-            content()
-        }
-    }
-}
-
-// ==================== ОСТАЛЬНЫЕ КОМПОНЕНТЫ ====================
+// ==================== ДИАЛОГИ ====================
 
 @Composable
 fun FullBackupRestoreDialog(
