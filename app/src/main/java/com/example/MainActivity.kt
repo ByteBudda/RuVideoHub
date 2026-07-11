@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
     setContent {
       val isDarkTheme by viewModel.isDarkTheme.collectAsState()
       val appTheme by viewModel.appTheme.collectAsState()
+      
       MyApplicationTheme(appTheme = appTheme, darkTheme = isDarkTheme) {
         SleekVideoHubApp(viewModel = viewModel)
       }
