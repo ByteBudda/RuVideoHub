@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,15 +28,102 @@ import com.example.ui.theme.liquidGlass
 import kotlinx.coroutines.launch
 
 @Composable
+fun GlobalUpdateChecker() {
+    val context = LocalContext.current
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var showDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val info = UpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
+        if (info != null && info.hasUpdate) {
+            updateInfo = info
+            showDialog = true
+        }
+    }
+
+    UpdateDialogs(showDialog = showDialog, updateInfo = updateInfo, onDismiss = { showDialog = false })
+}
+
+@Composable
+fun UpdateDialogs(
+    showDialog: Boolean,
+    updateInfo: UpdateInfo?,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val downloadState by UpdateManager.downloadState.collectAsStateWithLifecycle()
+
+    if (downloadState is DownloadState.Downloading) {
+        val progress = (downloadState as DownloadState.Downloading).progress
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Скачивание обновления") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (progress >= 0f) {
+                        LinearProgressIndicator(
+                            progress = progress,
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                    } else {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Подготовка...", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    } else if (downloadState is DownloadState.Error) {
+        val errorMsg = (downloadState as DownloadState.Error).message
+        AlertDialog(
+            onDismissRequest = { UpdateManager.downloadState.value = DownloadState.Idle },
+            title = { Text("Ошибка") },
+            text = { Text(errorMsg) },
+            confirmButton = {
+                TextButton(onClick = { UpdateManager.downloadState.value = DownloadState.Idle }) { Text("OK") }
+            }
+        )
+    }
+
+    if (showDialog && updateInfo != null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Доступно обновление") },
+            text = {
+                Column {
+                    Text("Новая версия: ${updateInfo.latestVersion}", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(updateInfo.releaseNotes, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onDismiss()
+                    UpdateManager.startDownloadAndInstall(context, updateInfo.downloadUrl, updateInfo.latestVersion)
+                    Toast.makeText(context, "Загрузка началась...", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Скачать и установить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+}
+
+@Composable
 fun UpdateSection(isDarkTheme: Boolean, isTvOptimized: Boolean) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isChecking by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
-    
     var showDialog by remember { mutableStateOf(false) }
-    val downloadState by UpdateManager.downloadState.collectAsStateWithLifecycle()
-
 
     Column(
         modifier = Modifier
@@ -108,61 +196,5 @@ fun UpdateSection(isDarkTheme: Boolean, isTvOptimized: Boolean) {
         }
     }
 
-    
-    if (downloadState is DownloadState.Downloading) {
-        val progress = (downloadState as DownloadState.Downloading).progress
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Скачивание обновления") },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    LinearProgressIndicator(
-                        progress = progress,
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.Bold)
-                }
-            },
-            confirmButton = {}
-        )
-    } else if (downloadState is DownloadState.Error) {
-        val errorMsg = (downloadState as DownloadState.Error).message
-        AlertDialog(
-            onDismissRequest = { UpdateManager.downloadState.value = DownloadState.Idle },
-            title = { Text("Ошибка") },
-            text = { Text(errorMsg) },
-            confirmButton = {
-                TextButton(onClick = { UpdateManager.downloadState.value = DownloadState.Idle }) { Text("OK") }
-            }
-        )
-    }
-
-    if (showDialog && updateInfo != null) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("Доступно обновление") },
-            text = {
-                Column {
-                    Text("Новая версия: ${updateInfo!!.latestVersion}", fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(updateInfo!!.releaseNotes, fontSize = 12.sp)
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    showDialog = false
-                    UpdateManager.startDownloadAndInstall(context, updateInfo!!.downloadUrl, updateInfo!!.latestVersion)
-                    Toast.makeText(context, "Загрузка началась...", Toast.LENGTH_SHORT).show()
-                }) {
-                    Text("Скачать и установить")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Отмена")
-                }
-            }
-        )
-    }
+    UpdateDialogs(showDialog = showDialog, updateInfo = updateInfo, onDismiss = { showDialog = false })
 }
