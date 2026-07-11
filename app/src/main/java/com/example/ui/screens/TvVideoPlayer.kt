@@ -59,7 +59,7 @@ fun TvTvSimulatedPlaybackBars(modifier: Modifier = Modifier) {
 
     Row(
         modifier = modifier
-            .background(Color(0xFF0F0F1A))
+            
             .padding(16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.Bottom
@@ -455,7 +455,7 @@ fun TvRutubeVideoPlayer(
                         Icon(
                             imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                             contentDescription = "Полный экран",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -546,7 +546,7 @@ fun TvRutubeVideoPlayer(
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .background(Color.DarkGray, CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                     .sleekTvFocus(CircleShape, onEnter = onBackClick)
                                     .clickable(
                                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -555,7 +555,7 @@ fun TvRutubeVideoPlayer(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.ArrowBack, "Назад", tint = Color.White, modifier = Modifier.size(28.dp))
+                                Icon(Icons.Default.ArrowBack, "Назад", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                         }
@@ -578,7 +578,7 @@ fun TvRutubeVideoPlayer(
                         }
                         Box(
                             modifier = Modifier
-                                .background(Color.DarkGray, RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                 .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
                                 .clickable(
@@ -588,7 +588,7 @@ fun TvRutubeVideoPlayer(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(selectedQuality, color = Color.White, fontSize = 16.sp)
+                            Text(selectedQuality, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         
@@ -601,7 +601,7 @@ fun TvRutubeVideoPlayer(
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
-                                .background(Color.DarkGray, CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                 .sleekTvFocus(CircleShape, onEnter = onAspectClick)
                                 .clickable(
                                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -610,7 +610,7 @@ fun TvRutubeVideoPlayer(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.AspectRatio, "Формат", tint = Color.White, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.AspectRatio, "Формат", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
                         }
                         
                         if (!isFullscreen) {
@@ -618,7 +618,7 @@ fun TvRutubeVideoPlayer(
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .background(Color.DarkGray, CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                     .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
                                     .clickable(
                                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -627,7 +627,7 @@ fun TvRutubeVideoPlayer(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Fullscreen, "Полный экран", tint = Color.White, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Default.Fullscreen, "Полный экран", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
                             }
                         }
                     }
@@ -649,7 +649,7 @@ fun TvRutubeVideoPlayer(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
                                 .sleekTvFocus(CircleShape, onEnter = onRewindClick)
                                 .clickable(
                                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -658,7 +658,7 @@ fun TvRutubeVideoPlayer(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.FastRewind, "Назад", tint = Color.White, modifier = Modifier.size(36.dp))
+                            Icon(Icons.Default.FastRewind, "Назад", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
                         }
 
                         val onPlayPauseClick: () -> Unit = {
@@ -676,7 +676,7 @@ fun TvRutubeVideoPlayer(
                         Box(
                             modifier = Modifier
                                 .size(96.dp)
-                                .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
                                 .focusRequester(playPauseFocusRequester)
                                 .sleekTvFocus(CircleShape, onEnter = onPlayPauseClick)
                                 .clickable(
@@ -689,7 +689,7 @@ fun TvRutubeVideoPlayer(
                             Icon(
                                 imageVector = if (isPlayingState) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = "Play/Pause",
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(56.dp)
                                     .align(Alignment.Center)
                             )
@@ -706,7 +706,7 @@ fun TvRutubeVideoPlayer(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .background(Color.DarkGray.copy(alpha = 0.8f), CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
                                 .sleekTvFocus(CircleShape, onEnter = onForwardClick)
                                 .clickable(
                                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -715,7 +715,7 @@ fun TvRutubeVideoPlayer(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.FastForward, "Вперед", tint = Color.White, modifier = Modifier.size(36.dp))
+                            Icon(Icons.Default.FastForward, "Вперед", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
                         }
                     }
 

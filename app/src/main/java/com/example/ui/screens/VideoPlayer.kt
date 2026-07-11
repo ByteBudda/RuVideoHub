@@ -64,7 +64,7 @@ fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
 
     Row(
         modifier = modifier
-            .background(Color(0xFF0F0F1A))
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.Bottom
@@ -919,7 +919,7 @@ fun RutubeVideoPlayer(
                                     DropdownMenu(
                                         expanded = qualityMenuExpanded,
                                         onDismissRequest = { qualityMenuExpanded = false },
-                                        modifier = Modifier.background(Color(0xFF0F0F1A))
+                                        modifier = Modifier.background(MaterialTheme.colorScheme.background)
                                     ) {
                                         availableQualities.forEach { q ->
                                             DropdownMenuItem(
@@ -971,7 +971,7 @@ fun RutubeVideoPlayer(
                                 DropdownMenu(
                                     expanded = speedMenuExpanded,
                                     onDismissRequest = { speedMenuExpanded = false },
-                                    modifier = Modifier.background(Color(0xFF0F0F1A))
+                                    modifier = Modifier.background(MaterialTheme.colorScheme.background)
                                 ) {
                                     availableSpeeds.forEach { speed ->
                                         DropdownMenuItem(

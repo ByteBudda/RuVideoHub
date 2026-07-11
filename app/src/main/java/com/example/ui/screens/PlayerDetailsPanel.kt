@@ -251,7 +251,7 @@ fun PlayerDetailsPanel(
                     DropdownMenu(
                         expanded = qualityMenuExpanded,
                         onDismissRequest = { qualityMenuExpanded = false },
-                        modifier = Modifier.background(Color(0xFF0F0F1A))
+                        modifier = Modifier.background(MaterialTheme.colorScheme.background)
                     ) {
                         availableQualities.forEach { q ->
                             val isSelected = activeVideoQuality == q || (activeVideoQuality == "Авто" && currentQuality == "Авто" && q == "Авто") || (activeVideoQuality != "Авто" && currentQuality == q)

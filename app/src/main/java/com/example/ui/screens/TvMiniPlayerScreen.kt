@@ -113,7 +113,7 @@ fun TvMiniPlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F1A))
+            .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {})
             }
@@ -136,7 +136,7 @@ fun TvMiniPlayerScreen(
                         text = "ТВ Плейлист",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     
@@ -174,7 +174,7 @@ fun TvMiniPlayerScreen(
                                         .clickable { viewModel.selectVideo(video) },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isCurrent) Primary.copy(alpha = 0.15f) else Color(0xFF1E1C29)
+                                        containerColor = if (isCurrent) Primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
                                     ),
                                     border = BorderStroke(
                                         width = 1.5.dp,
@@ -213,7 +213,7 @@ fun TvMiniPlayerScreen(
                                                 text = video.title,
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color.White,
+                                                color = MaterialTheme.colorScheme.onBackground,
                                                 maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -281,7 +281,7 @@ fun TvMiniPlayerScreen(
                                 modifier = Modifier
                                     .weight(0.9f)
                                     .height(44.dp)
-                                    .background(Color(0xFF2C2A3A), RoundedCornerShape(20.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
                                     .then(if (playableVideos.isEmpty()) Modifier.focusRequester(firstItemFocusRequester) else Modifier)
                                     .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = { viewModel.togglePlayPause() })
                                     .clickable(
@@ -295,11 +295,11 @@ fun TvMiniPlayerScreen(
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = "Плей Пауза",
-                                    tint = Color.White,
+                                    tint = MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = if (isPlaying) "Пауза" else "Старт", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(text = if (isPlaying) "Пауза" else "Старт", color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                             
                             // Full Screen Button
@@ -307,7 +307,7 @@ fun TvMiniPlayerScreen(
                                 modifier = Modifier
                                     .weight(1.1f)
                                     .height(44.dp)
-                                    .background(Color(0xFF2C2A3A), RoundedCornerShape(20.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
                                     .sleekTvFocus(RoundedCornerShape(20.dp), onEnter = { viewModel.setTvMiniFullscreen(true) })
                                     .clickable(
                                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -320,11 +320,11 @@ fun TvMiniPlayerScreen(
                                 Icon(
                                     imageVector = Icons.Default.Fullscreen,
                                     contentDescription = "Во весь экран",
-                                    tint = Color.White,
+                                    tint = MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "Развернуть", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(text = "Развернуть", color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                             
                             // Download Button
@@ -332,12 +332,12 @@ fun TvMiniPlayerScreen(
                             val downloadContainerColor = when {
                                 isDownloaded -> Color(0xFF10B981)
                                 activeDownload != null -> Color.Red.copy(alpha = 0.2f)
-                                else -> Color(0xFF2C2A3A)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
                             }
                             val downloadContentColor = when {
-                                isDownloaded -> Color.White
+                                isDownloaded -> MaterialTheme.colorScheme.onBackground
                                 activeDownload != null -> Color.Red
-                                else -> Color.White
+                                else -> MaterialTheme.colorScheme.onBackground
                             }
                             val onDownloadClick = {
                                 val video = currentVideo
@@ -456,14 +456,14 @@ fun TvMiniPlayerScreen(
                                     }
                                 }
                                 .verticalScroll(metadataScrollState)
-                                .background(Color(0xFF14131F), RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
                                 .padding(16.dp)
                         ) {
                             Text(
                                 text = currentVideo!!.title,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onBackground
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -475,7 +475,7 @@ fun TvMiniPlayerScreen(
                             Text(
                                 text = currentVideo!!.description.ifBlank { "Описание отсутствует" },
                                 fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
                                 lineHeight = 16.sp
                             )
                         }
@@ -484,8 +484,8 @@ fun TvMiniPlayerScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color(0xFF14131F), RoundedCornerShape(16.dp))
-                                .border(1.dp, Color(0xFF2C2A3A), RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
                                 .padding(24.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -504,7 +504,7 @@ fun TvMiniPlayerScreen(
                                     text = "ТВ Мини-плеер готов к работе",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onBackground,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))

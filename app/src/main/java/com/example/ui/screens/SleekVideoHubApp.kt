@@ -471,7 +471,7 @@ fun SleekTvNavigationRail(
         modifier = modifier
             .fillMaxHeight()
             .width(88.dp)
-            .background(if (isDark) Color(0xFF14131A) else Color(0xFFF0EDF5))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(vertical = 12.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
