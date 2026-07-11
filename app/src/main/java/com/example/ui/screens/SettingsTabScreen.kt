@@ -247,6 +247,7 @@ fun SettingsTabScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (!isTvOptimized) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -290,9 +291,11 @@ fun SettingsTabScreen(
                     modifier = Modifier.testTag("setting_large_cards_switch")
                 )
             }
-
+            
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            }
 
+            if (isTvOptimized) {
             // TV Grid columns
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -453,6 +456,8 @@ fun SettingsTabScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
+            }
+            if (!isTvOptimized) {
             // Mobile Grid columns
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -530,9 +535,10 @@ fun SettingsTabScreen(
                     }
                 }
             }
-
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
+            }
+            if (isTvOptimized) {
             // TV Focus Highlight Style
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -621,6 +627,7 @@ fun SettingsTabScreen(
                         }
                     }
                 }
+            }
             }
         }
 
