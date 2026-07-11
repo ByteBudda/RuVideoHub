@@ -93,8 +93,8 @@ fun SettingsTabScreen(
             val themeLabel = when (appTheme) {
                 "dark" -> "Тёмная"
                 "light" -> "Светлая"
-                "slate" -> "Тёмная нейтральная"
-                "sepia" -> "Светлая нейтральная"
+                "slate" -> "Серая"
+                "sepia" -> "Бежевая"
                 else -> "Тёмная"
             }
 
@@ -126,13 +126,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Цветовая тема",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Выберите оформление интерфейса",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -211,13 +211,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "ТВ-оптимизация",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Адаптировать интерфейс для управления пультом",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -274,13 +274,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Крупные карточки",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Большой размер превью",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -323,13 +323,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Колонок в сетке (ТВ)",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Количество столбцов при ТВ-оптимизации",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -403,13 +403,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Колонок в видео сетке (ТВ)",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Количество столбцов для списка видео на ТВ",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -485,13 +485,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Колонок в сетке (Мобильный)",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Количество столбцов на мобильных устройствах",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -566,13 +566,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Стиль фокуса ТВ",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Эффект подсветки при наведении пультом",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -676,13 +676,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Качество плеера",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Качество по умолчанию при запуске видео",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -755,13 +755,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Качество загрузки",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Желаемое качество при скачивании",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -851,13 +851,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Тип стартовой страницы",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Что открывать при запуске приложения",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -956,13 +956,13 @@ fun SettingsTabScreen(
                         Column {
                             Text(
                                 text = "Элемент из избранного",
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
                                 text = "Выберите плейлист, подкатегорию или канал",
-                                fontSize = 10.sp,
+                                fontSize = 8.sp,
                                 color = GreyText
                             )
                         }
@@ -1067,13 +1067,13 @@ fun SettingsTabScreen(
                         Column {
                             Text(
                                 text = "Категория для старта",
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
                                 text = "Каталог, загружаемый на первом экране",
-                                fontSize = 10.sp,
+                                fontSize = 8.sp,
                                 color = GreyText
                             )
                         }
@@ -1254,13 +1254,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Экспорт и импорт (Все данные)",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Сохранение закладок, истории и настроек в JSON",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -1332,13 +1332,13 @@ fun SettingsTabScreen(
                     Column {
                         Text(
                             text = "Пользовательское соглашение",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "Просмотреть условия использования приложения",
-                            fontSize = 10.sp,
+                            fontSize = 8.sp,
                             color = GreyText
                         )
                     }
@@ -1478,7 +1478,7 @@ fun FullBackupRestoreDialog(
                 ) {
                     Text(
                         text = "Экспорт данных",
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -1520,7 +1520,7 @@ fun FullBackupRestoreDialog(
                 ) {
                     Text(
                         text = "Импорт данных",
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
