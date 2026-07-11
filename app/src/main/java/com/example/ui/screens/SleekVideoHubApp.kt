@@ -170,6 +170,8 @@ fun SleekVideoHubApp(
             )
             return@CompositionLocalProvider
         }
+        
+        GlobalUpdateChecker()
 
         var lastBackPressTime by remember { mutableStateOf(0L) }
 
