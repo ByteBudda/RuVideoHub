@@ -66,6 +66,7 @@ fun HeroVideoCard(
                 id = video.id,
                 duration = video.duration,
                 thumbnailUrl = video.thumbnailUrl,
+                viewsAndTimeAgo = if (video.views.isNotBlank() || video.timeAgo.isNotBlank()) "${video.views} • ${video.timeAgo}".trim(' ', '•') else null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
@@ -117,22 +118,6 @@ fun HeroVideoCard(
                                     .weight(1f, fill = false)
                                     .then(channelModifier)
                             )
-                            
-                            Box(
-                                modifier = Modifier
-                                    .padding(start = 4.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.Black.copy(alpha = 0.7f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "${video.views} • ${video.timeAgo}",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
                         }
                     } else {
                         Row(
@@ -148,21 +133,6 @@ fun HeroVideoCard(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            Box(
-                                modifier = Modifier
-                                    .padding(start = 4.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.Black.copy(alpha = 0.7f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "${video.views} • ${video.timeAgo}",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
                         }
                     }
                 }
@@ -482,6 +452,43 @@ fun SecondaryVideoItemRow(
                         modifier = Modifier.weight(1f, fill = false)
                     )
                 }
+            }
+
+            // Quick mini controls
+            Row(
+                modifier = Modifier.padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBookmarkToggle,
+                    modifier = Modifier.size(24.dp)
+                        .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
+                        .testTag("quick_bookmark_${video.id}")
+                ) {
+                    Icon(
+                        imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = "Закладка",
+                        tint = Primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                
+                IconButton(
+                    onClick = onDownloadToggle,
+                    modifier = Modifier.size(24.dp)
+                        .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
+                        .testTag("quick_download_${video.id}")
+                ) {
+                    Icon(
+                        imageVector = if (video.isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
+                        contentDescription = "Скачать",
+                        tint = Primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.weight(1f))
 
                 if (video.views.isNotBlank()) {
                     Box(
@@ -499,38 +506,20 @@ fun SecondaryVideoItemRow(
                         )
                     }
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .size(3.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFCAC4D0))
-                    )
-                    Text(
-                        text = "HD",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GreyText
-                    )
-                }
-            }
-
-            // Quick mini controls
-            Row(
-                modifier = Modifier.padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                IconButton(
-                    onClick = onBookmarkToggle,
-                    modifier = Modifier.size(24.dp)
-                        .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
-                        .testTag("quick_bookmark_${video.id}")
-                ) {
-                    Icon(
-                        imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = "Закладка",
-                        tint = Primary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(3.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFCAC4D0))
+                        )
+                        Text(
+                            text = "HD",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GreyText
+                        )
+                    }
                 }
             }
         }
