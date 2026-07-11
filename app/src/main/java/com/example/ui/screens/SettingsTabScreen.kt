@@ -82,7 +82,7 @@ fun SettingsTabScreen(
             .padding(horizontal = 16.dp)
             .padding(bottom = 80.dp)
     ) {
-        // Header - фиксированный без liquidGlass
+        // Header
         Column(modifier = Modifier.padding(bottom = 20.dp)) {
             Text(
                 text = "Настройки",
@@ -107,7 +107,16 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        // Карточка с темой
+        var themeDropdownExpanded by remember { mutableStateOf(false) }
+        val themeLabel = when (appTheme) {
+            "dark" -> "Тёмная"
+            "light" -> "Светлая"
+            "sepia" -> "Светлая нейтральная"
+            "cyberpunk" -> "Киберпанк"
+            "amoled" -> "Pure Black"
+            else -> customThemes.find { it.id == appTheme }?.name ?: "Тёмная"
+        }
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,225 +129,241 @@ fun SettingsTabScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                // Цветовая тема
-                var themeDropdownExpanded by remember { mutableStateOf(false) }
-                val themeLabel = when (appTheme) {
-                    "dark" -> "Тёмная"
-                    "light" -> "Светлая"
-                    "slate" -> "Тёмная нейтральная"
-                    "sepia" -> "Светлая нейтральная"
-                    "cyberpunk" -> "Киберпанк"
-                    "amoled" -> "Pure Black"
-                    else -> customThemes.find { it.id == appTheme }?.name ?: "Тёмная"
-                }
-
+                // 1. Цветовая тема
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Цветовая тема",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Выберите оформление",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Цветовая тема",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Выберите оформление",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
                     }
 
-                    Box {
-                        Button(
-                            onClick = { themeDropdownExpanded = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = themeLabel,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = themeDropdownExpanded,
-                            onDismissRequest = { themeDropdownExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 300.dp)
-                        ) {
-                            val baseThemes = listOf(
-                                "dark" to "Тёмная",
-                                "light" to "Светлая",
-                                "slate" to "Тёмная нейтральная",
-                                "sepia" to "Светлая нейтральная",
-                                "cyberpunk" to "Киберпанк",
-                                "amoled" to "Pure Black"
-                            )
-                            val allThemes = baseThemes + customThemes.map { it.id to it.name }
-                            allThemes.forEach { (id, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = {
-                                        viewModel.setAppTheme(id)
-                                        themeDropdownExpanded = false
-                                    },
-                                    trailingIcon = {
-                                        if (customThemes.any { it.id == id }) {
-                                            IconButton(
-                                                onClick = { viewModel.removeCustomTheme(id) },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = "Удалить",
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        }
+                    Button(
+                        onClick = { themeDropdownExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(
+                            text = themeLabel,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-                // Импорт темы
+                // 2. Импорт темы
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { openThemeLauncher.launch(arrayOf("*/*")) }
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Style,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Импорт темы",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = if (themeStatusMessage.isNotBlank()) themeStatusMessage else "Загрузить из .rvht файла",
-                                fontSize = 12.sp,
-                                color = if (themeStatusMessage.isNotBlank()) MaterialTheme.colorScheme.primary else GreyText,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Style,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Импорт темы",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = if (themeStatusMessage.isNotBlank()) themeStatusMessage else "Загрузить из .rvht файла",
+                            fontSize = 12.sp,
+                            color = if (themeStatusMessage.isNotBlank()) MaterialTheme.colorScheme.primary else GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
                         tint = GreyText,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-                // ТВ-оптимизация
+                // 3. ТВ-оптимизация
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tv,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "ТВ-оптимизация",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Адаптация для пульта",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "ТВ-оптимизация",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Адаптация для пульта",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
+                    }
+                    
                     Switch(
                         checked = isTvOptimized,
                         onCheckedChange = { viewModel.toggleTvOptimized() },
                         modifier = Modifier.testTag("setting_tv_switch")
+                    )
+                }
+            }
+        }
+
+        // Выпадающий список вынесен ЗА карточку
+        if (themeDropdownExpanded) {
+            DropdownMenu(
+                expanded = themeDropdownExpanded,
+                onDismissRequest = { themeDropdownExpanded = false },
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface)
+                    .heightIn(max = 300.dp)
+            ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "Тема оформления",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = GreyText
+                        )
+                    },
+                    onClick = { /* ничего */ },
+                    enabled = false
+                )
+                
+                Divider()
+                
+                val baseThemes = listOf(
+                    "dark" to "Тёмная",
+                    "light" to "Светлая",
+                    "sepia" to "Светлая нейтральная",
+                    "cyberpunk" to "Киберпанк",
+                    "amoled" to "Pure Black"
+                )
+                val allThemes = baseThemes + customThemes.map { it.id to it.name }
+                allThemes.forEach { (id, label) ->
+                    DropdownMenuItem(
+                        text = { 
+                            Text(
+                                text = label,
+                                color = if (appTheme == id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (appTheme == id) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        onClick = {
+                            viewModel.setAppTheme(id)
+                            themeDropdownExpanded = false
+                        },
+                        trailingIcon = {
+                            if (appTheme == id) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Выбрано",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            } else if (customThemes.any { it.id == id }) {
+                                IconButton(
+                                    onClick = { viewModel.removeCustomTheme(id) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Удалить",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -367,47 +392,47 @@ fun SettingsTabScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 if (!isTvOptimized) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ViewList,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Крупные карточки",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = "Большой размер видео",
-                                    fontSize = 12.sp,
-                                    color = GreyText
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.ViewList,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Крупные карточки",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Большой размер видео",
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                        
                         Switch(
                             checked = isLargeCardsMode,
                             onCheckedChange = { viewModel.toggleLargeCardsMode() },
@@ -422,76 +447,156 @@ fun SettingsTabScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.GridOn,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Колонок в сетке (ТВ)",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = "Количество столбцов",
-                                    fontSize = 12.sp,
-                                    color = GreyText
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.GridOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
-                        Box {
-                            Button(
-                                onClick = { tvGridExpanded = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text("$tvGridColumns", fontSize = 12.sp)
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Колонок в сетке (ТВ)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Количество столбцов",
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { tvGridExpanded = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("$tvGridColumns", fontSize = 11.sp)
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    
+                    if (tvGridExpanded) {
+                        DropdownMenu(
+                            expanded = tvGridExpanded,
+                            onDismissRequest = { tvGridExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            listOf(3, 4, 5, 6).forEach { cols ->
+                                DropdownMenuItem(
+                                    text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                                    onClick = {
+                                        viewModel.setTvGridColumns(cols)
+                                        tvGridExpanded = false
+                                    }
                                 )
-                            }
-                            DropdownMenu(
-                                expanded = tvGridExpanded,
-                                onDismissRequest = { tvGridExpanded = false },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                            ) {
-                                listOf(3, 4, 5, 6).forEach { cols ->
-                                    DropdownMenuItem(
-                                        text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
-                                        onClick = {
-                                            viewModel.setTvGridColumns(cols)
-                                            tvGridExpanded = false
-                                        }
-                                    )
-                                }
                             }
                         }
                     }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                    var tvVideoGridExpanded by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OndemandVideo,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Колонок в видео сетке (ТВ)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Количество столбцов",
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { tvVideoGridExpanded = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("$tvVideoGridColumns", fontSize = 11.sp)
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    
+                    if (tvVideoGridExpanded) {
+                        DropdownMenu(
+                            expanded = tvVideoGridExpanded,
+                            onDismissRequest = { tvVideoGridExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            listOf(3, 4, 5, 6, 7, 8).forEach { cols ->
+                                DropdownMenuItem(
+                                    text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                                    onClick = {
+                                        viewModel.setTvVideoGridColumns(cols)
+                                        tvVideoGridExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
 
@@ -500,76 +605,78 @@ fun SettingsTabScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.GridView,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Колонок в сетке",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = "На мобильных устройствах",
-                                    fontSize = 12.sp,
-                                    color = GreyText
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.GridView,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
-                        Box {
-                            Button(
-                                onClick = { mobileGridExpanded = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text("$mobileGridColumns", fontSize = 12.sp)
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Колонок в сетке",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "На мобильных устройствах",
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { mobileGridExpanded = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("$mobileGridColumns", fontSize = 11.sp)
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    
+                    if (mobileGridExpanded) {
+                        DropdownMenu(
+                            expanded = mobileGridExpanded,
+                            onDismissRequest = { mobileGridExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            listOf(1, 2, 3).forEach { cols ->
+                                DropdownMenuItem(
+                                    text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                                    onClick = {
+                                        viewModel.setMobileGridColumns(cols)
+                                        mobileGridExpanded = false
+                                    }
                                 )
-                            }
-                            DropdownMenu(
-                                expanded = mobileGridExpanded,
-                                onDismissRequest = { mobileGridExpanded = false },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                            ) {
-                                listOf(1, 2, 3).forEach { cols ->
-                                    DropdownMenuItem(
-                                        text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
-                                        onClick = {
-                                            viewModel.setMobileGridColumns(cols)
-                                            mobileGridExpanded = false
-                                        }
-                                    )
-                                }
                             }
                         }
                     }
+
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
 
@@ -582,82 +689,90 @@ fun SettingsTabScreen(
                         "tint" -> "Подсветка"
                         else -> "Свечение"
                     }
+                    
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CenterFocusStrong,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Стиль фокуса ТВ",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = "Эффект при наведении",
-                                    fontSize = 12.sp,
-                                    color = GreyText
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.CenterFocusStrong,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
-                        Box {
-                            Button(
-                                onClick = { focusExpanded = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text(focusLabel, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Стиль фокуса ТВ",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Эффект при наведении",
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { focusExpanded = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text(
+                                text = focusLabel,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    
+                    if (focusExpanded) {
+                        DropdownMenu(
+                            expanded = focusExpanded,
+                            onDismissRequest = { focusExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            listOf(
+                                "glow" to "Свечение границ",
+                                "scale" to "Масштабирование",
+                                "scale_glow" to "Масштаб + Свечение",
+                                "classic" to "Простая рамка",
+                                "tint" to "Подсветка фона"
+                            ).forEach { (id, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                                    onClick = {
+                                        viewModel.setFocusStyle(id)
+                                        focusExpanded = false
+                                    }
                                 )
-                            }
-                            DropdownMenu(
-                                expanded = focusExpanded,
-                                onDismissRequest = { focusExpanded = false },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                            ) {
-                                listOf(
-                                    "glow" to "Свечение границ",
-                                    "scale" to "Масштабирование",
-                                    "scale_glow" to "Масштаб + Свечение",
-                                    "classic" to "Простая рамка",
-                                    "tint" to "Подсветка фона"
-                                ).forEach { (id, label) ->
-                                    DropdownMenuItem(
-                                        text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
-                                        onClick = {
-                                            viewModel.setFocusStyle(id)
-                                            focusExpanded = false
-                                        }
-                                    )
-                                }
                             }
                         }
                     }
@@ -688,79 +803,80 @@ fun SettingsTabScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 var qualityExpanded by remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.VideoLibrary,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Качество плеера",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "По умолчанию",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.VideoLibrary,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                    Box {
-                        Button(
-                            onClick = { qualityExpanded = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(playerQuality, fontSize = 12.sp)
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Качество плеера",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "По умолчанию",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
+                    }
+                    
+                    Button(
+                        onClick = { qualityExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(playerQuality, fontSize = 11.sp)
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                
+                if (qualityExpanded) {
+                    DropdownMenu(
+                        expanded = qualityExpanded,
+                        onDismissRequest = { qualityExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        listOf("Авто", "2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
+                            DropdownMenuItem(
+                                text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setPlayerQuality(opt)
+                                    qualityExpanded = false
+                                }
                             )
-                        }
-                        DropdownMenu(
-                            expanded = qualityExpanded,
-                            onDismissRequest = { qualityExpanded = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            listOf("Авто", "2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
-                                DropdownMenuItem(
-                                    text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = {
-                                        viewModel.setPlayerQuality(opt)
-                                        qualityExpanded = false
-                                    }
-                                )
-                            }
                         }
                     }
                 }
@@ -771,73 +887,74 @@ fun SettingsTabScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Качество загрузки",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "При скачивании",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                    Box {
-                        Button(
-                            onClick = { downloadExpanded = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(downloadQuality, fontSize = 12.sp)
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Качество загрузки",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "При скачивании",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
+                    }
+                    
+                    Button(
+                        onClick = { downloadExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(downloadQuality, fontSize = 11.sp)
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                
+                if (downloadExpanded) {
+                    DropdownMenu(
+                        expanded = downloadExpanded,
+                        onDismissRequest = { downloadExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        listOf("2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
+                            DropdownMenuItem(
+                                text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setDownloadQuality(opt)
+                                    downloadExpanded = false
+                                }
                             )
-                        }
-                        DropdownMenu(
-                            expanded = downloadExpanded,
-                            onDismissRequest = { downloadExpanded = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            listOf("2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
-                                DropdownMenuItem(
-                                    text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = {
-                                        viewModel.setDownloadQuality(opt)
-                                        downloadExpanded = false
-                                    }
-                                )
-                            }
                         }
                     }
                 }
@@ -867,7 +984,7 @@ fun SettingsTabScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 var typeExpanded by remember { mutableStateOf(false) }
                 val typeLabel = when (startPageType) {
@@ -880,78 +997,85 @@ fun SettingsTabScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Тип стартовой страницы",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Что открывать при запуске",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                    Box {
-                        Button(
-                            onClick = { typeExpanded = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(typeLabel, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Тип стартовой страницы",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Что открывать при запуске",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
+                    }
+                    
+                    Button(
+                        onClick = { typeExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(
+                            text = typeLabel,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                
+                if (typeExpanded) {
+                    DropdownMenu(
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        listOf(
+                            "default" to "По умолчанию (Фильмы)",
+                            "category" to "Выбрать категорию",
+                            "custom_url" to "Своя ссылка Rutube",
+                            "favorite" to "Элемент из избранного"
+                        ).forEach { (id, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setStartPageType(id)
+                                    typeExpanded = false
+                                }
                             )
-                        }
-                        DropdownMenu(
-                            expanded = typeExpanded,
-                            onDismissRequest = { typeExpanded = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            listOf(
-                                "default" to "По умолчанию (Фильмы)",
-                                "category" to "Выбрать категорию",
-                                "custom_url" to "Своя ссылка Rutube",
-                                "favorite" to "Элемент из избранного"
-                            ).forEach { (id, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = {
-                                        viewModel.setStartPageType(id)
-                                        typeExpanded = false
-                                    }
-                                )
-                            }
                         }
                     }
                 }
@@ -969,7 +1093,7 @@ fun SettingsTabScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
@@ -1007,42 +1131,45 @@ fun SettingsTabScreen(
                                 )
                             }
                         }
-                        DropdownMenu(
-                            expanded = favExpanded,
-                            onDismissRequest = { favExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 280.dp)
-                        ) {
-                            if (nonVideoBookmarks.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("Избранное пусто", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                    onClick = { favExpanded = false },
-                                    enabled = false
-                                )
-                            } else {
-                                nonVideoBookmarks.forEach { fav ->
+                        
+                        if (favExpanded) {
+                            DropdownMenu(
+                                expanded = favExpanded,
+                                onDismissRequest = { favExpanded = false },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .heightIn(max = 280.dp)
+                            ) {
+                                if (nonVideoBookmarks.isEmpty()) {
                                     DropdownMenuItem(
-                                        text = {
-                                            val typeLabel = when (fav.duration) {
-                                                "ПАПКА", "КАТАЛОГ" -> "Подкатегория"
-                                                "СЕРИАЛ" -> "Сериал"
-                                                "КАНАЛ" -> "Канал"
-                                                "ПЛЕЙЛИСТ" -> "Плейлист"
-                                                else -> "Элемент"
-                                            }
-                                            Text(
-                                                "${fav.title} ($typeLabel)",
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.setStartPageFavorite(fav.id, fav.title)
-                                            favExpanded = false
-                                        }
+                                        text = { Text("Избранное пусто", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                        onClick = { favExpanded = false },
+                                        enabled = false
                                     )
+                                } else {
+                                    nonVideoBookmarks.forEach { fav ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                val typeLabel = when (fav.duration) {
+                                                    "ПАПКА", "КАТАЛОГ" -> "Подкатегория"
+                                                    "СЕРИАЛ" -> "Сериал"
+                                                    "КАНАЛ" -> "Канал"
+                                                    "ПЛЕЙЛИСТ" -> "Плейлист"
+                                                    else -> "Элемент"
+                                                }
+                                                Text(
+                                                    "${fav.title} ($typeLabel)",
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            onClick = {
+                                                viewModel.setStartPageFavorite(fav.id, fav.title)
+                                                favExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1061,7 +1188,7 @@ fun SettingsTabScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
@@ -1099,21 +1226,24 @@ fun SettingsTabScreen(
                                 )
                             }
                         }
-                        DropdownMenu(
-                            expanded = catExpanded,
-                            onDismissRequest = { catExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 280.dp)
-                        ) {
-                            categoriesList.forEach { cat ->
-                                DropdownMenuItem(
-                                    text = { Text(cat, color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = {
-                                        viewModel.setStartPageCategory(cat)
-                                        catExpanded = false
-                                    }
-                                )
+                        
+                        if (catExpanded) {
+                            DropdownMenu(
+                                expanded = catExpanded,
+                                onDismissRequest = { catExpanded = false },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .heightIn(max = 280.dp)
+                            ) {
+                                categoriesList.forEach { cat ->
+                                    DropdownMenuItem(
+                                        text = { Text(cat, color = MaterialTheme.colorScheme.onSurface) },
+                                        onClick = {
+                                            viewModel.setStartPageCategory(cat)
+                                            catExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1126,7 +1256,7 @@ fun SettingsTabScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
@@ -1221,7 +1351,7 @@ fun SettingsTabScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 var showBackupDialog by remember { mutableStateOf(false) }
 
@@ -1229,46 +1359,46 @@ fun SettingsTabScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showBackupDialog = true }
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Backup,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Экспорт и импорт",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Закладки, история, настройки",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Backup,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Экспорт и импорт",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Закладки, история, настройки",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
+                    }
+                    
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
                         tint = GreyText,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
@@ -1306,7 +1436,7 @@ fun SettingsTabScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 var showAgreementDialog by remember { mutableStateOf(false) }
 
@@ -1314,46 +1444,46 @@ fun SettingsTabScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showAgreementDialog = true }
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Description,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Пользовательское соглашение",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Условия использования",
-                                fontSize = 12.sp,
-                                color = GreyText
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Пользовательское соглашение",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Условия использования",
+                            fontSize = 12.sp,
+                            color = GreyText
+                        )
+                    }
+                    
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
                         tint = GreyText,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
