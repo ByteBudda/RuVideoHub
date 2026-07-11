@@ -310,7 +310,7 @@ fun LazyListScope.homeSearchContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             rowItems.forEach { video ->
-                                if (isLargeCardsMode) {
+                                if (isLargeCardsMode && !isTvOptimized) {
                                     HeroVideoCard(
                                         video = video,
                                         onVideoClick = { viewModel.selectVideo(video) },
@@ -376,7 +376,7 @@ fun LazyListScope.homeSearchContent(
                         }
                     }
                 } else {
-                    if (isLargeCardsMode) {
+                    if (isLargeCardsMode && !isTvOptimized) {
                         items(restSearchVideos, key = { "search_rest_large_${it.id}" }) { video ->
                             HeroVideoCard(
                                 video = video,

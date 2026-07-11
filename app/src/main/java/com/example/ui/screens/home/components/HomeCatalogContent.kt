@@ -227,7 +227,7 @@ fun LazyListScope.homeCatalogContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             rowItems.forEach { video ->
-                                if (isLargeCardsMode) {
+                                if (isLargeCardsMode && !isTvOptimized) {
                                     HeroVideoCard(
                                         video = video,
                                         onVideoClick = { viewModel.selectVideo(video) },
@@ -293,7 +293,7 @@ fun LazyListScope.homeCatalogContent(
                         }
                     }
                 } else {
-                    if (isLargeCardsMode) {
+                    if (isLargeCardsMode && !isTvOptimized) {
                         items(groupVideos, key = { "group_video_large_${groupName}_${it.id}" }) { video ->
                             HeroVideoCard(
                                 video = video,

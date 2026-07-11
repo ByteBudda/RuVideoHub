@@ -487,8 +487,6 @@ fun SecondaryVideoItemRow(
                         modifier = Modifier.size(16.dp)
                     )
                 }
-                
-                Spacer(modifier = Modifier.weight(1f))
 
                 if (video.views.isNotBlank()) {
                     Box(
