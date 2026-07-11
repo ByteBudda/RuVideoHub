@@ -680,6 +680,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         return lower.contains("premier") ||
                lower.contains("start") ||
                lower.contains("viju") ||
+               lower.contains("КИОН") ||
                lower.contains("тв онлайн")
     }
 }
