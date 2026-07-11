@@ -99,7 +99,7 @@ fun SettingsTabScreen(
             )
         }
 
-        // Section: Interface Settings
+        // ============ ИНТЕРФЕЙС ============
         Text(
             text = "Интерфейс",
             fontSize = 14.sp,
@@ -108,14 +108,8 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            // App Theme row
+        SettingsCard(isDarkTheme, isTvOptimized) {
+            // Цветовая тема
             var themeDropdownExpanded by remember { mutableStateOf(false) }
             val themeLabel = when (appTheme) {
                 "dark" -> "Тёмная"
@@ -127,7 +121,7 @@ fun SettingsTabScreen(
                 else -> customThemes.find { it.id == appTheme }?.name ?: "Тёмная"
             }
 
-            SettingsItem(
+            SettingsSwitchItem(
                 icon = Icons.Default.Palette,
                 title = "Цветовая тема",
                 subtitle = "Выберите оформление интерфейса"
@@ -149,7 +143,7 @@ fun SettingsTabScreen(
                     val allThemes = baseThemes + customThemes.map { it.id to it.name }
                     allThemes.forEach { (id, label) ->
                         DropdownMenuItem(
-                            text = { Text(label, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
                             onClick = {
                                 viewModel.setAppTheme(id)
                                 themeDropdownExpanded = false
@@ -173,27 +167,19 @@ fun SettingsTabScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-            // Import Custom Theme
+            // Импорт темы
             SettingsItem(
                 icon = Icons.Default.Style,
                 title = "Импорт темы (.rvht)",
                 subtitle = if (themeStatusMessage.isNotBlank()) themeStatusMessage else "Загрузить пользовательскую тему из файла",
                 subtitleColor = if (themeStatusMessage.isNotBlank()) MaterialTheme.colorScheme.primary else GreyText,
-                onClick = { openThemeLauncher.launch(arrayOf("*/*")) },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                onClick = { openThemeLauncher.launch(arrayOf("*/*")) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-            // TV Mode Toggle row
-            SettingsItem(
+            // ТВ-оптимизация
+            SettingsSwitchItem(
                 icon = Icons.Default.Tv,
                 title = "ТВ-оптимизация",
                 subtitle = "Адаптировать интерфейс для управления пультом"
@@ -208,6 +194,7 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
         
+        // ============ ОТОБРАЖЕНИЕ ============
         Text(
             text = "Отображение",
             fontSize = 14.sp,
@@ -216,15 +203,9 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        SettingsCard(isDarkTheme, isTvOptimized) {
             if (!isTvOptimized) {
-                SettingsItem(
+                SettingsSwitchItem(
                     icon = Icons.Default.ViewList,
                     title = "Крупные карточки",
                     subtitle = "Использовать большой размер для видео в списках"
@@ -240,7 +221,6 @@ fun SettingsTabScreen(
             }
 
             if (isTvOptimized) {
-                // TV Grid columns
                 var tvGridDropdownExpanded by remember { mutableStateOf(false) }
                 SettingsItem(
                     icon = Icons.Default.GridOn,
@@ -267,7 +247,6 @@ fun SettingsTabScreen(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-                // TV Video Grid columns
                 var tvVideoGridDropdownExpanded by remember { mutableStateOf(false) }
                 SettingsItem(
                     icon = Icons.Default.OndemandVideo,
@@ -296,7 +275,6 @@ fun SettingsTabScreen(
             }
 
             if (!isTvOptimized) {
-                // Mobile Grid columns
                 var mobileGridDropdownExpanded by remember { mutableStateOf(false) }
                 SettingsItem(
                     icon = Icons.Default.GridView,
@@ -325,7 +303,6 @@ fun SettingsTabScreen(
             }
 
             if (isTvOptimized) {
-                // TV Focus Highlight Style
                 var focusStyleDropdownExpanded by remember { mutableStateOf(false) }
                 val focusStyleLabel = when (focusStyle) {
                     "scale" -> "Масштабирование"
@@ -368,7 +345,7 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section: Quality Settings
+        // ============ КАЧЕСТВО ============
         Text(
             text = "Качество воспроизведения и загрузки",
             fontSize = 14.sp,
@@ -377,14 +354,7 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            // Player Default Quality
+        SettingsCard(isDarkTheme, isTvOptimized) {
             var dropdownExpanded by remember { mutableStateOf(false) }
             SettingsItem(
                 icon = Icons.Default.VideoLibrary,
@@ -411,7 +381,6 @@ fun SettingsTabScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-            // Downloader Default Quality
             var dlDropdownExpanded by remember { mutableStateOf(false) }
             SettingsItem(
                 icon = Icons.Default.Download,
@@ -439,7 +408,7 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section: Start Page Settings
+        // ============ СТАРТОВЫЙ ЭКРАН ============
         Text(
             text = "Стартовый экран",
             fontSize = 14.sp,
@@ -448,14 +417,7 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            // Choice 1: Start page type selection
+        SettingsCard(isDarkTheme, isTvOptimized) {
             var typeDropdownExpanded by remember { mutableStateOf(false) }
             val typeLabel = when (startPageType) {
                 "category" -> "Выбранная категория"
@@ -492,7 +454,6 @@ fun SettingsTabScreen(
                 }
             }
 
-            // Conditionally show favorite selection
             if (startPageType == "favorite") {
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 
@@ -518,7 +479,7 @@ fun SettingsTabScreen(
                     ) {
                         if (nonVideoBookmarks.isEmpty()) {
                             DropdownMenuItem(
-                                text = { Text("Избранное пусто (добавьте туда плейлист/канал)", color = MaterialTheme.colorScheme.onSurface) },
+                                text = { Text("Избранное пусто", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = { favDropdownExpanded = false },
                                 enabled = false
                             )
@@ -533,7 +494,12 @@ fun SettingsTabScreen(
                                             "ПЛЕЙЛИСТ" -> "Плейлист"
                                             else -> "Элемент"
                                         }
-                                        Text("${fav.title} ($typeLabel)", color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            "${fav.title} ($typeLabel)",
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     },
                                     onClick = {
                                         viewModel.setStartPageFavorite(fav.id, fav.title)
@@ -546,7 +512,6 @@ fun SettingsTabScreen(
                 }
             }
 
-            // Conditionally show category selection
             if (startPageType == "category") {
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 
@@ -582,7 +547,6 @@ fun SettingsTabScreen(
                 }
             }
 
-            // Conditionally show custom URL input
             if (startPageType == "custom_url") {
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
@@ -650,7 +614,7 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section: Updates
+        // ============ ОБНОВЛЕНИЕ ============
         Text(
             text = "Обновление",
             fontSize = 14.sp,
@@ -662,7 +626,7 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section: Backup & Restore
+        // ============ РЕЗЕРВНОЕ КОПИРОВАНИЕ ============
         Text(
             text = "Резервное копирование",
             fontSize = 14.sp,
@@ -671,28 +635,14 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        SettingsCard(isDarkTheme, isTvOptimized) {
             var showBackupDialog by remember { mutableStateOf(false) }
 
             SettingsItem(
                 icon = Icons.Default.Backup,
                 title = "Экспорт и импорт (Все данные)",
                 subtitle = "Сохранение закладок, истории и настроек в JSON",
-                onClick = { showBackupDialog = true },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                onClick = { showBackupDialog = true }
             )
 
             if (showBackupDialog) {
@@ -707,7 +657,7 @@ fun SettingsTabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section: Information
+        // ============ ИНФОРМАЦИЯ ============
         Text(
             text = "Информация",
             fontSize = 14.sp,
@@ -716,28 +666,14 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        SettingsCard(isDarkTheme, isTvOptimized) {
             var showAgreementDialog by remember { mutableStateOf(false) }
 
             SettingsItem(
                 icon = Icons.Default.Description,
                 title = "Пользовательское соглашение",
                 subtitle = "Просмотреть условия использования приложения",
-                onClick = { showAgreementDialog = true },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                onClick = { showAgreementDialog = true }
             )
 
             if (showAgreementDialog) {
@@ -747,7 +683,24 @@ fun SettingsTabScreen(
     }
 }
 
-// ==================== ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ====================
+// ==================== КОМПОНЕНТЫ В СТИЛЕ TELEGRAM ====================
+
+@Composable
+private fun SettingsCard(
+    isDarkTheme: Boolean,
+    isTvOptimized: Boolean,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        content()
+    }
+}
 
 @Composable
 private fun SettingsItem(
@@ -756,14 +709,13 @@ private fun SettingsItem(
     subtitle: String,
     subtitleColor: Color = GreyText,
     onClick: (() -> Unit)? = null,
-    trailingIcon: @Composable (() -> Unit)? = null,
     trailingContent: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -774,7 +726,7 @@ private fun SettingsItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -791,17 +743,17 @@ private fun SettingsItem(
             ) {
                 Text(
                     text = title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = subtitle,
-                    fontSize = 10.sp,
+                    fontSize = 13.sp,
                     color = subtitleColor,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -810,9 +762,66 @@ private fun SettingsItem(
         if (trailingContent != null) {
             trailingContent()
         }
-        
-        if (trailingIcon != null) {
-            trailingIcon()
+    }
+}
+
+@Composable
+private fun SettingsSwitchItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    subtitleColor: Color = GreyText,
+    trailingContent: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 13.sp,
+                    color = subtitleColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        if (trailingContent != null) {
+            trailingContent()
         }
     }
 }
@@ -830,17 +839,17 @@ private fun DropdownButton(
         Button(
             onClick = onExpand,
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                contentColor = MaterialTheme.colorScheme.onSurface
             ),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.height(32.dp)
         ) {
             Text(
                 text = label,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -849,7 +858,7 @@ private fun DropdownButton(
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
 
@@ -864,6 +873,8 @@ private fun DropdownButton(
         }
     }
 }
+
+// ==================== ОСТАЛЬНЫЕ КОМПОНЕНТЫ ====================
 
 @Composable
 fun FullBackupRestoreDialog(
@@ -975,7 +986,6 @@ fun FullBackupRestoreDialog(
                     }
                 }
 
-                // EXPORT SECTION
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1017,7 +1027,6 @@ fun FullBackupRestoreDialog(
                     }
                 }
 
-                // IMPORT SECTION
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
