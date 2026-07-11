@@ -1,5 +1,7 @@
 package com.example.manager
 
+import com.example.ui.theme.CustomTheme
+
 import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
@@ -13,6 +15,8 @@ class SettingsManager(private val application: Application) {
 
     private val _appTheme = MutableStateFlow("dark")
     val appTheme = _appTheme.asStateFlow()
+    private val _appEffect = MutableStateFlow("default")
+    val appEffect = _appEffect.asStateFlow()
 
     private val _isDarkTheme = MutableStateFlow(true)
     val isDarkTheme = _isDarkTheme.asStateFlow()
@@ -59,8 +63,12 @@ class SettingsManager(private val application: Application) {
     private val _focusStyle = MutableStateFlow("glow")
     val focusStyle = _focusStyle.asStateFlow()
 
+    private val _customThemes = MutableStateFlow<List<CustomTheme>>(emptyList())
+    val customThemes = _customThemes.asStateFlow()
+
     init {
         val savedTheme = sharedPrefs.getString("app_theme", null)
+        _appEffect.value = sharedPrefs.getString("app_effect", "default") ?: "default"
         if (savedTheme != null) {
             _appTheme.value = savedTheme
             _isDarkTheme.value = (savedTheme == "dark" || savedTheme == "slate")
@@ -90,6 +98,20 @@ class SettingsManager(private val application: Application) {
         _tvVideoGridColumns.value = sharedPrefs.getInt("tv_video_grid_columns", 4)
         _mobileGridColumns.value = sharedPrefs.getInt("mobile_grid_columns", 2)
         _focusStyle.value = sharedPrefs.getString("focus_style", "glow") ?: "glow"
+        
+        try {
+            val savedCustomThemes = sharedPrefs.getString("custom_themes", null)
+            if (savedCustomThemes != null) {
+                val arr = org.json.JSONArray(savedCustomThemes)
+                val themes = mutableListOf<CustomTheme>()
+                for (i in 0 until arr.length()) {
+                    themes.add(CustomTheme.fromJson(arr.getString(i)))
+                }
+                _customThemes.value = themes
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun toggleTheme() {
@@ -98,6 +120,11 @@ class SettingsManager(private val application: Application) {
         setAppTheme(nextTheme)
     }
 
+    fun setAppEffect(effect: String) {
+        _appEffect.value = effect
+        sharedPrefs.edit().putString("app_effect", effect).apply()
+    }
+    
     fun setAppTheme(theme: String) {
         _appTheme.value = theme
         val isDark = (theme == "dark" || theme == "slate")
@@ -177,5 +204,28 @@ class SettingsManager(private val application: Application) {
     fun setFocusStyle(style: String) {
         _focusStyle.value = style
         sharedPrefs.edit().putString("focus_style", style).apply()
+    }
+    fun addCustomTheme(theme: CustomTheme) {
+        val list = _customThemes.value.toMutableList()
+        list.removeAll { it.id == theme.id }
+        list.add(theme)
+        _customThemes.value = list
+        saveCustomThemes()
+    }
+    
+    fun removeCustomTheme(id: String) {
+        val list = _customThemes.value.toMutableList()
+        list.removeAll { it.id == id }
+        _customThemes.value = list
+        saveCustomThemes()
+        if (_appTheme.value == id) {
+            setAppTheme("dark")
+        }
+    }
+    
+    private fun saveCustomThemes() {
+        val arr = org.json.JSONArray()
+        _customThemes.value.forEach { arr.put(it.toJsonString()) }
+        sharedPrefs.edit().putString("custom_themes", arr.toString()).apply()
     }
 }
