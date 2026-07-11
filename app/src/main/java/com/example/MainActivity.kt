@@ -65,9 +65,24 @@ class MainActivity : ComponentActivity() {
     setContent {
       val isDarkTheme by viewModel.isDarkTheme.collectAsState()
       val appTheme by viewModel.appTheme.collectAsState()
+      val appEffect by viewModel.appEffect.collectAsState()
+      val customThemes by viewModel.customThemes.collectAsState()
       
-      MyApplicationTheme(appTheme = appTheme, darkTheme = isDarkTheme) {
-        SleekVideoHubApp(viewModel = viewModel)
+      val context = androidx.compose.ui.platform.LocalContext.current
+      var stableDensity = context.resources.displayMetrics.density
+      try {
+          val stableDpi = android.util.DisplayMetrics::class.java.getField("DENSITY_DEVICE_STABLE").getInt(null)
+          stableDensity = stableDpi / 160f
+      } catch (e: Exception) {
+      }
+      val customDensity = androidx.compose.ui.unit.Density(density = stableDensity, fontScale = 1.0f)
+      
+      androidx.compose.runtime.CompositionLocalProvider(
+          androidx.compose.ui.platform.LocalDensity provides customDensity
+      ) {
+        MyApplicationTheme(appTheme = appTheme, appEffect = appEffect, darkTheme = isDarkTheme, customThemes = customThemes) {
+          SleekVideoHubApp(viewModel = viewModel)
+        }
       }
     }
 
