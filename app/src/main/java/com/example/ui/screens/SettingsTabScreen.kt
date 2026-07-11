@@ -82,7 +82,7 @@ fun SettingsTabScreen(
             .padding(horizontal = 16.dp)
             .padding(bottom = 80.dp)
     ) {
-        // Header
+        // Header - фиксированный без liquidGlass
         Column(modifier = Modifier.padding(bottom = 20.dp)) {
             Text(
                 text = "Настройки",
@@ -107,16 +107,20 @@ fun SettingsTabScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
+        // Карточка с темой
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp)
             ) {
                 // Цветовая тема
                 var themeDropdownExpanded by remember { mutableStateOf(false) }
@@ -355,12 +359,15 @@ fun SettingsTabScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp)
             ) {
                 if (!isTvOptimized) {
                     Row(
@@ -411,7 +418,6 @@ fun SettingsTabScreen(
                 }
 
                 if (isTvOptimized) {
-                    // Колонки ТВ
                     var tvGridExpanded by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
@@ -490,7 +496,6 @@ fun SettingsTabScreen(
                 }
 
                 if (!isTvOptimized) {
-                    // Мобильные колонки
                     var mobileGridExpanded by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
@@ -569,7 +574,6 @@ fun SettingsTabScreen(
                 }
 
                 if (isTvOptimized) {
-                    // Стиль фокуса
                     var focusExpanded by remember { mutableStateOf(false) }
                     val focusLabel = when (focusStyle) {
                         "scale" -> "Масштаб"
@@ -676,14 +680,16 @@ fun SettingsTabScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp)
             ) {
-                // Качество плеера
                 var qualityExpanded by remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier
@@ -761,7 +767,6 @@ fun SettingsTabScreen(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-                // Качество загрузки
                 var downloadExpanded by remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier
@@ -854,14 +859,16 @@ fun SettingsTabScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp)
             ) {
-                // Тип стартовой страницы
                 var typeExpanded by remember { mutableStateOf(false) }
                 val typeLabel = when (startPageType) {
                     "category" -> "Категория"
@@ -949,7 +956,6 @@ fun SettingsTabScreen(
                     }
                 }
 
-                // Избранное
                 if (startPageType == "favorite") {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     var favExpanded by remember { mutableStateOf(false) }
@@ -1043,7 +1049,6 @@ fun SettingsTabScreen(
                     }
                 }
 
-                // Категория
                 if (startPageType == "category") {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     var catExpanded by remember { mutableStateOf(false) }
@@ -1114,7 +1119,6 @@ fun SettingsTabScreen(
                     }
                 }
 
-                // Своя ссылка
                 if (startPageType == "custom_url") {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     var textInput by remember(startPageCustomUrl) { mutableStateOf(startPageCustomUrl) }
@@ -1209,12 +1213,15 @@ fun SettingsTabScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp)
             ) {
                 var showBackupDialog by remember { mutableStateOf(false) }
 
@@ -1291,12 +1298,15 @@ fun SettingsTabScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp)
             ) {
                 var showAgreementDialog by remember { mutableStateOf(false) }
 
