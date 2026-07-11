@@ -118,6 +118,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
         return checkText.contains("premier") ||
                checkText.contains("start") ||
+               checkText.contains("kion") ||
                checkText.contains("viju")
     }
 
