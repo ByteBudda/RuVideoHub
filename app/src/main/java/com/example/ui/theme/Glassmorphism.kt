@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -28,11 +29,16 @@ fun AmbientGlassBackground(
     isTvOptimized: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val appTheme = LocalAppTheme.current
+    val enableGlassmorphism = appTheme == "dark" || appTheme == "light"
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F0E13) else Color(0xFFF6F4FA))
+            .background(MaterialTheme.colorScheme.background)
             .drawBehind {
+                if (!enableGlassmorphism) return@drawBehind
+
                 val width = size.width
                 val height = size.height
                 if (width > 0 && height > 0 && !isTvOptimized) {
@@ -50,7 +56,6 @@ fun AmbientGlassBackground(
                         radius = width * 0.65f,
                         center = Offset(width * 0.85f, height * 0.2f)
                     )
-
                     // Blob 2: Middle Left - Soft Cyan/Teal
                     drawCircle(
                         brush = Brush.radialGradient(
@@ -65,7 +70,6 @@ fun AmbientGlassBackground(
                         radius = width * 0.55f,
                         center = Offset(width * 0.1f, height * 0.55f)
                     )
-
                     // Blob 3: Bottom Right - Vibrant Rose
                     drawCircle(
                         brush = Brush.radialGradient(
@@ -94,60 +98,57 @@ fun AmbientGlassBackground(
 fun Modifier.liquidGlass(
     shape: Shape,
     borderWidth: Dp = 1.dp,
-    isDark: Boolean,
+    isDark: Boolean, // Kept for API compatibility, but we use MaterialTheme mostly
     isTvOptimized: Boolean = false
-): Modifier {
+): Modifier = composed {
+    val appTheme = LocalAppTheme.current
+    val enableGlassmorphism = appTheme == "dark" || appTheme == "light"
+
+    if (!enableGlassmorphism) {
+        return@composed this
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(borderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+    }
+
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    
     val bgModifier = if (isTvOptimized) {
-        Modifier.background(if (isDark) Color(0xFF1D1B22) else Color(0xFFECE7F2))
+        Modifier.background(surfaceColor)
     } else {
         Modifier.background(
             Brush.linearGradient(
-                colors = if (isDark) {
-                    listOf(
-                        Color(0x3D1A1625), // Ultra-premium dark translucent
-                        Color(0x1A09070F)
-                    )
-                } else {
-                    listOf(
-                        Color(0xA6FFFFFF), // Pure clear glassy white
-                        Color(0x66F1EDF8)
-                    )
-                }
+                colors = listOf(
+                    surfaceColor.copy(alpha = 0.85f),
+                    surfaceColor.copy(alpha = 0.4f)
+                )
             )
         )
     }
-
+    
     val borderModifier = if (isTvOptimized) {
         Modifier.border(
             width = borderWidth,
-            color = if (isDark) Color(0x26FFFFFF) else Color(0x1F000000),
+            color = onSurfaceColor.copy(alpha = 0.15f),
             shape = shape
         )
     } else {
         Modifier.border(
             width = borderWidth,
             brush = Brush.linearGradient(
-                colors = if (isDark) {
-                    listOf(
-                        Color(0x3DFFFFFF), // Refractive highlight on top edge
-                        Color(0x10FFFFFF),
-                        Color(0x08FFFFFF),
-                        Color(0x24000000)  // Shadow on bottom edge
-                    )
-                } else {
-                    listOf(
-                        Color(0x99FFFFFF),
-                        Color(0x30FFFFFF),
-                        Color(0x15FFFFFF),
-                        Color(0x267F52FF)  // Hint of violet reflection
-                    )
-                }
+                colors = listOf(
+                    onSurfaceColor.copy(alpha = 0.3f),
+                    onSurfaceColor.copy(alpha = 0.1f),
+                    onSurfaceColor.copy(alpha = 0.05f),
+                    Color(0x24000000)
+                )
             ),
             shape = shape
         )
     }
 
-    return this
+    this
         .clip(shape)
         .then(bgModifier)
         .then(borderModifier)

@@ -8,7 +8,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+
+val LocalAppTheme = compositionLocalOf { "dark" }
 
 private val DarkColorScheme = darkColorScheme(
   primary = DarkPrimary,
@@ -44,15 +48,55 @@ private val LightColorScheme = lightColorScheme(
   onTertiaryContainer = LightProBadgeText
 )
 
+private val SlateColorScheme = darkColorScheme(
+  primary = SlatePrimary,
+  onPrimary = SlateOnPrimary,
+  primaryContainer = SlatePrimaryContainer,
+  onPrimaryContainer = SlateOnPrimaryContainer,
+  background = SlateBackground,
+  onBackground = SlateOnBackground,
+  surface = SlateSurface,
+  onSurface = SlateOnSurface,
+  surfaceVariant = SlateSurfaceVariant,
+  onSurfaceVariant = SlateOnSurfaceVariant,
+  outline = SlateOutline,
+  secondaryContainer = SlateSecondaryBackground,
+  tertiaryContainer = SlateProBadgeBg,
+  onTertiaryContainer = SlateProBadgeText
+)
+
+private val SepiaColorScheme = lightColorScheme(
+  primary = SepiaPrimary,
+  onPrimary = SepiaOnPrimary,
+  primaryContainer = SepiaPrimaryContainer,
+  onPrimaryContainer = SepiaOnPrimaryContainer,
+  background = SepiaBackground,
+  onBackground = SepiaOnBackground,
+  surface = SepiaSurface,
+  onSurface = SepiaOnSurface,
+  surfaceVariant = SepiaSurfaceVariant,
+  onSurfaceVariant = SepiaOnSurfaceVariant,
+  outline = SepiaOutline,
+  secondaryContainer = SepiaSecondaryBackground,
+  tertiaryContainer = SepiaProBadgeBg,
+  onTertiaryContainer = SepiaProBadgeText
+)
+
 @Composable
 fun MyApplicationTheme(
+  appTheme: String = "dark",
   darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color disabled to retain the exact Sleek theme style branding
   dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
-  val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-
-
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  val colorScheme = when (appTheme) {
+      "light" -> LightColorScheme
+      "slate" -> SlateColorScheme
+      "sepia" -> SepiaColorScheme
+      "dark" -> DarkColorScheme
+      else -> if (darkTheme) DarkColorScheme else LightColorScheme
+  }
+  CompositionLocalProvider(LocalAppTheme provides appTheme) {
+      MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  }
 }
