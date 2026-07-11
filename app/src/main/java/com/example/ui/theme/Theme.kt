@@ -13,6 +13,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 
 val LocalAppTheme = compositionLocalOf { "dark" }
+val LocalThemeEffect = compositionLocalOf { "none" }
 
 private val DarkColorScheme = darkColorScheme(
   primary = DarkPrimary,
@@ -82,21 +83,73 @@ private val SepiaColorScheme = lightColorScheme(
   onTertiaryContainer = SepiaProBadgeText
 )
 
+private val CyberpunkColorScheme = darkColorScheme(
+  primary = CyberpunkPrimary,
+  onPrimary = CyberpunkOnPrimary,
+  primaryContainer = CyberpunkPrimaryContainer,
+  onPrimaryContainer = CyberpunkOnPrimaryContainer,
+  background = CyberpunkBackground,
+  onBackground = CyberpunkOnBackground,
+  surface = CyberpunkSurface,
+  onSurface = CyberpunkOnSurface,
+  surfaceVariant = CyberpunkSurfaceVariant,
+  onSurfaceVariant = CyberpunkOnSurfaceVariant,
+  outline = CyberpunkOutline,
+  secondaryContainer = CyberpunkSecondaryBackground,
+  tertiaryContainer = CyberpunkProBadgeBg,
+  onTertiaryContainer = CyberpunkProBadgeText
+)
+
+private val AmoledColorScheme = darkColorScheme(
+  primary = AmoledPrimary,
+  onPrimary = AmoledOnPrimary,
+  primaryContainer = AmoledPrimaryContainer,
+  onPrimaryContainer = AmoledOnPrimaryContainer,
+  background = AmoledBackground,
+  onBackground = AmoledOnBackground,
+  surface = AmoledSurface,
+  onSurface = AmoledOnSurface,
+  surfaceVariant = AmoledSurfaceVariant,
+  onSurfaceVariant = AmoledOnSurfaceVariant,
+  outline = AmoledOutline,
+  secondaryContainer = AmoledSecondaryBackground,
+  tertiaryContainer = AmoledProBadgeBg,
+  onTertiaryContainer = AmoledProBadgeText
+)
+
 @Composable
 fun MyApplicationTheme(
   appTheme: String = "dark",
+  appEffect: String = "default",
   darkTheme: Boolean = isSystemInDarkTheme(),
   dynamicColor: Boolean = false,
+  customThemes: List<CustomTheme> = emptyList(),
   content: @Composable () -> Unit,
 ) {
-  val colorScheme = when (appTheme) {
-      "light" -> LightColorScheme
-      "slate" -> SlateColorScheme
-      "sepia" -> SepiaColorScheme
-      "dark" -> DarkColorScheme
-      else -> if (darkTheme) DarkColorScheme else LightColorScheme
+  val customTheme = customThemes.find { it.id == appTheme }
+  val colorScheme = if (customTheme != null) {
+      customTheme.toColorScheme()
+  } else {
+      when (appTheme) {
+          "light" -> LightColorScheme
+          "slate" -> SlateColorScheme
+          "sepia" -> SepiaColorScheme
+          "cyberpunk" -> CyberpunkColorScheme
+          "amoled" -> AmoledColorScheme
+          "dark" -> DarkColorScheme
+          else -> if (darkTheme) DarkColorScheme else LightColorScheme
+      }
   }
-  CompositionLocalProvider(LocalAppTheme provides appTheme) {
+
+  val themeEffect = if (appEffect != "default") appEffect else (customTheme?.effect ?: when (appTheme) {
+      "dark", "light" -> "glassmorphism"
+      else -> "none"
+  })
+
+  CompositionLocalProvider(
+      LocalAppTheme provides appTheme,
+      LocalThemeEffect provides themeEffect
+  ) {
       MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
   }
 }
