@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clipToBounds
 
 @Composable
 fun SettingsTabScreen(
@@ -175,7 +176,7 @@ fun SettingsTabScreen(
                         }
                     }
 
-                    Box {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                         Button(
                             onClick = { themeDropdownExpanded = true },
                             colors = ButtonDefaults.buttonColors(
@@ -205,7 +206,9 @@ fun SettingsTabScreen(
                         DropdownMenu(
                             expanded = themeDropdownExpanded,
                             onDismissRequest = { themeDropdownExpanded = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface)
+                                .heightIn(max = 280.dp)
                         ) {
                             val baseThemes = listOf(
                                 "dark" to "Тёмная",
@@ -469,7 +472,7 @@ fun SettingsTabScreen(
                             }
                         }
 
-                        Box {
+                        Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                             Button(
                                 onClick = { tvGridDropdownExpanded = true },
                                 colors = ButtonDefaults.buttonColors(
@@ -558,7 +561,7 @@ fun SettingsTabScreen(
                             }
                         }
 
-                        Box {
+                        Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                             Button(
                                 onClick = { tvVideoGridDropdownExpanded = true },
                                 colors = ButtonDefaults.buttonColors(
@@ -648,7 +651,7 @@ fun SettingsTabScreen(
                             }
                         }
 
-                        Box {
+                        Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                             Button(
                                 onClick = { mobileGridDropdownExpanded = true },
                                 colors = ButtonDefaults.buttonColors(
@@ -743,7 +746,7 @@ fun SettingsTabScreen(
                             }
                         }
 
-                        Box {
+                        Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                             Button(
                                 onClick = { focusStyleDropdownExpanded = true },
                                 colors = ButtonDefaults.buttonColors(
@@ -865,7 +868,7 @@ fun SettingsTabScreen(
                         }
                     }
 
-                    Box {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                         Button(
                             onClick = { dropdownExpanded = true },
                             colors = ButtonDefaults.buttonColors(
@@ -952,7 +955,7 @@ fun SettingsTabScreen(
                         }
                     }
 
-                    Box {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                         Button(
                             onClick = { dlDropdownExpanded = true },
                             colors = ButtonDefaults.buttonColors(
@@ -1070,7 +1073,7 @@ fun SettingsTabScreen(
                         }
                     }
 
-                    Box {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
                         Button(
                             onClick = { typeDropdownExpanded = true },
                             colors = ButtonDefaults.buttonColors(
@@ -1163,68 +1166,70 @@ fun SettingsTabScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         
-                        Button(
-                            onClick = { favDropdownExpanded = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                        Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
+                            Button(
+                                onClick = { favDropdownExpanded = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = if (startPageFavoriteTitle.isNotBlank()) startPageFavoriteTitle else "Не выбрано",
-                                    fontSize = 12.sp,
-                                    color = if (startPageFavoriteTitle.isNotBlank()) MaterialTheme.colorScheme.onBackground else GreyText,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = GreyText,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = favDropdownExpanded,
-                            onDismissRequest = { favDropdownExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 280.dp)
-                        ) {
-                            if (nonVideoBookmarks.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("Избранное пусто (добавьте туда плейлист/канал)", color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = { favDropdownExpanded = false },
-                                    enabled = false
-                                )
-                            } else {
-                                nonVideoBookmarks.forEach { fav ->
-                                    DropdownMenuItem(
-                                        text = { 
-                                            val typeLabel = when (fav.duration) {
-                                                "ПАПКА", "КАТАЛОГ" -> "Подкатегория"
-                                                "СЕРИАЛ" -> "Сериал"
-                                                "КАНАЛ" -> "Канал"
-                                                "ПЛЕЙЛИСТ" -> "Плейлист"
-                                                else -> "Элемент"
-                                            }
-                                            Text("${fav.title} ($typeLabel)", color = MaterialTheme.colorScheme.onSurface) 
-                                        },
-                                        onClick = {
-                                            viewModel.setStartPageFavorite(fav.id, fav.title)
-                                            favDropdownExpanded = false
-                                        }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (startPageFavoriteTitle.isNotBlank()) startPageFavoriteTitle else "Не выбрано",
+                                        fontSize = 12.sp,
+                                        color = if (startPageFavoriteTitle.isNotBlank()) MaterialTheme.colorScheme.onBackground else GreyText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = GreyText,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = favDropdownExpanded,
+                                onDismissRequest = { favDropdownExpanded = false },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .heightIn(max = 280.dp)
+                            ) {
+                                if (nonVideoBookmarks.isEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text("Избранное пусто (добавьте туда плейлист/канал)", color = MaterialTheme.colorScheme.onSurface) },
+                                        onClick = { favDropdownExpanded = false },
+                                        enabled = false
+                                    )
+                                } else {
+                                    nonVideoBookmarks.forEach { fav ->
+                                        DropdownMenuItem(
+                                            text = { 
+                                                val typeLabel = when (fav.duration) {
+                                                    "ПАПКА", "КАТАЛОГ" -> "Подкатегория"
+                                                    "СЕРИАЛ" -> "Сериал"
+                                                    "КАНАЛ" -> "Канал"
+                                                    "ПЛЕЙЛИСТ" -> "Плейлист"
+                                                    else -> "Элемент"
+                                                }
+                                                Text("${fav.title} ($typeLabel)", color = MaterialTheme.colorScheme.onSurface) 
+                                            },
+                                            onClick = {
+                                                viewModel.setStartPageFavorite(fav.id, fav.title)
+                                                favDropdownExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1255,52 +1260,54 @@ fun SettingsTabScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         
-                        Button(
-                            onClick = { catDropdownExpanded = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                        Box(modifier = Modifier.wrapContentSize(Alignment.Center)) {
+                            Button(
+                                onClick = { catDropdownExpanded = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = startPageCategory,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = GreyText,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = startPageCategory,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = GreyText,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
-                        }
 
-                        DropdownMenu(
-                            expanded = catDropdownExpanded,
-                            onDismissRequest = { catDropdownExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface)
-                                .heightIn(max = 280.dp)
-                        ) {
-                            categoriesList.forEach { cat ->
-                                DropdownMenuItem(
-                                    text = { Text(cat, color = MaterialTheme.colorScheme.onSurface) },
-                                    onClick = {
-                                        viewModel.setStartPageCategory(cat)
-                                        catDropdownExpanded = false
-                                    }
-                                )
+                            DropdownMenu(
+                                expanded = catDropdownExpanded,
+                                onDismissRequest = { catDropdownExpanded = false },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .heightIn(max = 280.dp)
+                            ) {
+                                categoriesList.forEach { cat ->
+                                    DropdownMenuItem(
+                                        text = { Text(cat, color = MaterialTheme.colorScheme.onSurface) },
+                                        onClick = {
+                                            viewModel.setStartPageCategory(cat)
+                                            catDropdownExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
