@@ -273,13 +273,13 @@ fun SettingsTabScreen(
                     }
                     Column {
                         Text(
-                            text = "Крупные карточки в каталоге",
+                            text = "Крупные карточки",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "Использовать большой размер для видео в списках",
+                            text = "Большой размер превью",
                             fontSize = 10.sp,
                             color = GreyText
                         )
