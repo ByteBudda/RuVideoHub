@@ -906,7 +906,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             settingsObj.put("tv_grid_columns", settingsManager.tvGridColumns.value)
             settingsObj.put("mobile_grid_columns", settingsManager.mobileGridColumns.value)
             settingsObj.put("focus_style", settingsManager.focusStyle.value)
+            settingsObj.put("app_theme", settingsManager.appTheme.value)
             root.put("settings", settingsObj)
+
+            // 1b. Custom Themes
+            val customThemesArray = org.json.JSONArray()
+            for (theme in settingsManager.customThemes.value) {
+                customThemesArray.put(org.json.JSONObject(theme.toJsonString()))
+            }
+            root.put("custom_themes", customThemesArray)
 
             // 2. Bookmarks
             val bookmarksArray = org.json.JSONArray()
@@ -1009,6 +1017,26 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     settingsManager.setFocusStyle(settingsObj.getString("focus_style"))
                     importedSettingsCount++
                 }
+                if (settingsObj.has("app_theme")) {
+                    settingsManager.setAppTheme(settingsObj.getString("app_theme"))
+                    importedSettingsCount++
+                }
+            }
+
+            // 1b. Custom Themes
+            val customThemesArray = root.optJSONArray("custom_themes")
+            var importedThemesCount = 0
+            if (customThemesArray != null) {
+                for (i in 0 until customThemesArray.length()) {
+                    try {
+                        val themeObj = customThemesArray.getJSONObject(i)
+                        val theme = com.example.ui.theme.CustomTheme.fromJson(themeObj.toString())
+                        settingsManager.addCustomTheme(theme)
+                        importedThemesCount++
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
             }
 
             // 2. Bookmarks
@@ -1071,7 +1099,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            Result.success("Импортировано: настроек - $importedSettingsCount, закладок - $importedBookmarksCount, истории - $importedRecentsCount")
+            val customThemeMsg = if (importedThemesCount > 0) ", тем - $importedThemesCount" else ""
+            Result.success("Импортировано: настроек - $importedSettingsCount, закладок - $importedBookmarksCount, истории - $importedRecentsCount$customThemeMsg")
         } catch (e: Exception) {
             Result.failure(e)
         }
