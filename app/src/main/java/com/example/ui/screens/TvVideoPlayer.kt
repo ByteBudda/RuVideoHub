@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -145,6 +146,13 @@ fun TvRutubeVideoPlayer(
     }
     var controlsVisible by remember { mutableStateOf(!isMiniPlayer) }
     var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    
+    LaunchedEffect(isMiniPlayer) {
+        if (!isMiniPlayer) {
+            controlsVisible = true
+            lastInteractionTime = System.currentTimeMillis()
+        }
+    }
 
     var currentPos by remember { mutableStateOf(0L) }
     var totalDuration by remember { mutableStateOf(0L) }
@@ -417,6 +425,17 @@ fun TvRutubeVideoPlayer(
                     .fillMaxSize()
                     .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
             )
+            
+            if (isMiniPlayer) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { onToggleFullscreen() })
+                        }
+                )
+            }
+            
             AnimatedVisibility(
                 visible = controlsVisible && !isMiniPlayer,
                 enter = fadeIn(),
@@ -476,6 +495,23 @@ fun TvRutubeVideoPlayer(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
+            )
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                if (isMiniPlayer) {
+                                    onToggleFullscreen()
+                                } else {
+                                    controlsVisible = !controlsVisible
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
+                        )
+                    }
             )
             
             if (isBufferingState) {
@@ -734,6 +770,42 @@ fun TvRutubeVideoPlayer(
                                     } else {
                                         false
                                     }
+                                }
+                                .pointerInput(totalDuration) {
+                                    detectTapGestures(
+                                        onTap = { offset ->
+                                            if (totalDuration > 0) {
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                exoPlayer?.let { player ->
+                                                    val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                    val newPos = (totalDuration * fraction).toLong()
+                                                    player.seekTo(newPos)
+                                                    currentPos = newPos
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                                .pointerInput(totalDuration) {
+                                    detectDragGestures(
+                                        onDragStart = { _ ->
+                                            lastInteractionTime = System.currentTimeMillis()
+                                        },
+                                        onDrag = { change, _ ->
+                                            change.consume()
+                                            if (totalDuration > 0) {
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                val newPos = (totalDuration * fraction).toLong()
+                                                currentPos = newPos
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            exoPlayer?.let { player ->
+                                                player.seekTo(currentPos)
+                                            }
+                                        }
+                                    )
                                 }
                                 .padding(horizontal = 4.dp),
                             contentAlignment = Alignment.CenterStart
