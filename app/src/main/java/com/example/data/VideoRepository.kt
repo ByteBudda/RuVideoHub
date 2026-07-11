@@ -147,7 +147,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             }
             is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
                 val ratingStr = if (card.rating != null && card.rating > 0.05) " • Кинопоиск: ${card.rating}" else ""
-                val yearVal = card.year ?: "Передача"
+                val yearVal = card.year ?: "Сериал"
                 val viewsText = if (card.episodesCount > 0 && card.seasonsCount <= 1) "${card.episodesCount} серий" else "${card.seasonsCount} сезонов"
                 Video(
                     id = "tv_${card.id}__${card.actionUrl ?: ""}",
@@ -196,10 +196,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 Video(
                     id = "promo_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
-                    channel = "Реклама",
-                    views = "Промо",
-                    timeAgo = "Перейти по ссылке",
-                    duration = "ПРОМО",
+                    channel = "Подборка",
+                    views = "Коллекция",
+                    timeAgo = "Плейлист",
+                    duration = "Подборка",
                     isPro = true,
                     category = defaultCategoryName,
                     description = card.description ?: "Спонсорский медиаконтент.",
@@ -680,7 +680,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         return lower.contains("premier") ||
                lower.contains("start") ||
                lower.contains("viju") ||
-               lower.contains("КИОН") ||
+               lower.contains("RUTUBE x КИОН") ||
                lower.contains("тв онлайн")
     }
 }
