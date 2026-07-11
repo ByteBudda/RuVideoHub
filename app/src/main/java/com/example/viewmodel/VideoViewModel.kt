@@ -1,5 +1,7 @@
 package com.example.viewmodel
 
+import com.example.ui.theme.CustomTheme
+
 import android.app.Application
 import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
@@ -80,6 +82,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     // Proxies for backward compatibility and UI convenience
     val currentTab = navigationManager.currentTab
     val appTheme = settingsManager.appTheme
+    val appEffect = settingsManager.appEffect
     val isDarkTheme = settingsManager.isDarkTheme
     val isTvOptimized = settingsManager.isTvOptimized
     val isLargeCardsMode = settingsManager.isLargeCardsMode
@@ -111,9 +114,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val tvVideoGridColumns = settingsManager.tvVideoGridColumns
     val mobileGridColumns = settingsManager.mobileGridColumns
     val focusStyle = settingsManager.focusStyle
+
+    val customThemes = settingsManager.customThemes
     
     fun toggleTheme() = settingsManager.toggleTheme()
     fun setAppTheme(theme: String) = settingsManager.setAppTheme(theme)
+    fun setAppEffect(effect: String) = settingsManager.setAppEffect(effect)
     fun toggleTvOptimized() = settingsManager.toggleTvOptimized()
     fun toggleLargeCardsMode() = settingsManager.toggleLargeCardsMode()
     fun agreeToTerms() = settingsManager.agreeToTerms()
@@ -127,6 +133,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setTvVideoGridColumns(cols: Int) = settingsManager.setTvVideoGridColumns(cols)
     fun setMobileGridColumns(cols: Int) = settingsManager.setMobileGridColumns(cols)
     fun setFocusStyle(style: String) = settingsManager.setFocusStyle(style)
+    fun addCustomTheme(theme: CustomTheme) = settingsManager.addCustomTheme(theme)
+    fun removeCustomTheme(id: String) = settingsManager.removeCustomTheme(id)
     
     fun selectTab(tab: String) = navigationManager.selectTab(tab)
     fun setSearchQuery(query: String) {
