@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 class SettingsManager(private val application: Application) {
     private val sharedPrefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
 
+    private val _appTheme = MutableStateFlow("dark")
+    val appTheme = _appTheme.asStateFlow()
+
     private val _isDarkTheme = MutableStateFlow(true)
     val isDarkTheme = _isDarkTheme.asStateFlow()
 
@@ -47,6 +50,9 @@ class SettingsManager(private val application: Application) {
     private val _tvGridColumns = MutableStateFlow(4)
     val tvGridColumns = _tvGridColumns.asStateFlow()
 
+    private val _tvVideoGridColumns = MutableStateFlow(4)
+    val tvVideoGridColumns = _tvVideoGridColumns.asStateFlow()
+
     private val _mobileGridColumns = MutableStateFlow(2)
     val mobileGridColumns = _mobileGridColumns.asStateFlow()
 
@@ -54,7 +60,16 @@ class SettingsManager(private val application: Application) {
     val focusStyle = _focusStyle.asStateFlow()
 
     init {
-        _isDarkTheme.value = sharedPrefs.getBoolean("is_dark_theme", true)
+        val savedTheme = sharedPrefs.getString("app_theme", null)
+        if (savedTheme != null) {
+            _appTheme.value = savedTheme
+            _isDarkTheme.value = (savedTheme == "dark" || savedTheme == "slate")
+        } else {
+            val legacyIsDark = sharedPrefs.getBoolean("is_dark_theme", true)
+            _appTheme.value = if (legacyIsDark) "dark" else "light"
+            _isDarkTheme.value = legacyIsDark
+        }
+        
         _isTermsAgreed.value = sharedPrefs.getBoolean("terms_agreed", false)
 
         val uiModeManager = application.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
@@ -72,14 +87,25 @@ class SettingsManager(private val application: Application) {
         _startPageFavoriteTitle.value = sharedPrefs.getString("start_page_favorite_title", "") ?: ""
 
         _tvGridColumns.value = sharedPrefs.getInt("tv_grid_columns", 4)
+        _tvVideoGridColumns.value = sharedPrefs.getInt("tv_video_grid_columns", 4)
         _mobileGridColumns.value = sharedPrefs.getInt("mobile_grid_columns", 2)
         _focusStyle.value = sharedPrefs.getString("focus_style", "glow") ?: "glow"
     }
 
     fun toggleTheme() {
-        val newValue = !_isDarkTheme.value
-        _isDarkTheme.value = newValue
-        sharedPrefs.edit().putBoolean("is_dark_theme", newValue).apply()
+        // Toggle is now handled by setAppTheme, but we keep this for compatibility if needed.
+        val nextTheme = if (_isDarkTheme.value) "light" else "dark"
+        setAppTheme(nextTheme)
+    }
+
+    fun setAppTheme(theme: String) {
+        _appTheme.value = theme
+        val isDark = (theme == "dark" || theme == "slate")
+        _isDarkTheme.value = isDark
+        sharedPrefs.edit()
+            .putString("app_theme", theme)
+            .putBoolean("is_dark_theme", isDark)
+            .apply()
     }
 
     fun toggleTvOptimized() {
@@ -136,6 +162,11 @@ class SettingsManager(private val application: Application) {
     fun setTvGridColumns(cols: Int) {
         _tvGridColumns.value = cols
         sharedPrefs.edit().putInt("tv_grid_columns", cols).apply()
+    }
+
+    fun setTvVideoGridColumns(cols: Int) {
+        _tvVideoGridColumns.value = cols
+        sharedPrefs.edit().putInt("tv_video_grid_columns", cols).apply()
     }
 
     fun setMobileGridColumns(cols: Int) {
