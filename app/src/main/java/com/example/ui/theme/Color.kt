@@ -4,6 +4,38 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+// Cyberpunk Colors
+val CyberpunkPrimary = Color(0xFF00FFCC)
+val CyberpunkOnPrimary = Color(0xFF000000)
+val CyberpunkPrimaryContainer = Color(0xFF004433)
+val CyberpunkOnPrimaryContainer = Color(0xFF00FFCC)
+val CyberpunkBackground = Color(0xFF0D0A18)
+val CyberpunkOnBackground = Color(0xFFE2E2E2)
+val CyberpunkSurface = Color(0xFF140D24)
+val CyberpunkOnSurface = Color(0xFFE2E2E2)
+val CyberpunkSurfaceVariant = Color(0xFF2A1B44)
+val CyberpunkOnSurfaceVariant = Color(0xFFB0A2C9)
+val CyberpunkOutline = Color(0xFFFF0055)
+val CyberpunkSecondaryBackground = Color(0xFF1B1130)
+val CyberpunkProBadgeBg = Color(0xFFFF0055)
+val CyberpunkProBadgeText = Color(0xFFFFFFFF)
+
+// AMOLED Colors
+val AmoledPrimary = Color(0xFF82B1FF)
+val AmoledOnPrimary = Color(0xFF000000)
+val AmoledPrimaryContainer = Color(0xFF002244)
+val AmoledOnPrimaryContainer = Color(0xFF82B1FF)
+val AmoledBackground = Color(0xFF000000)
+val AmoledOnBackground = Color(0xFFE0E0E0)
+val AmoledSurface = Color(0xFF000000)
+val AmoledOnSurface = Color(0xFFE0E0E0)
+val AmoledSurfaceVariant = Color(0xFF111111)
+val AmoledOnSurfaceVariant = Color(0xFFAAAAAA)
+val AmoledOutline = Color(0xFF333333)
+val AmoledSecondaryBackground = Color(0xFF0A0A0A)
+val AmoledProBadgeBg = Color(0xFF333333)
+val AmoledProBadgeText = Color(0xFFFFFFFF)
+
 // Light Colors
 val LightPrimary = Color(0xFF6750A4)
 val LightOnPrimary = Color(0xFFFFFFFF)
