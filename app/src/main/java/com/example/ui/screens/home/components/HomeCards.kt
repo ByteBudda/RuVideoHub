@@ -288,37 +288,7 @@ fun SleekVideoGridItem(
                         )
                     }
 
-                    if (video.views.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color.Black.copy(alpha = 0.7f))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "${video.views} • ${video.timeAgo.ifBlank { "HD" }}",
-                                color = Color.White,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Medium,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(3.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFCAC4D0))
-                        )
 
-                        Text(
-                            text = video.timeAgo.ifBlank { "HD" },
-                            color = GreyText,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                 }
             }
         }
@@ -488,37 +458,7 @@ fun SecondaryVideoItemRow(
                     )
                 }
 
-                if (video.views.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.Black.copy(alpha = 0.7f))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "${video.views} • ${video.timeAgo.ifBlank { "HD" }}",
-                            color = Color.White,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(3.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFCAC4D0))
-                        )
-                        Text(
-                            text = "HD",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GreyText
-                        )
-                    }
-                }
+
             }
         }
     }

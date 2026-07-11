@@ -174,24 +174,6 @@ fun VideoThumbnail(
             }
         }
         
-        // Views and Time Ago capsule
-        if (viewsAndTimeAgo != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = viewsAndTimeAgo,
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp
-                )
-            }
-        }
+        // Views and Time Ago capsule removed
     }
 }
