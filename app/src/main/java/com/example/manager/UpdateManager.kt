@@ -113,6 +113,7 @@ object UpdateManager {
             }
             
             val downloadId = downloadManager.enqueue(request)
+            downloadState.value = DownloadState.Downloading(-1f)
             
             CoroutineScope(Dispatchers.IO).launch {
                 var isDownloading = true
@@ -143,6 +144,8 @@ object UpdateManager {
                                 if (bytesTotal > 0) {
                                     val progress = bytesDownloaded.toFloat() / bytesTotal.toFloat()
                                     downloadState.value = DownloadState.Downloading(progress)
+                                } else {
+                                    downloadState.value = DownloadState.Downloading(-1f)
                                 }
                             }
                         }
