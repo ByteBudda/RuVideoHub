@@ -29,6 +29,7 @@ import com.example.ui.theme.SecondaryBackground
 import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
+import com.example.ui.screens.home.components.VideoThumbnail
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale

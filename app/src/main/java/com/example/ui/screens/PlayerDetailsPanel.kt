@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.Video
 import com.example.utils.VideoType
 import com.example.viewmodel.VideoViewModel
+import com.example.ui.screens.home.components.VideoThumbnail
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.ui.theme.PrimaryContainer

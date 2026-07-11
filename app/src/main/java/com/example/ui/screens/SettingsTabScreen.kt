@@ -24,6 +24,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
 import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SettingsTabScreen(
@@ -31,6 +34,7 @@ fun SettingsTabScreen(
     modifier: Modifier = Modifier
 ) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+    val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
     val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
     val playerQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
@@ -41,6 +45,7 @@ fun SettingsTabScreen(
     val bookmarkedVideos by viewModel.bookmarkedSavedVideos.collectAsStateWithLifecycle()
 
     val tvGridColumns by viewModel.tvGridColumns.collectAsStateWithLifecycle()
+    val tvVideoGridColumns by viewModel.tvVideoGridColumns.collectAsStateWithLifecycle()
     val mobileGridColumns by viewModel.mobileGridColumns.collectAsStateWithLifecycle()
     val focusStyle by viewModel.focusStyle.collectAsStateWithLifecycle()
 
@@ -83,11 +88,19 @@ fun SettingsTabScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Dark Theme Toggle row
+            // App Theme row
+            var themeDropdownExpanded by remember { mutableStateOf(false) }
+            val themeLabel = when (appTheme) {
+                "dark" -> "Тёмная"
+                "light" -> "Светлая"
+                "slate" -> "Тёмная нейтральная"
+                "sepia" -> "Светлая нейтральная"
+                else -> "Тёмная"
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { viewModel.toggleTheme() }
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -104,7 +117,7 @@ fun SettingsTabScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                            imageVector = Icons.Default.Palette,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
@@ -112,23 +125,58 @@ fun SettingsTabScreen(
                     }
                     Column {
                         Text(
-                            text = "Темная тема",
+                            text = "Цветовая тема",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "Использовать темное оформление интерфейса",
+                            text = "Выберите оформление интерфейса",
                             fontSize = 10.sp,
                             color = GreyText
                         )
                     }
                 }
-                Switch(
-                    checked = isDarkTheme,
-                    onCheckedChange = { viewModel.toggleTheme() },
-                    modifier = Modifier.testTag("setting_theme_switch")
-                )
+
+                Box {
+                    Button(
+                        onClick = { themeDropdownExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .sleekTvFocus(RoundedCornerShape(8.dp))
+                    ) {
+                        Text(text = themeLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+
+                    DropdownMenu(
+                        expanded = themeDropdownExpanded,
+                        onDismissRequest = { themeDropdownExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        listOf(
+                            "dark" to "Тёмная",
+                            "light" to "Светлая",
+                            "slate" to "Тёмная нейтральная",
+                            "sepia" to "Светлая нейтральная"
+                        ).forEach { (id, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setAppTheme(id)
+                                    themeDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
@@ -284,11 +332,12 @@ fun SettingsTabScreen(
                     }
                 }
 
-                var tvColsDropdownExpanded by remember { mutableStateOf(false) }
-
+                var tvGridDropdownExpanded by remember { mutableStateOf(false) }
+                val tvColsOptions = listOf(3, 4, 5, 6)
+                
                 Box {
                     Button(
-                        onClick = { tvColsDropdownExpanded = true },
+                        onClick = { tvGridDropdownExpanded = true },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -297,24 +346,104 @@ fun SettingsTabScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .height(36.dp)
-                            .sleekTvFocus(RoundedCornerShape(8.dp))
+                            .sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.1f)
                     ) {
                         Text(text = "$tvGridColumns", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
-
+                    
                     DropdownMenu(
-                        expanded = tvColsDropdownExpanded,
-                        onDismissRequest = { tvColsDropdownExpanded = false },
+                        expanded = tvGridDropdownExpanded,
+                        onDismissRequest = { tvGridDropdownExpanded = false },
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
-                        listOf(3, 4, 5, 6).forEach { cols ->
+                        tvColsOptions.forEach { cols ->
                             DropdownMenuItem(
                                 text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     viewModel.setTvGridColumns(cols)
-                                    tvColsDropdownExpanded = false
+                                    tvGridDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+            // TV Video Grid columns
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OndemandVideo,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Колонок в видео сетке (ТВ)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Количество столбцов для списка видео на ТВ",
+                            fontSize = 10.sp,
+                            color = GreyText
+                        )
+                    }
+                }
+
+                var tvVideoGridDropdownExpanded by remember { mutableStateOf(false) }
+                val tvVideoColsOptions = listOf(3, 4, 5, 6, 7, 8)
+                
+                Box {
+                    Button(
+                        onClick = { tvVideoGridDropdownExpanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.1f)
+                    ) {
+                        Text(text = "$tvVideoGridColumns", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                    
+                    DropdownMenu(
+                        expanded = tvVideoGridDropdownExpanded,
+                        onDismissRequest = { tvVideoGridDropdownExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        tvVideoColsOptions.forEach { cols ->
+                            DropdownMenuItem(
+                                text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    viewModel.setTvVideoGridColumns(cols)
+                                    tvVideoGridDropdownExpanded = false
                                 }
                             )
                         }
@@ -363,11 +492,12 @@ fun SettingsTabScreen(
                     }
                 }
 
-                var mobileColsDropdownExpanded by remember { mutableStateOf(false) }
-
+                var mobileGridDropdownExpanded by remember { mutableStateOf(false) }
+                val mobileColsOptions = listOf(1, 2, 3)
+                
                 Box {
                     Button(
-                        onClick = { mobileColsDropdownExpanded = true },
+                        onClick = { mobileGridDropdownExpanded = true },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -376,24 +506,24 @@ fun SettingsTabScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .height(36.dp)
-                            .sleekTvFocus(RoundedCornerShape(8.dp))
+                            .sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.1f)
                     ) {
                         Text(text = "$mobileGridColumns", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
-
+                    
                     DropdownMenu(
-                        expanded = mobileColsDropdownExpanded,
-                        onDismissRequest = { mobileColsDropdownExpanded = false },
+                        expanded = mobileGridDropdownExpanded,
+                        onDismissRequest = { mobileGridDropdownExpanded = false },
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
-                        listOf(1, 2, 3).forEach { cols ->
+                        mobileColsOptions.forEach { cols ->
                             DropdownMenuItem(
                                 text = { Text("$cols", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     viewModel.setMobileGridColumns(cols)
-                                    mobileColsDropdownExpanded = false
+                                    mobileGridDropdownExpanded = false
                                 }
                             )
                         }
@@ -1228,13 +1358,56 @@ fun FullBackupRestoreDialog(
     isTvOptimized: Boolean,
     onDismiss: () -> Unit
 ) {
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var importText by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
     
     val bookmarkedVideos by viewModel.bookmarkedSavedVideos.collectAsStateWithLifecycle()
     val recentVideos by viewModel.recentSavedVideos.collectAsStateWithLifecycle()
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val json = viewModel.exportBackupToJson()
+                    context.contentResolver.openOutputStream(it)?.use { stream ->
+                        stream.write(json.toByteArray(Charsets.UTF_8))
+                    }
+                    statusMessage = "Резервная копия успешно сохранена на диск!"
+                } catch (e: Exception) {
+                    statusMessage = "Ошибка сохранения: ${e.localizedMessage}"
+                }
+            }
+        }
+    }
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(it)
+                    val jsonText = inputStream?.bufferedReader()?.use { reader -> reader.readText() } ?: ""
+                    if (jsonText.isBlank()) {
+                        statusMessage = "Выбранный файл пуст или не удалось его прочесть."
+                    } else {
+                        viewModel.importBackupFromJson(jsonText)
+                            .onSuccess { msg ->
+                                statusMessage = "Успешное восстановление: $msg"
+                            }
+                            .onFailure { err ->
+                                statusMessage = "Ошибка восстановления: ${err.localizedMessage}"
+                            }
+                    }
+                } catch (e: Exception) {
+                    statusMessage = "Ошибка чтения файла: ${e.localizedMessage}"
+                }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1265,7 +1438,7 @@ fun FullBackupRestoreDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Резервная копия позволяет сохранить ваши настройки, историю просмотров и закладки в один JSON текст. Вы можете сохранить его или перенести на другое устройство.",
+                    text = "Резервная копия сохраняет ваши настройки, историю просмотров и закладки в файл .json на диске. Вы можете импортировать этот файл на любом устройстве.",
                     fontSize = 12.sp,
                     color = GreyText
                 )
@@ -1312,9 +1485,11 @@ fun FullBackupRestoreDialog(
 
                     Button(
                         onClick = {
-                            val json = viewModel.exportBackupToJson()
-                            clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(json))
-                            statusMessage = "Резервная копия скопирована в буфер обмена! Сохраните этот текст в надежном месте."
+                            try {
+                                createDocumentLauncher.launch("sleek_video_hub_backup.json")
+                            } catch (e: Exception) {
+                                statusMessage = "Не удалось запустить выбор сохранения: ${e.localizedMessage}"
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(8.dp),
@@ -1322,9 +1497,9 @@ fun FullBackupRestoreDialog(
                             .fillMaxWidth()
                             .sleekTvFocus(RoundedCornerShape(8.dp))
                     ) {
-                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Копировать резервную копию", fontSize = 12.sp)
+                        Text("Экспортировать в файл .json", fontSize = 12.sp)
                     }
                 }
 
@@ -1343,80 +1518,30 @@ fun FullBackupRestoreDialog(
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    TextField(
-                        value = importText,
-                        onValueChange = { importText = it },
-                        placeholder = { Text("Вставьте JSON резервной копии сюда...", fontSize = 11.sp, color = GreyText) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                            .testTag("backup_import_input"),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            fontSize = 11.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
+                    Text(
+                        text = "Выберите ранее экспортированный файл резервной копии .json для восстановления всех данных.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 16.sp
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Button(
+                        onClick = {
+                            try {
+                                openDocumentLauncher.launch(arrayOf("application/json", "application/octet-stream", "*/*"))
+                            } catch (e: Exception) {
+                                statusMessage = "Не удалось открыть выбор файла: ${e.localizedMessage}"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .sleekTvFocus(RoundedCornerShape(8.dp))
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                val clipText = clipboardManager.getText()?.text ?: ""
-                                if (clipText.isNotBlank()) {
-                                    importText = clipText
-                                    statusMessage = "Текст из буфера вставлен!"
-                                } else {
-                                    statusMessage = "Буфер обмена пуст"
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .weight(1.0f)
-                                .sleekTvFocus(RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Вставить", fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                if (importText.isBlank()) {
-                                    statusMessage = "Сначала вставьте JSON"
-                                    return@Button
-                                }
-                                scope.launch {
-                                    viewModel.importBackupFromJson(importText)
-                                        .onSuccess { msg ->
-                                            statusMessage = msg
-                                            importText = ""
-                                        }
-                                        .onFailure { err ->
-                                            statusMessage = "Ошибка импорта: ${err.localizedMessage}"
-                                        }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .sleekTvFocus(RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(imageVector = Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Восстановить", fontSize = 12.sp)
-                        }
+                        Icon(imageVector = Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Импортировать из файла .json", fontSize = 12.sp)
                     }
                 }
             }

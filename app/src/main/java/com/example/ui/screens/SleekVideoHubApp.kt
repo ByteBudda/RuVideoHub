@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 val LocalFocusStyle = androidx.compose.runtime.compositionLocalOf { "glow" }
 val LocalTvGridColumns = androidx.compose.runtime.compositionLocalOf { 4 }
+val LocalTvVideoGridColumns = androidx.compose.runtime.compositionLocalOf { 4 }
 val LocalMobileGridColumns = androidx.compose.runtime.compositionLocalOf { 2 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -50,6 +53,7 @@ val LocalMobileGridColumns = androidx.compose.runtime.compositionLocalOf { 2 }
 fun Modifier.sleekTvFocus(
     shape: Shape = RoundedCornerShape(12.dp),
     focusColor: Color = MaterialTheme.colorScheme.primary,
+    scaleAmount: Float = 1.06f,
     onEnter: (() -> Unit)? = null,
     onLongEnter: (() -> Unit)? = null
 ): Modifier = this.composed {
@@ -62,7 +66,7 @@ fun Modifier.sleekTvFocus(
     val focusStyle = LocalFocusStyle.current
     val scale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isFocused) {
-            if (focusStyle == "scale" || focusStyle == "scale_glow") 1.06f else 1.00f
+            if (focusStyle == "scale" || focusStyle == "scale_glow") scaleAmount else 1.00f
         } else {
             1.0f
         },
@@ -143,11 +147,13 @@ fun SleekVideoHubApp(
 ) {
     val focusStyle by viewModel.focusStyle.collectAsStateWithLifecycle()
     val tvGridColumns by viewModel.tvGridColumns.collectAsStateWithLifecycle()
+    val tvVideoGridColumns by viewModel.tvVideoGridColumns.collectAsStateWithLifecycle()
     val mobileGridColumns by viewModel.mobileGridColumns.collectAsStateWithLifecycle()
 
     CompositionLocalProvider(
         LocalFocusStyle provides focusStyle,
         LocalTvGridColumns provides tvGridColumns,
+        LocalTvVideoGridColumns provides tvVideoGridColumns,
         LocalMobileGridColumns provides mobileGridColumns
     ) {
         val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
@@ -340,17 +346,10 @@ fun SleekBottomNavigation(
             .height(68.dp)
             .background(
                 brush = Brush.verticalGradient(
-                    colors = if (isDark) {
-                        listOf(
-                            Color(0xCC221F2E),
-                            Color(0xD9161421)
-                        )
-                    } else {
-                        listOf(
-                            Color(0xF2FFFFFF),
-                            Color(0xE6EAE6F3)
-                        )
-                    }
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                    )
                 ),
                 shape = RoundedCornerShape(24.dp)
             )
@@ -420,19 +419,21 @@ fun RowScope.BottomTabItem(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Top,
         modifier = modifier
             .weight(1f)
-            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = onClick)
+            .fillMaxHeight()
+            .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.18f, onEnter = onClick)
             .clickable(onClick = onClick)
-            .padding(vertical = 2.dp)
+            .padding(top = 10.dp, bottom = 2.dp)
             .testTag(testTag)
     ) {
         Box(
             modifier = Modifier
+                .height(30.dp)
                 .clip(RoundedCornerShape(100.dp))
                 .background(if (isActive) PrimaryContainer else Color.Transparent)
-                .padding(horizontal = 14.dp, vertical = 3.dp),
+                .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -447,7 +448,11 @@ fun RowScope.BottomTabItem(
             text = label,
             fontSize = 10.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-            color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText
+            color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText,
+            maxLines = 1,
+            overflow = TextOverflow.Visible,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -509,8 +514,8 @@ fun SleekTvNavigationRail(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier
+                        .sleekTvFocus(shape = RoundedCornerShape(10.dp), scaleAmount = 1.18f, onEnter = { onTabSelected(tabId) })
                         .fillMaxWidth()
-                        .sleekTvFocus(shape = RoundedCornerShape(10.dp), onEnter = { onTabSelected(tabId) })
                         .clickable { onTabSelected(tabId) }
                         .padding(vertical = 4.dp)
                 ) {
@@ -547,8 +552,8 @@ fun SleekTvNavigationRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
+                .sleekTvFocus(shape = RoundedCornerShape(10.dp), scaleAmount = 1.18f, onEnter = { context.findActivity()?.finishAndRemoveTask() })
                 .fillMaxWidth()
-                .sleekTvFocus(shape = RoundedCornerShape(10.dp), onEnter = { context.findActivity()?.finishAndRemoveTask() })
                 .clickable { context.findActivity()?.finishAndRemoveTask() }
                 .padding(vertical = 4.dp)
         ) {

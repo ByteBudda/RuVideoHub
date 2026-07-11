@@ -31,6 +31,8 @@ import com.example.ui.theme.Primary
 import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.PrimaryContainer
 import com.example.viewmodel.VideoViewModel
+import com.example.ui.screens.home.components.VideoThumbnail
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -417,11 +419,43 @@ fun TvMiniPlayerScreen(
                         }
                         
                         // Metadata Box
+                        val metadataScrollState = rememberScrollState()
+                        val metadataScope = rememberCoroutineScope()
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .verticalScroll(rememberScrollState())
+                                .sleekTvFocus(RoundedCornerShape(16.dp))
+                                .onKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown) {
+                                        when (event.key) {
+                                            Key.DirectionDown -> {
+                                                if (metadataScrollState.value < metadataScrollState.maxValue) {
+                                                    metadataScope.launch {
+                                                        metadataScrollState.animateScrollTo((metadataScrollState.value + 120).coerceAtMost(metadataScrollState.maxValue))
+                                                    }
+                                                    true
+                                                } else {
+                                                    false
+                                                }
+                                            }
+                                            Key.DirectionUp -> {
+                                                if (metadataScrollState.value > 0) {
+                                                    metadataScope.launch {
+                                                        metadataScrollState.animateScrollTo((metadataScrollState.value - 120).coerceAtLeast(0))
+                                                    }
+                                                    true
+                                                } else {
+                                                    false
+                                                }
+                                            }
+                                            else -> false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                }
+                                .verticalScroll(metadataScrollState)
                                 .background(Color(0xFF14131F), RoundedCornerShape(16.dp))
                                 .padding(16.dp)
                         ) {

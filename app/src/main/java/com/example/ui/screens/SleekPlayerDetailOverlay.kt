@@ -33,6 +33,7 @@ import com.example.data.Video
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.viewmodel.VideoViewModel
+import com.example.ui.screens.home.components.VideoThumbnail
 import com.example.ui.theme.liquidGlass
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.gestures.detectDragGestures

@@ -88,12 +88,12 @@ fun ExploreTabScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(115.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(getCategoryGradient(item.title))
-                                    .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = {
+                                    .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.18f, onEnter = {
                                         viewModel.selectCategory(item.title, item.target)
                                         viewModel.selectTab("home")
                                     })
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(getCategoryGradient(item.title))
                                     .border(
                                         width = 1.dp,
                                         brush = Brush.linearGradient(
