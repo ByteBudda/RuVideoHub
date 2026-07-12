@@ -124,100 +124,90 @@ fun RecentsTabScreen(
                 }
             }
         } else {
+            val isHistoryLargeCardsMode by viewModel.isHistoryLargeCardsMode.collectAsStateWithLifecycle()
+            val tvVideoColsSetting = com.example.ui.screens.LocalTvVideoGridColumns.current
+            val mobileColsSetting = com.example.ui.screens.LocalMobileGridColumns.current
+            val cols = if (isTvOptimized) tvVideoColsSetting else mobileColsSetting
+
+            val recentVideosRuntime = recentVideos.map { saved ->
+                Video(
+                    id = saved.id,
+                    title = saved.title,
+                    channel = saved.channel,
+                    views = saved.views,
+                    timeAgo = saved.timeAgo,
+                    duration = saved.duration,
+                    isPro = saved.isPro,
+                    category = saved.category,
+                    description = "Просмотрено недавно.",
+                    thumbnailUrl = saved.thumbnailUrl,
+                    isDownloaded = saved.isDownloaded,
+                    isBookmarked = saved.isBookmarked
+                )
+            }
+
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(top = 2.dp, bottom = 80.dp)
             ) {
-                items(recentVideos, key = { it.id }) { saved ->
-                    val videoRuntime = Video(
-                        id = saved.id,
-                        title = saved.title,
-                        channel = saved.channel,
-                        views = saved.views,
-                        timeAgo = saved.timeAgo,
-                        duration = saved.duration,
-                        isPro = saved.isPro,
-                        category = saved.category,
-                        description = "Просмотрено недавно.",
-                        thumbnailUrl = saved.thumbnailUrl,
-                        isDownloaded = saved.isDownloaded,
-                        isBookmarked = saved.isBookmarked
-                    )
-
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .sleekTvFocus(
-                                shape = RoundedCornerShape(16.dp), 
-                                onEnter = { viewModel.selectVideo(videoRuntime) },
-                                onLongEnter = { 
-                                    viewModel.deleteRecentItem(videoRuntime)
-                                    android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                            .then(
-                                if (isTvOptimized) Modifier
-                                else Modifier.combinedClickable(
+                if (isTvOptimized) {
+                    val chunked = recentVideosRuntime.chunked(cols)
+                    items(chunked, key = { it.hashCode() }) { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowItems.forEach { videoRuntime ->
+                                com.example.ui.screens.home.components.SleekVideoGridItem(
+                                    video = videoRuntime,
+                                    onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                    onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                    isDark = isDarkTheme,
+                                    isTvOptimized = isTvOptimized,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            repeat(cols - rowItems.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                } else {
+                    if (isHistoryLargeCardsMode) {
+                        items(recentVideosRuntime, key = { it.id }) { videoRuntime ->
+                            com.example.ui.screens.home.components.HeroVideoCard(
+                                video = videoRuntime,
+                                onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).combinedClickable(
                                     onClick = { viewModel.selectVideo(videoRuntime) },
-                                    onLongClick = { 
+                                    onLongClick = {
                                         viewModel.deleteRecentItem(videoRuntime)
                                         android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 )
                             )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            VideoThumbnail(
-                                id = saved.id,
-                                duration = saved.duration,
-                                thumbnailUrl = saved.thumbnailUrl,
-                                modifier = Modifier
-                                    .width(100.dp)
-                                    .height(60.dp)
-                            )
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = saved.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = saved.channel,
-                                    fontSize = 10.sp,
-                                    color = GreyText
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { 
+                        }
+                    } else {
+                        items(recentVideosRuntime, key = { it.id }) { videoRuntime ->
+                            com.example.ui.screens.home.components.SecondaryVideoItemRow(
+                                video = videoRuntime,
+                                onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                onDeleteClick = {
                                     viewModel.deleteRecentItem(videoRuntime)
                                     android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
                                 },
-                                modifier = Modifier.size(32.dp)
-                                    .sleekTvFocus(CircleShape)
-                                    .testTag("delete_recent_${saved.id}")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Удалить из истории",
-                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                            )
                         }
                     }
                 }
@@ -292,6 +282,28 @@ fun DownloadsTabScreen(
                 }
             }
         } else {
+            val isDownloadsLargeCardsMode by viewModel.isDownloadsLargeCardsMode.collectAsStateWithLifecycle()
+            val tvVideoColsSetting = com.example.ui.screens.LocalTvVideoGridColumns.current
+            val mobileColsSetting = com.example.ui.screens.LocalMobileGridColumns.current
+            val cols = if (isTvOptimized) tvVideoColsSetting else mobileColsSetting
+
+            val downloadedVideosRuntime = downloadedVideos.map { saved ->
+                Video(
+                    id = saved.id,
+                    title = saved.title,
+                    channel = saved.channel,
+                    views = saved.views,
+                    timeAgo = saved.timeAgo,
+                    duration = saved.duration,
+                    isPro = saved.isPro,
+                    category = saved.category,
+                    description = "Скачанное видео.",
+                    thumbnailUrl = saved.thumbnailUrl,
+                    isDownloaded = true,
+                    isBookmarked = saved.isBookmarked
+                )
+            }
+
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -396,88 +408,54 @@ fun DownloadsTabScreen(
                     }
                 }
 
-                items(downloadedVideos, key = { it.id }) { saved ->
-                    val videoRuntime = Video(
-                        id = saved.id,
-                        title = saved.title,
-                        channel = saved.channel,
-                        views = saved.views,
-                        timeAgo = saved.timeAgo,
-                        duration = saved.duration,
-                        isPro = saved.isPro,
-                        category = saved.category,
-                        description = "Скачанное видео.",
-                        thumbnailUrl = saved.thumbnailUrl,
-                        isDownloaded = true,
-                        isBookmarked = saved.isBookmarked
-                    )
-
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .sleekTvFocus(
-                                shape = RoundedCornerShape(16.dp), 
-                                onEnter = { viewModel.selectVideo(videoRuntime) },
-                                onLongEnter = { viewModel.toggleDownload(videoRuntime) }
-                            )
-                            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                            .then(
-                                if (isTvOptimized) Modifier
-                                else Modifier.combinedClickable(
-                                    onClick = { viewModel.selectVideo(videoRuntime) },
-                                    onLongClick = { viewModel.toggleDownload(videoRuntime) }
-                                )
-                            )
-                    ) {
+                if (isTvOptimized) {
+                    val chunked = downloadedVideosRuntime.chunked(cols)
+                    items(chunked, key = { "downloads_" + it.hashCode() }) { rowItems ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            VideoThumbnail(
-                                id = saved.id,
-                                duration = saved.duration,
-                                thumbnailUrl = saved.thumbnailUrl,
-                                modifier = Modifier
-                                    .width(100.dp)
-                                    .height(60.dp)
+                            rowItems.forEach { videoRuntime ->
+                                com.example.ui.screens.home.components.SleekVideoGridItem(
+                                    video = videoRuntime,
+                                    onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                    onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                    isDark = isDarkTheme,
+                                    isTvOptimized = isTvOptimized,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            repeat(cols - rowItems.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                } else {
+                    if (isDownloadsLargeCardsMode) {
+                        items(downloadedVideosRuntime, key = { "large_" + it.id }) { videoRuntime ->
+                            com.example.ui.screens.home.components.HeroVideoCard(
+                                video = videoRuntime,
+                                onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
                             )
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = saved.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = saved.channel,
-                                    fontSize = 10.sp,
-                                    color = GreyText
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { 
-                                    viewModel.toggleDownload(videoRuntime)
-                                },
-                                modifier = Modifier.size(32.dp)
-                                    .sleekTvFocus(CircleShape)
-                                    .testTag("delete_download_${saved.id}")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Удалить загрузку",
-                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                        }
+                    } else {
+                        items(downloadedVideosRuntime, key = { "list_" + it.id }) { videoRuntime ->
+                            com.example.ui.screens.home.components.SecondaryVideoItemRow(
+                                video = videoRuntime,
+                                onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                onDeleteClick = null,
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                            )
                         }
                     }
                 }
