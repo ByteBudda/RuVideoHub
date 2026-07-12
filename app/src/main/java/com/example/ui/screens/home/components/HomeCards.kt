@@ -41,20 +41,23 @@ fun HeroVideoCard(
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val customTheme = com.example.ui.theme.LocalCustomTheme.current
+    val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
+    val cardShape = RoundedCornerShape(cardCornerRadius.dp)
 
     Card(
-        shape = RoundedCornerShape(28.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 560.dp)
             .padding(horizontal = 4.dp, vertical = 4.dp)
             .sleekTvFocus(
-                shape = RoundedCornerShape(28.dp),
+                shape = cardShape,
                 onEnter = onVideoClick,
                 onLongEnter = { showMenu = true }
             )
-            .liquidGlass(RoundedCornerShape(28.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
+            .liquidGlass(cardShape, borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .combinedClickable(
                 onClick = onVideoClick,
                 onLongClick = { showMenu = true }
@@ -67,6 +70,12 @@ fun HeroVideoCard(
                 duration = video.duration,
                 thumbnailUrl = video.thumbnailUrl,
                 viewsAndTimeAgo = if (video.views.isNotBlank() || video.timeAgo.isNotBlank()) "${video.views} • ${video.timeAgo}".trim(' ', '•') else null,
+                shape = RoundedCornerShape(
+                    topStart = cardCornerRadius.dp,
+                    topEnd = cardCornerRadius.dp,
+                    bottomStart = 0.dp,
+                    bottomEnd = 0.dp
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
@@ -205,19 +214,22 @@ fun SleekVideoGridItem(
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val customTheme = com.example.ui.theme.LocalCustomTheme.current
+    val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
+    val cardShape = RoundedCornerShape(cardCornerRadius.dp)
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 4.dp)
             .sleekTvFocus(
-                shape = RoundedCornerShape(16.dp),
+                shape = cardShape,
                 onEnter = onVideoClick,
                 onLongEnter = { showMenu = true }
             )
-            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
+            .liquidGlass(cardShape, borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .combinedClickable(
                 onClick = onVideoClick,
                 onLongClick = { showMenu = true }
@@ -229,6 +241,12 @@ fun SleekVideoGridItem(
                 id = video.id,
                 duration = video.duration,
                 thumbnailUrl = video.thumbnailUrl,
+                shape = RoundedCornerShape(
+                    topStart = cardCornerRadius.dp,
+                    topEnd = cardCornerRadius.dp,
+                    bottomStart = 0.dp,
+                    bottomEnd = 0.dp
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
@@ -357,13 +375,17 @@ fun SecondaryVideoItemRow(
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val customTheme = com.example.ui.theme.LocalCustomTheme.current
+    val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
+    val cardShape = RoundedCornerShape(cardCornerRadius.dp)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .sleekTvFocus(shape = RoundedCornerShape(16.dp), onEnter = onVideoClick)
+            .sleekTvFocus(shape = cardShape, onEnter = onVideoClick)
             .clickable(onClick = onVideoClick)
-            .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
+            .liquidGlass(cardShape, borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically

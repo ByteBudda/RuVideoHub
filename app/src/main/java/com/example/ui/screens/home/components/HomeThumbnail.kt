@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,8 +34,13 @@ fun VideoThumbnail(
     hasPlayOverlay: Boolean = false,
     isPlaying: Boolean = false,
     onPlayClick: (() -> Unit)? = null,
-    viewsAndTimeAgo: String? = null
+    viewsAndTimeAgo: String? = null,
+    shape: Shape? = null
 ) {
+    val customTheme = com.example.ui.theme.LocalCustomTheme.current
+    val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
+    val finalShape = shape ?: RoundedCornerShape(cardCornerRadius.dp)
+
     val isFolder = duration == com.example.utils.VideoType.FOLDER
     val gradientColors = when {
         isFolder -> listOf(Color(0xFFFFB300), Color(0xFFE65100))
@@ -49,7 +55,7 @@ fun VideoThumbnail(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(finalShape)
             .background(Brush.linearGradient(colors = gradientColors))
     ) {
         if (isFolder) {
