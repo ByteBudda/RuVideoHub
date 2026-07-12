@@ -345,7 +345,7 @@ fun SleekBottomNavigation(
         modifier = modifier
             .widthIn(max = 480.dp)
             .fillMaxWidth(0.92f)
-            .height(68.dp)
+            .height(60.dp)
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
@@ -421,18 +421,17 @@ fun RowScope.BottomTabItem(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top,
+        verticalArrangement = Arrangement.Center,
         modifier = modifier
             .weight(1f)
             .fillMaxHeight()
             .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.18f, onEnter = onClick)
             .clickable(onClick = onClick)
-            .padding(top = 10.dp, bottom = 2.dp)
             .testTag(testTag)
     ) {
         Box(
             modifier = Modifier
-                .height(30.dp)
+                .height(36.dp)
                 .clip(RoundedCornerShape(100.dp))
                 .background(if (isActive) PrimaryContainer else Color.Transparent)
                 .padding(horizontal = 14.dp),
@@ -442,20 +441,9 @@ fun RowScope.BottomTabItem(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else GreyText,
-                modifier = Modifier.size(19.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
-        Spacer(modifier = Modifier.height(1.dp))
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-            color = if (isActive) MaterialTheme.colorScheme.onBackground else GreyText,
-            maxLines = 1,
-            overflow = TextOverflow.Visible,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
