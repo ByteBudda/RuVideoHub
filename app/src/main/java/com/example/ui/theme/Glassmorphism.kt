@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -30,6 +31,7 @@ fun AmbientGlassBackground(
     content: @Composable () -> Unit
 ) {
     val effect = LocalThemeEffect.current
+    val customTheme = LocalCustomTheme.current
 
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondaryContainer
@@ -43,7 +45,21 @@ fun AmbientGlassBackground(
             .drawBehind {
                 val width = size.width
                 val height = size.height
-                if (width <= 0 || height <= 0 || isTvOptimized) return@drawBehind
+                if (width <= 0 || height <= 0) return@drawBehind
+
+                // If custom background gradient is provided, draw it first
+                if (customTheme != null && customTheme.backgroundGradientStart != null && customTheme.backgroundGradientEnd != null) {
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                customTheme.backgroundGradientStart,
+                                customTheme.backgroundGradientEnd
+                            ),
+                            start = Offset(0f, 0f),
+                            end = Offset(0f, height)
+                        )
+                    )
+                }
 
                 when (effect) {
                     "glassmorphism" -> {
@@ -160,30 +176,57 @@ fun Modifier.liquidGlass(
     isTvOptimized: Boolean = false
 ): Modifier = composed {
     val effect = LocalThemeEffect.current
+    val customTheme = LocalCustomTheme.current
+    
+    val opacity = customTheme?.cardOpacity ?: 0.3f
+    val glowColor = customTheme?.glowColor
+    val glowRadius = customTheme?.glowRadius ?: 0
+    val glowEnabled = customTheme?.glowEnabled ?: false
+    
+    val cornerRadius = customTheme?.cardCornerRadius ?: 16
+    val finalShape = RoundedCornerShape(cornerRadius.dp)
+    
+    val finalBorderWidth = (customTheme?.cardBorderWidth ?: 1f).dp
+    val finalBorderColor = customTheme?.cardBorderColor ?: when (effect) {
+        "neon", "cyber_grid", "matrix" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+    }
+    
+    val shadowColor = customTheme?.cardShadowColor
+    val shadowElevation = customTheme?.cardShadowElevation ?: 0f
+    
+    var baseModifier = this
+    
+    if (shadowColor != null && shadowElevation > 0f) {
+        baseModifier = baseModifier.customShadow(
+            color = shadowColor,
+            elevation = shadowElevation.dp,
+            borderRadius = cornerRadius.dp
+        )
+    }
+    
+    if (glowEnabled && glowColor != null && glowRadius > 0) {
+        baseModifier = baseModifier.neonGlow(color = glowColor, radius = glowRadius.dp, cornerRadius = cornerRadius.dp)
+    }
     
     when (effect) {
         "glassmorphism", "aurora" -> {
             val surfaceColor = MaterialTheme.colorScheme.surface
-            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
             
-            val bgModifier = if (isTvOptimized) {
-                Modifier.background(surfaceColor)
-            } else {
-                Modifier.background(surfaceColor.copy(alpha = 0.3f))
-            }
+            val bgModifier = Modifier.background(surfaceColor.copy(alpha = opacity))
             
-            this
-                .clip(shape)
+            baseModifier
+                .clip(finalShape)
                 .then(bgModifier)
-                .border(borderWidth, onSurfaceColor.copy(alpha = 0.15f), shape)
+                .border(finalBorderWidth, finalBorderColor, finalShape)
         }
         "neon", "cyber_grid", "matrix" -> {
             val primaryColor = MaterialTheme.colorScheme.primary
             val surfaceColor = MaterialTheme.colorScheme.surface
-            this
-                .clip(shape)
-                .background(surfaceColor.copy(alpha = 0.8f))
-                .border(borderWidth, primaryColor.copy(alpha = 0.8f), shape)
+            baseModifier
+                .clip(finalShape)
+                .background(surfaceColor.copy(alpha = opacity.coerceAtLeast(0.6f)))
+                .border(finalBorderWidth, finalBorderColor, finalShape)
                 .drawBehind {
                     val paint = androidx.compose.ui.graphics.Paint().apply {
                         this.color = primaryColor.copy(alpha = 0.5f)
@@ -195,22 +238,23 @@ fun Modifier.liquidGlass(
                     }
                     drawContext.canvas.drawRoundRect(
                         0f, 0f, size.width, size.height,
-                        16.dp.toPx(), 16.dp.toPx(), paint
+                        cornerRadius.dp.toPx(), cornerRadius.dp.toPx(), paint
                     )
                 }
         }
         else -> {
-            this
-                .clip(shape)
+            baseModifier
+                .clip(finalShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(borderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+                .border(finalBorderWidth, finalBorderColor, finalShape)
         }
     }
 }
 
 fun Modifier.neonGlow(
     color: Color,
-    radius: Dp = 8.dp
+    radius: Dp = 8.dp,
+    cornerRadius: Dp = 16.dp
 ): Modifier = this.drawBehind {
     val paint = androidx.compose.ui.graphics.Paint().apply {
         this.color = color
@@ -222,6 +266,30 @@ fun Modifier.neonGlow(
     }
     drawContext.canvas.drawRoundRect(
         0f, 0f, size.width, size.height,
-        16.dp.toPx(), 16.dp.toPx(), paint
+        cornerRadius.toPx(), cornerRadius.toPx(), paint
     )
+}
+
+fun Modifier.customShadow(
+    color: Color,
+    elevation: Dp,
+    borderRadius: Dp = 16.dp
+): Modifier = if (elevation > 0.dp) {
+    this.drawBehind {
+        val paint = androidx.compose.ui.graphics.Paint().apply {
+            this.color = color
+            val frameworkPaint = this.asFrameworkPaint()
+            frameworkPaint.maskFilter = android.graphics.BlurMaskFilter(
+                elevation.toPx(),
+                android.graphics.BlurMaskFilter.Blur.NORMAL
+            )
+        }
+        // Offset the shadow slightly vertically to resemble authentic material shadow projection
+        drawContext.canvas.drawRoundRect(
+            0f, elevation.toPx() / 3f, size.width, size.height + elevation.toPx() / 3f,
+            borderRadius.toPx(), borderRadius.toPx(), paint
+        )
+    }
+} else {
+    this
 }

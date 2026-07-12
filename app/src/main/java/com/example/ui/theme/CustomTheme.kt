@@ -24,7 +24,18 @@ data class CustomTheme(
     val secondaryContainer: Color,
     val tertiaryContainer: Color,
     val onTertiaryContainer: Color,
-    val effect: String = "none"
+    val effect: String = "none",
+    val backgroundGradientStart: Color? = null,
+    val backgroundGradientEnd: Color? = null,
+    val cardOpacity: Float = 0.3f,
+    val glowColor: Color? = null,
+    val glowRadius: Int = 0,
+    val glowEnabled: Boolean = false,
+    val cardBorderWidth: Float = 1f,
+    val cardBorderColor: Color? = null,
+    val cardShadowColor: Color? = null,
+    val cardShadowElevation: Float = 0f,
+    val cardCornerRadius: Int = 16
 ) {
     fun toColorScheme(): ColorScheme {
         return if (isDark) {
@@ -84,6 +95,19 @@ data class CustomTheme(
         obj.put("tertiaryContainer", colorToHex(tertiaryContainer))
         obj.put("onTertiaryContainer", colorToHex(onTertiaryContainer))
         obj.put("effect", effect)
+        
+        obj.put("backgroundGradientStart", backgroundGradientStart?.let { colorToHex(it) } ?: "")
+        obj.put("backgroundGradientEnd", backgroundGradientEnd?.let { colorToHex(it) } ?: "")
+        obj.put("cardOpacity", cardOpacity.toDouble())
+        obj.put("glowColor", glowColor?.let { colorToHex(it) } ?: "")
+        obj.put("glowRadius", glowRadius)
+        obj.put("glowEnabled", glowEnabled)
+        obj.put("cardBorderWidth", cardBorderWidth.toDouble())
+        obj.put("cardBorderColor", cardBorderColor?.let { colorToHex(it) } ?: "")
+        obj.put("cardShadowColor", cardShadowColor?.let { colorToHex(it) } ?: "")
+        obj.put("cardShadowElevation", cardShadowElevation.toDouble())
+        obj.put("cardCornerRadius", cardCornerRadius)
+        
         return obj.toString()
     }
 
@@ -98,6 +122,26 @@ data class CustomTheme(
     companion object {
         fun fromJson(json: String): CustomTheme {
             val obj = JSONObject(json)
+            
+            val bgGradStartStr = obj.optString("backgroundGradientStart", "")
+            val bgGradEndStr = obj.optString("backgroundGradientEnd", "")
+            val glowColorStr = obj.optString("glowColor", "")
+            val cardBorderColorStr = obj.optString("cardBorderColor", "")
+            val cardShadowColorStr = obj.optString("cardShadowColor", "")
+
+            val backgroundGradientStart = if (bgGradStartStr.isNotEmpty()) parseColor(bgGradStartStr) else null
+            val backgroundGradientEnd = if (bgGradEndStr.isNotEmpty()) parseColor(bgGradEndStr) else null
+            val cardOpacity = obj.optDouble("cardOpacity", 0.3).toFloat()
+            val glowColor = if (glowColorStr.isNotEmpty()) parseColor(glowColorStr) else null
+            val glowRadius = obj.optInt("glowRadius", 0)
+            val glowEnabled = obj.optBoolean("glowEnabled", false)
+            
+            val cardBorderWidth = obj.optDouble("cardBorderWidth", 1.0).toFloat()
+            val cardBorderColor = if (cardBorderColorStr.isNotEmpty()) parseColor(cardBorderColorStr) else null
+            val cardShadowColor = if (cardShadowColorStr.isNotEmpty()) parseColor(cardShadowColorStr) else null
+            val cardShadowElevation = obj.optDouble("cardShadowElevation", 0.0).toFloat()
+            val cardCornerRadius = obj.optInt("cardCornerRadius", 16)
+
             return CustomTheme(
                 id = obj.getString("id"),
                 name = obj.getString("name"),
@@ -116,7 +160,18 @@ data class CustomTheme(
                 secondaryContainer = parseColor(obj.getString("secondaryContainer")),
                 tertiaryContainer = parseColor(obj.getString("tertiaryContainer")),
                 onTertiaryContainer = parseColor(obj.getString("onTertiaryContainer")),
-                effect = obj.optString("effect", "none")
+                effect = obj.optString("effect", "none"),
+                backgroundGradientStart = backgroundGradientStart,
+                backgroundGradientEnd = backgroundGradientEnd,
+                cardOpacity = cardOpacity,
+                glowColor = glowColor,
+                glowRadius = glowRadius,
+                glowEnabled = glowEnabled,
+                cardBorderWidth = cardBorderWidth,
+                cardBorderColor = cardBorderColor,
+                cardShadowColor = cardShadowColor,
+                cardShadowElevation = cardShadowElevation,
+                cardCornerRadius = cardCornerRadius
             )
         }
 

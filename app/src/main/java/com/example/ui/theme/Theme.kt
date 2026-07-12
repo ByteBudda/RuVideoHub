@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 
 val LocalAppTheme = compositionLocalOf { "dark" }
 val LocalThemeEffect = compositionLocalOf { "none" }
+val LocalCustomTheme = compositionLocalOf<CustomTheme?> { null }
 
 private val DarkColorScheme = darkColorScheme(
   primary = DarkPrimary,
@@ -124,6 +125,7 @@ fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   dynamicColor: Boolean = false,
   customThemes: List<CustomTheme> = emptyList(),
+  isTvOptimized: Boolean = false,
   content: @Composable () -> Unit,
 ) {
   val customTheme = customThemes.find { it.id == appTheme }
@@ -148,7 +150,8 @@ fun MyApplicationTheme(
 
   CompositionLocalProvider(
       LocalAppTheme provides appTheme,
-      LocalThemeEffect provides themeEffect
+      LocalThemeEffect provides themeEffect,
+      LocalCustomTheme provides customTheme
   ) {
       MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
   }
