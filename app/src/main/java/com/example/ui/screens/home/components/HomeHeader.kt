@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import com.example.ui.screens.sleekTvFocus
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
+    onMicClick: () -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
@@ -72,7 +74,7 @@ fun SleekHeader(
                 ),
                 modifier = Modifier
                     .weight(1f)
-                    .sleekTvFocus(shape = RoundedCornerShape(8.dp))
+                    .sleekTvFocus(shape = RoundedCornerShape(8.dp), enabled = isTvOptimized)
                     .testTag("search_input"),
                 singleLine = true,
                 decorationBox = { innerTextField ->
@@ -90,13 +92,25 @@ fun SleekHeader(
             if (searchQuery.isNotEmpty()) {
                 IconButton(
                     onClick = { onSearchQueryChanged("") },
-                    modifier = Modifier.size(24.dp).sleekTvFocus(CircleShape)
+                    modifier = Modifier.size(36.dp).sleekTvFocus(CircleShape, onEnter = { onSearchQueryChanged("") }, enabled = isTvOptimized)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Очистить",
                         tint = GreyText,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onMicClick,
+                    modifier = Modifier.size(36.dp).sleekTvFocus(CircleShape, onEnter = onMicClick, enabled = isTvOptimized)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Голосовой поиск",
+                        tint = GreyText,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
