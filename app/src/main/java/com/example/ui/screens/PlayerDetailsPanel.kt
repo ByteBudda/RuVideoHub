@@ -358,53 +358,122 @@ fun PlayerDetailsPanel(
             modifier = Modifier.padding(bottom = 10.dp)
         )
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            currentEpList.forEach { ep ->
-                val isActive = ep.id == video.id
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .sleekTvFocus(RoundedCornerShape(12.dp), onEnter = { viewModel.selectVideo(ep) })
-                        .clickable { viewModel.selectVideo(ep) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                    ),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isActive) MaterialTheme.colorScheme.primary else SurfaceVariant
-                    )
-                ) {
+        val tvVideoColsSetting = LocalTvVideoGridColumns.current
+        val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
+
+        if (isTvOptimized) {
+            val chunkedEpList = currentEpList.chunked(tvVideoColsSetting)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                chunkedEpList.forEach { rowItems ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            VideoThumbnail(
-                                id = ep.id,
-                                duration = ep.duration,
-                                thumbnailUrl = ep.thumbnailUrl,
-                                modifier = Modifier
-                                    .width(72.dp)
-                                    .height(44.dp)
+                        rowItems.forEach { ep ->
+                            com.example.ui.screens.home.components.SleekVideoGridItem(
+                                video = ep,
+                                onVideoClick = { viewModel.selectVideo(ep) },
+                                onDownloadToggle = { viewModel.toggleDownload(ep) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(ep) },
+                                isDark = isDark,
+                                onChannelClick = if (!ep.authorId.isNullOrBlank()) {
+                                    {
+                                        val channelDummy = Video(
+                                            id = "channel_${ep.authorId}__${ep.authorActionUrl ?: ""}",
+                                            title = ep.channel,
+                                            channel = ep.channel,
+                                            views = "",
+                                            timeAgo = "",
+                                            duration = VideoType.CHANNEL,
+                                            category = ep.category,
+                                            description = "",
+                                            thumbnailUrl = ep.authorAvatarUrl,
+                                            authorAvatarUrl = ep.authorAvatarUrl,
+                                            authorId = ep.authorId,
+                                            authorActionUrl = ep.authorActionUrl
+                                        )
+                                        viewModel.selectVideo(channelDummy)
+                                    }
+                                } else null,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.weight(1f)
                             )
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = ep.title,
-                                fontSize = 11.sp,
-                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
-                                color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        repeat(tvVideoColsSetting - rowItems.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isLargeCardsMode) {
+                    currentEpList.forEach { ep ->
+                        com.example.ui.screens.home.components.HeroVideoCard(
+                            video = ep,
+                            onVideoClick = { viewModel.selectVideo(ep) },
+                            onDownloadToggle = { viewModel.toggleDownload(ep) },
+                            onBookmarkToggle = { viewModel.toggleBookmark(ep) },
+                            isDark = isDark,
+                            onChannelClick = if (!ep.authorId.isNullOrBlank()) {
+                                {
+                                    val channelDummy = Video(
+                                        id = "channel_${ep.authorId}__${ep.authorActionUrl ?: ""}",
+                                        title = ep.channel,
+                                        channel = ep.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = VideoType.CHANNEL,
+                                        category = ep.category,
+                                        description = "",
+                                        thumbnailUrl = ep.authorAvatarUrl,
+                                        authorAvatarUrl = ep.authorAvatarUrl,
+                                        authorId = ep.authorId,
+                                        authorActionUrl = ep.authorActionUrl
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                            } else null,
+                            isTvOptimized = isTvOptimized,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    currentEpList.forEach { ep ->
+                        com.example.ui.screens.home.components.SecondaryVideoItemRow(
+                            video = ep,
+                            onVideoClick = { viewModel.selectVideo(ep) },
+                            onDownloadToggle = { viewModel.toggleDownload(ep) },
+                            onBookmarkToggle = { viewModel.toggleBookmark(ep) },
+                            isDark = isDark,
+                            onChannelClick = if (!ep.authorId.isNullOrBlank()) {
+                                {
+                                    val channelDummy = Video(
+                                        id = "channel_${ep.authorId}__${ep.authorActionUrl ?: ""}",
+                                        title = ep.channel,
+                                        channel = ep.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = VideoType.CHANNEL,
+                                        category = ep.category,
+                                        description = "",
+                                        thumbnailUrl = ep.authorAvatarUrl,
+                                        authorAvatarUrl = ep.authorAvatarUrl,
+                                        authorId = ep.authorId,
+                                        authorActionUrl = ep.authorActionUrl
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                            } else null,
+                            isTvOptimized = isTvOptimized,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
