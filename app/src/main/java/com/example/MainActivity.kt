@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
       val appTheme by viewModel.appTheme.collectAsState()
       val appEffect by viewModel.appEffect.collectAsState()
       val customThemes by viewModel.customThemes.collectAsState()
+      val isTvOptimized by viewModel.isTvOptimized.collectAsState()
       
       val context = androidx.compose.ui.platform.LocalContext.current
       var stableDensity = context.resources.displayMetrics.density
@@ -80,7 +81,13 @@ class MainActivity : ComponentActivity() {
       androidx.compose.runtime.CompositionLocalProvider(
           androidx.compose.ui.platform.LocalDensity provides customDensity
       ) {
-        MyApplicationTheme(appTheme = appTheme, appEffect = appEffect, darkTheme = isDarkTheme, customThemes = customThemes) {
+        MyApplicationTheme(
+            appTheme = appTheme,
+            appEffect = appEffect,
+            darkTheme = isDarkTheme,
+            customThemes = customThemes,
+            isTvOptimized = isTvOptimized
+        ) {
           SleekVideoHubApp(viewModel = viewModel)
         }
       }
