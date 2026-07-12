@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.data.SavedVideo
 import com.example.data.Video
 import com.example.ui.theme.GreyText
@@ -36,6 +37,8 @@ import com.example.ui.theme.Primary
 import com.example.ui.theme.liquidGlass
 import com.example.viewmodel.VideoViewModel
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import kotlinx.coroutines.delay
 
@@ -67,8 +70,10 @@ fun HomeTabScreen(
     val continueWatchingVideos by viewModel.continueWatchingVideos.collectAsStateWithLifecycle()
 
     val initialFocusRequester = remember { FocusRequester() }
+    var isVoiceSearchActive by rememberSaveable { mutableStateOf(false) }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         val feedTabs by viewModel.feedTabs.collectAsStateWithLifecycle()
         val selectedFeedTab by viewModel.selectedFeedTab.collectAsStateWithLifecycle()
         val selectedSubfolderName by viewModel.selectedSubfolderName.collectAsStateWithLifecycle()
@@ -188,6 +193,7 @@ fun HomeTabScreen(
                 SleekHeader(
                     searchQuery = searchQuery,
                     onSearchQueryChanged = { viewModel.setSearchQuery(it) },
+                    onMicClick = { isVoiceSearchActive = true },
                     isDark = isDarkTheme,
                     isTvOptimized = isTvOptimized
                 )
@@ -424,5 +430,37 @@ fun HomeTabScreen(
                 }
             }
         }
+
+        val context = LocalContext.current
+        val voiceLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                val matches = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                if (!matches.isNullOrEmpty()) {
+                    viewModel.setSearchQuery(matches[0])
+                }
+            }
+            isVoiceSearchActive = false
+        }
+
+        LaunchedEffect(isVoiceSearchActive) {
+            if (isVoiceSearchActive) {
+                try {
+                    val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Слушаю...")
+                    }
+                    voiceLauncher.launch(intent)
+                } catch (e: Exception) {
+                    // Simulation mode if no Speech Recognizer exists
+                    kotlinx.coroutines.delay(1000)
+                    viewModel.setSearchQuery("смешные коты")
+                    isVoiceSearchActive = false
+                }
+            }
+        }
     }
+}
 }

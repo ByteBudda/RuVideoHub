@@ -55,8 +55,9 @@ fun Modifier.sleekTvFocus(
     focusColor: Color = MaterialTheme.colorScheme.primary,
     scaleAmount: Float = 1.06f,
     onEnter: (() -> Unit)? = null,
-    onLongEnter: (() -> Unit)? = null
-): Modifier = this.composed {
+    onLongEnter: (() -> Unit)? = null,
+    enabled: Boolean = true
+): Modifier = if (!enabled) this else this.composed {
     var isFocused by remember { mutableStateOf(false) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
