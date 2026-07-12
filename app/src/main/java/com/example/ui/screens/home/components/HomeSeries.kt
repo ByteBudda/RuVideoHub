@@ -33,14 +33,18 @@ fun SleekSeriesCard(
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val customTheme = com.example.ui.theme.LocalCustomTheme.current
+    val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
+    val cardShape = RoundedCornerShape(cardCornerRadius.dp)
+
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 560.dp)
-            .sleekTvFocus(shape = RoundedCornerShape(24.dp), onEnter = onClick)
-            .liquidGlass(RoundedCornerShape(24.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
+            .sleekTvFocus(shape = cardShape, onEnter = onClick)
+            .liquidGlass(cardShape, borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .clickable(onClick = onClick)
     ) {
         Column {
@@ -49,7 +53,12 @@ fun SleekSeriesCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .clip(RoundedCornerShape(
+                        topStart = cardCornerRadius.dp,
+                        topEnd = cardCornerRadius.dp,
+                        bottomStart = 0.dp,
+                        bottomEnd = 0.dp
+                    ))
             ) {
                 if (!video.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -96,16 +105,6 @@ fun SleekSeriesCard(
                     lineHeight = 16.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (video.channel.isNotBlank()) video.channel else "Сериал",
-                    color = GreyText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

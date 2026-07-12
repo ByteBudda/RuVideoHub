@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import com.example.ui.screens.sleekTvFocus
 fun SleekHeader(
     searchQuery: String,
     onSearchQueryChanged: (String) -> Unit,
+    onMicClick: () -> Unit,
     isDark: Boolean,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
@@ -97,6 +99,18 @@ fun SleekHeader(
                         contentDescription = "Очистить",
                         tint = GreyText,
                         modifier = Modifier.size(14.dp)
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onMicClick,
+                    modifier = Modifier.size(24.dp).sleekTvFocus(CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Голосовой поиск",
+                        tint = GreyText,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
