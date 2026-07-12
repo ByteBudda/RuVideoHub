@@ -207,14 +207,25 @@ fun LazyListScope.homeSearchContent(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     rowItems.forEach { seriesItem ->
-                        SleekSeriesCard(
-                            video = seriesItem,
-                            onClick = { viewModel.selectVideo(seriesItem) },
-                            onBookmarkToggle = { viewModel.toggleBookmark(seriesItem) },
-                            isDark = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            modifier = Modifier.weight(1f)
-                        )
+                        if (folderItemsSearch.isNotEmpty()) {
+                            SleekFolderGridItem(
+                                video = seriesItem,
+                                onFolderClick = { viewModel.selectVideo(seriesItem) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(seriesItem) },
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
+                            SleekSeriesCard(
+                                video = seriesItem,
+                                onClick = { viewModel.selectVideo(seriesItem) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(seriesItem) },
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                     repeat(seriesColsSearch - rowItems.size) {
                         Spacer(modifier = Modifier.weight(1f))
@@ -236,14 +247,25 @@ fun LazyListScope.homeSearchContent(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     rowItems.forEach { playlist ->
-                        SleekPlaylistCard(
-                            video = playlist,
-                            onClick = { viewModel.selectVideo(playlist) },
-                            onBookmarkToggle = { viewModel.toggleBookmark(playlist) },
-                            isDark = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            modifier = Modifier.weight(1f)
-                        )
+                        if (folderItemsSearch.isNotEmpty()) {
+                            SleekFolderGridItem(
+                                video = playlist,
+                                onFolderClick = { viewModel.selectVideo(playlist) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(playlist) },
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
+                            SleekPlaylistCard(
+                                video = playlist,
+                                onClick = { viewModel.selectVideo(playlist) },
+                                onBookmarkToggle = { viewModel.toggleBookmark(playlist) },
+                                isDark = isDarkTheme,
+                                isTvOptimized = isTvOptimized,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                     repeat(playlistColsSearch - rowItems.size) {
                         Spacer(modifier = Modifier.weight(1f))
@@ -257,189 +279,146 @@ fun LazyListScope.homeSearchContent(
             item {
                 SectionHeader(title = "Выпуски", isDark = isDarkTheme)
             }
-
-            val firstVideo = otherVideosSearch.first()
-            item {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    HeroVideoCard(
-                        video = firstVideo,
-                        onVideoClick = { viewModel.selectVideo(firstVideo) },
-                        onDownloadToggle = { viewModel.toggleDownload(firstVideo) },
-                        onBookmarkToggle = { viewModel.toggleBookmark(firstVideo) },
-                        isDark = isDarkTheme,
-                        onChannelClick = if (!firstVideo.authorId.isNullOrBlank()) {
-                            {
-                                val channelDummy = Video(
-                                    id = "channel_${firstVideo.authorId}__${firstVideo.authorActionUrl ?: ""}",
-                                    title = firstVideo.channel,
-                                    channel = firstVideo.channel,
-                                    views = "",
-                                    timeAgo = "",
-                                    duration = com.example.utils.VideoType.CHANNEL,
-                                    category = firstVideo.category,
-                                    description = "",
-                                    thumbnailUrl = firstVideo.authorAvatarUrl,
-                                    authorAvatarUrl = firstVideo.authorAvatarUrl,
-                                    authorId = firstVideo.authorId,
-                                    authorActionUrl = firstVideo.authorActionUrl
-                                )
-                                viewModel.selectVideo(channelDummy)
-                            }
-                        } else null,
-                        isTvOptimized = isTvOptimized,
-                        modifier = (if (shouldFocusHeroCard) Modifier.focusRequester(initialFocusRequester) else Modifier)
+            if (isTvOptimized) {
+                val cols = tvVideoColsSetting
+                val chunkedOtherVideos = otherVideosSearch.chunked(cols)
+                items(chunkedOtherVideos, key = { "search_video_row_${cols}_${it.hashCode()}" }) { rowItems ->
+                    Row(
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            if (otherVideosSearch.size > 1) {
-                val restSearchVideos = otherVideosSearch.subList(1, otherVideosSearch.size)
-                if (isTvOptimized) {
-                    val cols = tvVideoColsSetting
-                    val chunkedRest = restSearchVideos.chunked(cols)
-                    items(chunkedRest, key = { "search_rest_row_${cols}_${it.hashCode()}" }) { rowItems ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            rowItems.forEach { video ->
-                                if (isLargeCardsMode && !isTvOptimized) {
-                                    HeroVideoCard(
-                                        video = video,
-                                        onVideoClick = { viewModel.selectVideo(video) },
-                                        onDownloadToggle = { viewModel.toggleDownload(video) },
-                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                        isDark = isDarkTheme,
-                                        onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                            {
-                                                val channelDummy = Video(
-                                                    id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                                    title = video.channel,
-                                                    channel = video.channel,
-                                                    views = "",
-                                                    timeAgo = "",
-                                                    duration = com.example.utils.VideoType.CHANNEL,
-                                                    category = video.category,
-                                                    description = "",
-                                                    thumbnailUrl = video.authorAvatarUrl,
-                                                    authorAvatarUrl = video.authorAvatarUrl,
-                                                    authorId = video.authorId,
-                                                    authorActionUrl = video.authorActionUrl
-                                                )
-                                                viewModel.selectVideo(channelDummy)
-                                            }
-                                        } else null,
-                                        isTvOptimized = true,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                } else {
-                                    SleekVideoGridItem(
-                                        video = video,
-                                        onVideoClick = { viewModel.selectVideo(video) },
-                                        onDownloadToggle = { viewModel.toggleDownload(video) },
-                                        onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                        isDark = isDarkTheme,
-                                        onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                            {
-                                                val channelDummy = Video(
-                                                    id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                                    title = video.channel,
-                                                    channel = video.channel,
-                                                    views = "",
-                                                    timeAgo = "",
-                                                    duration = com.example.utils.VideoType.CHANNEL,
-                                                    category = video.category,
-                                                    description = "",
-                                                    thumbnailUrl = video.authorAvatarUrl,
-                                                    authorAvatarUrl = video.authorAvatarUrl,
-                                                    authorId = video.authorId,
-                                                    authorActionUrl = video.authorActionUrl
-                                                )
-                                                viewModel.selectVideo(channelDummy)
-                                            }
-                                        } else null,
-                                        isTvOptimized = true,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowItems.forEach { video ->
+                            if (isLargeCardsMode && !isTvOptimized) {
+                                HeroVideoCard(
+                                    video = video,
+                                    onVideoClick = { viewModel.selectVideo(video) },
+                                    onDownloadToggle = { viewModel.toggleDownload(video) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                    isDark = isDarkTheme,
+                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                        {
+                                            val channelDummy = Video(
+                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                title = video.channel,
+                                                channel = video.channel,
+                                                views = "",
+                                                timeAgo = "",
+                                                duration = com.example.utils.VideoType.CHANNEL,
+                                                category = video.category,
+                                                description = "",
+                                                thumbnailUrl = video.authorAvatarUrl,
+                                                authorAvatarUrl = video.authorAvatarUrl,
+                                                authorId = video.authorId,
+                                                authorActionUrl = video.authorActionUrl
+                                            )
+                                            viewModel.selectVideo(channelDummy)
+                                        }
+                                    } else null,
+                                    isTvOptimized = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else {
+                                SleekVideoGridItem(
+                                    video = video,
+                                    onVideoClick = { viewModel.selectVideo(video) },
+                                    onDownloadToggle = { viewModel.toggleDownload(video) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                                    isDark = isDarkTheme,
+                                    onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                        {
+                                            val channelDummy = Video(
+                                                id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                                title = video.channel,
+                                                channel = video.channel,
+                                                views = "",
+                                                timeAgo = "",
+                                                duration = com.example.utils.VideoType.CHANNEL,
+                                                category = video.category,
+                                                description = "",
+                                                thumbnailUrl = video.authorAvatarUrl,
+                                                authorAvatarUrl = video.authorAvatarUrl,
+                                                authorId = video.authorId,
+                                                authorActionUrl = video.authorActionUrl
+                                            )
+                                            viewModel.selectVideo(channelDummy)
+                                        }
+                                    } else null,
+                                    isTvOptimized = true,
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
-                            repeat(cols - rowItems.size) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
+                        }
+                        repeat(cols - rowItems.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
+                }
+            } else {
+                if (isLargeCardsMode && !isTvOptimized) {
+                    items(otherVideosSearch, key = { "search_large_${it.id}" }) { video ->
+                        HeroVideoCard(
+                            video = video,
+                            onVideoClick = { viewModel.selectVideo(video) },
+                            onDownloadToggle = { viewModel.toggleDownload(video) },
+                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                            isDark = isDarkTheme,
+                            onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                {
+                                    val channelDummy = Video(
+                                        id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                        title = video.channel,
+                                        channel = video.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = com.example.utils.VideoType.CHANNEL,
+                                        category = video.category,
+                                        description = "",
+                                        thumbnailUrl = video.authorAvatarUrl,
+                                        authorAvatarUrl = video.authorAvatarUrl,
+                                        authorId = video.authorId,
+                                        authorActionUrl = video.authorActionUrl
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                            } else null,
+                            isTvOptimized = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
                 } else {
-                    if (isLargeCardsMode && !isTvOptimized) {
-                        items(restSearchVideos, key = { "search_rest_large_${it.id}" }) { video ->
-                            HeroVideoCard(
-                                video = video,
-                                onVideoClick = { viewModel.selectVideo(video) },
-                                onDownloadToggle = { viewModel.toggleDownload(video) },
-                                onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                isDark = isDarkTheme,
-                                onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                    {
-                                        val channelDummy = Video(
-                                            id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                            title = video.channel,
-                                            channel = video.channel,
-                                            views = "",
-                                            timeAgo = "",
-                                            duration = com.example.utils.VideoType.CHANNEL,
-                                            category = video.category,
-                                            description = "",
-                                            thumbnailUrl = video.authorAvatarUrl,
-                                            authorAvatarUrl = video.authorAvatarUrl,
-                                            authorId = video.authorId,
-                                            authorActionUrl = video.authorActionUrl
-                                        )
-                                        viewModel.selectVideo(channelDummy)
-                                    }
-                                } else null,
-                                isTvOptimized = false,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                            )
-                        }
-                    } else {
-                        items(restSearchVideos, key = { "search_rest_list_${it.id}" }) { video ->
-                            SecondaryVideoItemRow(
-                                video = video,
-                                onVideoClick = { viewModel.selectVideo(video) },
-                                onDownloadToggle = { viewModel.toggleDownload(video) },
-                                onBookmarkToggle = { viewModel.toggleBookmark(video) },
-                                isDark = isDarkTheme,
-                                onChannelClick = if (!video.authorId.isNullOrBlank()) {
-                                    {
-                                        val channelDummy = Video(
-                                            id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
-                                            title = video.channel,
-                                            channel = video.channel,
-                                            views = "",
-                                            timeAgo = "",
-                                            duration = com.example.utils.VideoType.CHANNEL,
-                                            category = video.category,
-                                            description = "",
-                                            thumbnailUrl = video.authorAvatarUrl,
-                                            authorAvatarUrl = video.authorAvatarUrl,
-                                            authorId = video.authorId,
-                                            authorActionUrl = video.authorActionUrl
-                                        )
-                                        viewModel.selectVideo(channelDummy)
-                                    }
-                                } else null,
-                                isTvOptimized = false,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                    items(otherVideosSearch, key = { "search_list_${it.id}" }) { video ->
+                        SecondaryVideoItemRow(
+                            video = video,
+                            onVideoClick = { viewModel.selectVideo(video) },
+                            onDownloadToggle = { viewModel.toggleDownload(video) },
+                            onBookmarkToggle = { viewModel.toggleBookmark(video) },
+                            isDark = isDarkTheme,
+                            onChannelClick = if (!video.authorId.isNullOrBlank()) {
+                                {
+                                    val channelDummy = Video(
+                                        id = "channel_${video.authorId}__${video.authorActionUrl ?: ""}",
+                                        title = video.channel,
+                                        channel = video.channel,
+                                        views = "",
+                                        timeAgo = "",
+                                        duration = com.example.utils.VideoType.CHANNEL,
+                                        category = video.category,
+                                        description = "",
+                                        thumbnailUrl = video.authorAvatarUrl,
+                                        authorAvatarUrl = video.authorAvatarUrl,
+                                        authorId = video.authorId,
+                                        authorActionUrl = video.authorActionUrl
+                                    )
+                                    viewModel.selectVideo(channelDummy)
+                                }
+                            } else null,
+                            isTvOptimized = false,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
