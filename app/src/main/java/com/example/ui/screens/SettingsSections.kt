@@ -358,6 +358,8 @@ fun DisplaySettingsSection(
     isTvOptimized: Boolean
 ) {
     val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
+    val isHistoryLargeCardsMode by viewModel.isHistoryLargeCardsMode.collectAsStateWithLifecycle()
+    val isDownloadsLargeCardsMode by viewModel.isDownloadsLargeCardsMode.collectAsStateWithLifecycle()
     val mobileGridColumns by viewModel.mobileGridColumns.collectAsStateWithLifecycle()
     val tvGridColumns by viewModel.tvGridColumns.collectAsStateWithLifecycle()
     val tvVideoGridColumns by viewModel.tvVideoGridColumns.collectAsStateWithLifecycle()
@@ -376,6 +378,38 @@ fun DisplaySettingsSection(
                         checked = isLargeCardsMode,
                         onCheckedChange = { viewModel.toggleLargeCardsMode() },
                         modifier = Modifier.testTag("setting_large_cards_switch")
+                    )
+                }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+
+            SettingsRow(
+                icon = Icons.Default.History,
+                title = "Крупные карточки в истории",
+                description = "Использовать большой размер для недавних видео",
+                onClick = { viewModel.toggleHistoryLargeCardsMode() },
+                control = {
+                    Switch(
+                        checked = isHistoryLargeCardsMode,
+                        onCheckedChange = { viewModel.toggleHistoryLargeCardsMode() },
+                        modifier = Modifier.testTag("setting_history_large_cards_switch")
+                    )
+                }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+
+            SettingsRow(
+                icon = Icons.Default.Download,
+                title = "Крупные карточки в загрузках",
+                description = "Использовать большой размер для загруженных видео",
+                onClick = { viewModel.toggleDownloadsLargeCardsMode() },
+                control = {
+                    Switch(
+                        checked = isDownloadsLargeCardsMode,
+                        onCheckedChange = { viewModel.toggleDownloadsLargeCardsMode() },
+                        modifier = Modifier.testTag("setting_downloads_large_cards_switch")
                     )
                 }
             )
