@@ -78,6 +78,7 @@ fun HomeTabScreen(
         val selectedFeedTab by viewModel.selectedFeedTab.collectAsStateWithLifecycle()
         val selectedSubfolderName by viewModel.selectedSubfolderName.collectAsStateWithLifecycle()
         val currentSubfolderVideo by viewModel.currentSubfolderVideo.collectAsStateWithLifecycle()
+        val currentChannelVideo by viewModel.currentChannelVideo.collectAsStateWithLifecycle()
 
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val isMoreLoading by viewModel.isMoreLoading.collectAsStateWithLifecycle()
@@ -241,9 +242,17 @@ fun HomeTabScreen(
                 }
             }
 
-            // 3. Subfolder back button / path
-            if (selectedSubfolderName != null) {
+            // 3. Subfolder or Channel back button / path
+            val showTopBar = selectedSubfolderName != null || isChannelView
+            if (showTopBar) {
                 item {
+                    val activeVideo = if (isChannelView) currentChannelVideo else currentSubfolderVideo
+                    val barTitle = if (isChannelView) {
+                        "${selectedFeedTab?.name ?: "Назад"} › ${activeVideo?.title ?: "Канал"}"
+                    } else {
+                        "${selectedFeedTab?.name ?: "Назад"} › $selectedSubfolderName"
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -271,7 +280,7 @@ fun HomeTabScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "${selectedFeedTab?.name ?: "Назад"} › $selectedSubfolderName",
+                                text = barTitle,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -280,20 +289,52 @@ fun HomeTabScreen(
                             )
                         }
 
-                        currentSubfolderVideo?.let { activeVideo ->
+                        activeVideo?.let { video ->
                             IconButton(
-                                onClick = { viewModel.toggleBookmark(activeVideo) },
+                                onClick = { viewModel.toggleBookmark(video) },
                                 modifier = Modifier
                                     .size(36.dp)
                                     .sleekTvFocus(CircleShape)
                                     .liquidGlass(CircleShape, borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
                             ) {
                                 Icon(
-                                    imageVector = if (activeVideo.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                    imageVector = if (video.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
                                     contentDescription = "В избранное",
                                     tint = Primary,
                                     modifier = Modifier.size(18.dp)
                                 )
+                            }
+                            
+                            if (video.duration == "ПЛЕЙЛИСТ" || isChannelView) {
+                                IconButton(
+                                    onClick = {
+                                        val shareUrl = if (isChannelView) {
+                                            val rawChannelId = video.id.substringAfter("channel_").substringBefore("__")
+                                            "https://rutube.ru/channel/$rawChannelId/"
+                                        } else {
+                                            val id = video.id.substringAfter("playlist_").substringBefore("__")
+                                            "https://rutube.ru/plst/$id/"
+                                        }
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, "Смотрите '${video.title}' в RuVideoHub:\n$shareUrl")
+                                            type = "text/plain"
+                                        }
+                                        val shareIntent = Intent.createChooser(sendIntent, "Поделиться")
+                                        context.startActivity(shareIntent)
+                                    },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .sleekTvFocus(CircleShape)
+                                        .liquidGlass(CircleShape, borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Поделиться",
+                                        tint = Primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -303,7 +344,7 @@ fun HomeTabScreen(
             // 3.5. Channel header
             if (isChannelView) {
                 item {
-                    val activeChannel by viewModel.currentChannelVideo.collectAsStateWithLifecycle()
+                    val activeChannel = currentChannelVideo
                     ChannelHeader(
                         channel = activeChannel,
                         onFavoriteToggle = { channelVideo -> 
