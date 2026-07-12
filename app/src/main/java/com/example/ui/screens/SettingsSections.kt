@@ -3,6 +3,9 @@ package com.example.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -19,9 +23,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import com.example.ui.theme.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.theme.GreyText
-import com.example.ui.theme.CustomTheme
 import com.example.viewmodel.VideoViewModel
 import kotlinx.coroutines.launch
 
@@ -58,9 +64,33 @@ fun InterfaceSettingsSection(
         }
     }
 
+    var themeToExport by remember { mutableStateOf<CustomTheme?>(null) }
+
+    val exportThemeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val theme = themeToExport
+                    if (theme != null) {
+                        val json = theme.toJsonString()
+                        context.contentResolver.openOutputStream(it)?.use { stream ->
+                            stream.write(json.toByteArray(Charsets.UTF_8))
+                        }
+                        themeStatusMessage = "Тема '${theme.name}' успешно экспортирована!"
+                    }
+                } catch (e: Exception) {
+                    themeStatusMessage = "Ошибка экспорта: ${e.localizedMessage}"
+                }
+            }
+        }
+    }
+
     SettingsGroup(title = "Интерфейс", isDarkTheme = isDarkTheme, isTvOptimized = isTvOptimized) {
         // App Theme Selector
         var themeDropdownExpanded by remember { mutableStateOf(false) }
+        var themeToEdit by remember { mutableStateOf<CustomTheme?>(null) }
         val themeLabel = when (appTheme) {
             "dark" -> "Тёмная"
             "light" -> "Светлая"
@@ -165,18 +195,58 @@ fun InterfaceSettingsSection(
                             themeDropdownExpanded = false
                         },
                         trailingIcon = {
-                            if (customThemes.any { it.id == id }) {
-                                IconButton(
-                                    onClick = { viewModel.removeCustomTheme(id) },
-                                    modifier = Modifier.size(32.dp)
+                            val matchingCustom = customThemes.find { it.id == id }
+                            if (matchingCustom != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Удалить тему", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                    IconButton(
+                                        onClick = {
+                                            themeToEdit = matchingCustom
+                                            themeDropdownExpanded = false
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Редактировать тему",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.removeCustomTheme(id) },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Удалить тему",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     )
                 }
             }
+        }
+
+        if (themeToEdit != null) {
+            ThemeCreatorDialog(
+                initialTheme = themeToEdit,
+                onDismiss = { themeToEdit = null },
+                onSave = { updatedTheme ->
+                    viewModel.addCustomTheme(updatedTheme)
+                    if (appTheme == updatedTheme.id) {
+                        viewModel.setAppTheme(updatedTheme.id)
+                    }
+                    themeStatusMessage = "Тема '${updatedTheme.name}' успешно обновлена!"
+                    themeToEdit = null
+                }
+            )
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
@@ -196,6 +266,71 @@ fun InterfaceSettingsSection(
                 )
             }
         )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+
+        // Export Custom Theme
+        var showThemeExporterDialog by remember { mutableStateOf(false) }
+
+        SettingsRow(
+            icon = Icons.Default.Share,
+            title = "Экспорт темы (.rvht)",
+            description = "Сохранить созданную вами тему в файл для обмена",
+            onClick = { showThemeExporterDialog = true },
+            control = {
+                Icon(
+                    imageVector = Icons.Default.Upload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+
+        // Custom Theme Creator Row
+        var showThemeCreatorDialog by remember { mutableStateOf(false) }
+
+        SettingsRow(
+            icon = Icons.Default.ColorLens,
+            title = "Конструктор тем",
+            description = "Создайте свою собственную тему с градиентами, свечением и прозрачностью",
+            onClick = { showThemeCreatorDialog = true },
+            control = {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        )
+
+        if (showThemeCreatorDialog) {
+            ThemeCreatorDialog(
+                onDismiss = { showThemeCreatorDialog = false },
+                onSave = { newTheme ->
+                    viewModel.addCustomTheme(newTheme)
+                    viewModel.setAppTheme(newTheme.id)
+                    themeStatusMessage = "Создана тема '${newTheme.name}'!"
+                    showThemeCreatorDialog = false
+                }
+            )
+        }
+
+        if (showThemeExporterDialog) {
+            ThemeExporterDialog(
+                customThemes = customThemes,
+                onDismiss = { showThemeExporterDialog = false },
+                onSelectTheme = { theme ->
+                    themeToExport = theme
+                    val safeName = theme.name.replace(Regex("[^a-zA-Z0-9а-яА-Я_]"), "_")
+                    exportThemeLauncher.launch("$safeName.rvht")
+                    showThemeExporterDialog = false
+                }
+            )
+        }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
 
@@ -1014,3 +1149,6 @@ fun InfoSettingsSection(
         }
     }
 }
+
+
+
