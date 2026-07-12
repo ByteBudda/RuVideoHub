@@ -183,6 +183,8 @@ fun HomeTabScreen(
         val chunkedSeries = remember(seriesItems, seriesCols) { seriesItems.chunked(seriesCols) }
         val chunkedPlaylists = remember(playlistItems, playlistCols) { playlistItems.chunked(playlistCols) }
 
+        val context = LocalContext.current
+
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -431,7 +433,6 @@ fun HomeTabScreen(
             }
         }
 
-        val context = LocalContext.current
         val voiceLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult()
         ) { result ->
