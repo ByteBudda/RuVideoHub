@@ -203,8 +203,10 @@ fun ChannelHeader(
     } else {
         ""
     }
+    
+    val coverUrl = channel.thumbnailUrl
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -214,14 +216,49 @@ fun ChannelHeader(
                 isDark = isDark,
                 isTvOptimized = isTvOptimized
             )
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        if (!coverUrl.isNullOrBlank() && coverUrl != avatarUrl) {
+            AsyncImage(
+                model = coverUrl,
+                contentDescription = "Обложка канала",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            )
+            // Gradient Overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                androidx.compose.ui.graphics.Color.Transparent,
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (!coverUrl.isNullOrBlank() && coverUrl != avatarUrl) {
+                Spacer(modifier = Modifier.height(40.dp))
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // Channel Avatar
             Box(
                 modifier = Modifier
@@ -285,97 +322,10 @@ fun ChannelHeader(
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                 lineHeight = 16.sp,
-                maxLines = 3,
+                maxLines = 10,
                 overflow = TextOverflow.Ellipsis
             )
         }
-
-        // Bottom Action buttons row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Favorite Button
-            Button(
-                onClick = { onFavoriteToggle(channel) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .then(
-                        if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
-                    ),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (channel.isBookmarked) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    contentColor = if (channel.isBookmarked) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onPrimary
-                    }
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (channel.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = "В избранное",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = if (channel.isBookmarked) "В избранном" else "В избранное",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            // Share Button
-            OutlinedButton(
-                onClick = {
-                    val rawChannelId = channel.id.substringAfter("channel_").substringBefore("__")
-                    val shareUrl = "https://rutube.ru/channel/$rawChannelId/"
-                    val sendIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, "Смотрите авторский канал '${channel.title}' в RuVideoHub:\n$shareUrl")
-                        type = "text/plain"
-                    }
-                    val shareIntent = Intent.createChooser(sendIntent, "Поделиться каналом")
-                    context.startActivity(shareIntent)
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Поделиться",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Поделиться",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
     }
+}
 }
