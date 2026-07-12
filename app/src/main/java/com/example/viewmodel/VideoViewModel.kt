@@ -86,6 +86,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val isDarkTheme = settingsManager.isDarkTheme
     val isTvOptimized = settingsManager.isTvOptimized
     val isLargeCardsMode = settingsManager.isLargeCardsMode
+    val isHistoryLargeCardsMode = settingsManager.isHistoryLargeCardsMode
+    val isDownloadsLargeCardsMode = settingsManager.isDownloadsLargeCardsMode
     val isTermsAgreed = settingsManager.isTermsAgreed
     val startPageType = settingsManager.startPageType
     val startPageCategory = settingsManager.startPageCategory
@@ -122,6 +124,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setAppEffect(effect: String) = settingsManager.setAppEffect(effect)
     fun toggleTvOptimized() = settingsManager.toggleTvOptimized()
     fun toggleLargeCardsMode() = settingsManager.toggleLargeCardsMode()
+    fun toggleHistoryLargeCardsMode() = settingsManager.toggleHistoryLargeCardsMode()
+    fun toggleDownloadsLargeCardsMode() = settingsManager.toggleDownloadsLargeCardsMode()
     fun agreeToTerms() = settingsManager.agreeToTerms()
     fun setStartPageType(type: String) = settingsManager.setStartPageType(type)
     fun setStartPageCategory(category: String) = settingsManager.setStartPageCategory(category)
@@ -1312,6 +1316,31 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                         _isLoading.value = true
                         _isLoadingPlaylists.value = true
                         try {
+                            try {
+                                val channelProfileUrl = "https://rutube.ru/api/profile/user/$channelId/?format=json"
+                                val profileResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(channelProfileUrl)
+                                val profileBody = profileResponse.string()
+                                val jsonObject = org.json.JSONObject(profileBody)
+                                val name = jsonObject.optString("name", video.channel)
+                                val description = jsonObject.optString("description", video.description)
+                                val subCount = jsonObject.optInt("subscribers_count", 0)
+                                val avatarUrl = jsonObject.optString("avatar_url", video.authorAvatarUrl)
+                                val appearance = jsonObject.optJSONObject("appearance")
+                                val coverImage = appearance?.optString("cover_image", video.thumbnailUrl) ?: video.thumbnailUrl
+
+                                val updatedVideo = video.copy(
+                                    title = name,
+                                    channel = name,
+                                    description = description,
+                                    views = if (subCount > 0) "$subCount подписчиков" else video.views,
+                                    authorAvatarUrl = avatarUrl,
+                                    thumbnailUrl = coverImage
+                                )
+                                _currentChannelVideo.value = updatedVideo
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+
                             val vidUrl = "https://rutube.ru/api/video/person/$channelId/?format=json"
                             val plUrl = "https://rutube.ru/api/playlist/user/$channelId/?format=json"
                             
