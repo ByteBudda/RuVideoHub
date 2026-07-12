@@ -27,6 +27,12 @@ class SettingsManager(private val application: Application) {
     private val _isLargeCardsMode = MutableStateFlow(false)
     val isLargeCardsMode = _isLargeCardsMode.asStateFlow()
 
+    private val _isHistoryLargeCardsMode = MutableStateFlow(false)
+    val isHistoryLargeCardsMode = _isHistoryLargeCardsMode.asStateFlow()
+
+    private val _isDownloadsLargeCardsMode = MutableStateFlow(false)
+    val isDownloadsLargeCardsMode = _isDownloadsLargeCardsMode.asStateFlow()
+
     private val _isTermsAgreed = MutableStateFlow(false)
     val isTermsAgreed = _isTermsAgreed.asStateFlow()
 
@@ -85,6 +91,8 @@ class SettingsManager(private val application: Application) {
                 application.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
         _isTvOptimized.value = sharedPrefs.getBoolean("is_tv_optimized", isDeviceTv)
         _isLargeCardsMode.value = sharedPrefs.getBoolean("is_large_cards_mode", false)
+        _isHistoryLargeCardsMode.value = sharedPrefs.getBoolean("is_history_large_cards_mode", false)
+        _isDownloadsLargeCardsMode.value = sharedPrefs.getBoolean("is_downloads_large_cards_mode", false)
         _playerQuality.value = sharedPrefs.getString("player_quality", "Авто") ?: "Авто"
         _downloadQuality.value = sharedPrefs.getString("download_quality", "720p") ?: "720p"
 
@@ -145,6 +153,18 @@ class SettingsManager(private val application: Application) {
         val newValue = !_isLargeCardsMode.value
         _isLargeCardsMode.value = newValue
         sharedPrefs.edit().putBoolean("is_large_cards_mode", newValue).apply()
+    }
+
+    fun toggleHistoryLargeCardsMode() {
+        val newValue = !_isHistoryLargeCardsMode.value
+        _isHistoryLargeCardsMode.value = newValue
+        sharedPrefs.edit().putBoolean("is_history_large_cards_mode", newValue).apply()
+    }
+
+    fun toggleDownloadsLargeCardsMode() {
+        val newValue = !_isDownloadsLargeCardsMode.value
+        _isDownloadsLargeCardsMode.value = newValue
+        sharedPrefs.edit().putBoolean("is_downloads_large_cards_mode", newValue).apply()
     }
 
     fun agreeToTerms() {
