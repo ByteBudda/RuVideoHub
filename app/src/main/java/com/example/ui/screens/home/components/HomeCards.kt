@@ -37,6 +37,7 @@ fun HeroVideoCard(
     onBookmarkToggle: () -> Unit,
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -210,6 +211,7 @@ fun SleekVideoGridItem(
     onBookmarkToggle: () -> Unit,
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -372,6 +374,7 @@ fun SecondaryVideoItemRow(
     onBookmarkToggle: () -> Unit,
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -478,6 +481,22 @@ fun SecondaryVideoItemRow(
                         tint = Primary,
                         modifier = Modifier.size(16.dp)
                     )
+                }
+
+                if (onDeleteClick != null) {
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(24.dp)
+                            .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
+                            .testTag("delete_item_${video.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Удалить из списка",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
 
