@@ -3,6 +3,7 @@ package com.example.ui.screens.home.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
@@ -10,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
+import com.example.ui.screens.mouseDragScrollable
 import androidx.compose.ui.unit.sp
 import com.example.data.Video
 import com.example.viewmodel.VideoViewModel
@@ -93,10 +95,14 @@ fun LazyListScope.homeSearchContent(
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
+                val listState1 = rememberLazyListState()
                 LazyRow(
+                    state = listState1,
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .mouseDragScrollable(listState1)
                 ) {
                     items(searchChannels, key = { it.id }) { channel ->
                         SleekSearchChannelItem(
@@ -177,8 +183,12 @@ fun LazyListScope.homeSearchContent(
                 SectionHeader(title = "Каналы", isDark = isDarkTheme)
             }
             item {
+                val listState2 = rememberLazyListState()
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
+                    state = listState2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .mouseDragScrollable(listState2),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {

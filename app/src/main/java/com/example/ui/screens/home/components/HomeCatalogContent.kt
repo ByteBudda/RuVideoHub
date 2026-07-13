@@ -3,10 +3,12 @@ package com.example.ui.screens.home.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.ui.screens.mouseDragScrollable
 import com.example.data.Video
 import com.example.viewmodel.VideoViewModel
 import com.example.ui.screens.home.utils.*
@@ -114,8 +116,12 @@ fun LazyListScope.homeCatalogContent(
                     SectionHeader(title = "Каналы", isDark = isDarkTheme)
                 }
                 item(key = "row_channels_$groupName") {
+                    val listState = rememberLazyListState()
                     LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .mouseDragScrollable(listState),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {

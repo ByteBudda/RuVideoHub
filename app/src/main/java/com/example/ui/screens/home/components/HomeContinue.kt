@@ -2,7 +2,9 @@ package com.example.ui.screens.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,11 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
 import coil.compose.AsyncImage
 import com.example.data.SavedVideo
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.ui.screens.sleekTvFocus
+import com.example.ui.screens.mouseDragScrollable
 
 @Composable
 fun ContinueWatchingSection(
@@ -37,6 +41,7 @@ fun ContinueWatchingSection(
     isTvOptimized: Boolean,
     focusRequester: FocusRequester? = null
 ) {
+    val listState = rememberLazyListState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -67,9 +72,12 @@ fun ContinueWatchingSection(
         }
 
         LazyRow(
+            state = listState,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 4.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .mouseDragScrollable(listState)
         ) {
             itemsIndexed(videos, key = { _, v -> v.id }) { index, saved ->
                 val progressPercent = if (saved.lastDuration > 0) {
