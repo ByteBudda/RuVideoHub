@@ -114,6 +114,13 @@ fun PlayerDetailsPanel(
         // Direct active action layout pills
         val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
         val activeDownload = activeDownloads[video.id]
+        val isContainer = video.duration == VideoType.PLAYLIST ||
+                video.duration == VideoType.SERIES ||
+                video.duration == VideoType.CHANNEL ||
+                video.duration == VideoType.FOLDER ||
+                video.duration == VideoType.CATALOG ||
+                video.duration == VideoType.PROMO ||
+                video.duration == "ПЛЕЙЛИСТ"
 
         Row(
             modifier = Modifier
@@ -123,63 +130,65 @@ fun PlayerDetailsPanel(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Download action state button
-            Button(
-                onClick = {
-                    if (video.isDownloaded) {
-                        showDownloadOptionsDialog(true)
-                    } else {
-                        if (activeDownload == null) {
-                            viewModel.toggleDownload(video)
+            if (!isContainer) {
+                Button(
+                    onClick = {
+                        if (video.isDownloaded) {
+                            showDownloadOptionsDialog(true)
                         } else {
-                            viewModel.cancelDownload(video.id)
+                            if (activeDownload == null) {
+                                viewModel.toggleDownload(video)
+                            } else {
+                                viewModel.cancelDownload(video.id)
+                            }
                         }
-                    }
-                },
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = when {
-                        video.isDownloaded -> Color(0xFF10B981)
-                        activeDownload != null -> Color.Red.copy(alpha = 0.2f)
-                        else -> PrimaryContainer
                     },
-                    contentColor = when {
-                        video.isDownloaded -> Color.White
-                        activeDownload != null -> Color.Red
-                        else -> MaterialTheme.colorScheme.onPrimaryContainer
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = when {
+                            video.isDownloaded -> Color(0xFF10B981)
+                            activeDownload != null -> Color.Red.copy(alpha = 0.2f)
+                            else -> PrimaryContainer
+                        },
+                        contentColor = when {
+                            video.isDownloaded -> Color.White
+                            activeDownload != null -> Color.Red
+                            else -> MaterialTheme.colorScheme.onPrimaryContainer
+                        }
+                    ),
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .height(40.dp)
+                        .sleekTvFocus(RoundedCornerShape(20.dp))
+                ) {
+                    if (activeDownload != null) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Отмена",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.Red
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                ),
-                contentPadding = PaddingValues(horizontal = 4.dp),
-                modifier = Modifier
-                    .weight(1.2f)
-                    .height(40.dp)
-                    .sleekTvFocus(RoundedCornerShape(20.dp))
-            ) {
-                if (activeDownload != null) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Отмена",
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.Red
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (video.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = when {
+                            video.isDownloaded -> "Скачано"
+                            activeDownload != null -> "Отмена (${(activeDownload.progress * 100).toInt()}%)"
+                            else -> "Скачать"
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = when {
-                        video.isDownloaded -> "Скачано"
-                        activeDownload != null -> "Отмена (${(activeDownload.progress * 100).toInt()}%)"
-                        else -> "Скачать"
-                    },
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
 
             // Bookmark Toggle 
@@ -212,7 +221,7 @@ fun PlayerDetailsPanel(
             }
 
             // Quality Selection Pill
-            if (!video.isDownloaded) {
+            if (!video.isDownloaded && !isContainer) {
                 var qualityMenuExpanded by remember { mutableStateOf(false) }
                 val activeVideoQuality by viewModel.activeVideoQuality.collectAsStateWithLifecycle()
                 val currentQuality by viewModel.playerQuality.collectAsStateWithLifecycle()
