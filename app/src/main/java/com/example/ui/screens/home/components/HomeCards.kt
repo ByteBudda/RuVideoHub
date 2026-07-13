@@ -45,6 +45,14 @@ fun HeroVideoCard(
     val customTheme = com.example.ui.theme.LocalCustomTheme.current
     val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
     val cardShape = RoundedCornerShape(cardCornerRadius.dp)
+    val isContainer = video.duration == com.example.utils.VideoType.PLAYLIST ||
+            video.duration == com.example.utils.VideoType.SERIES ||
+            video.duration == com.example.utils.VideoType.CHANNEL ||
+            video.duration == com.example.utils.VideoType.FOLDER ||
+            video.duration == com.example.utils.VideoType.CATALOG ||
+            video.duration == com.example.utils.VideoType.PROMO ||
+            video.duration == "ПЛЕЙЛИСТ" ||
+            video.id.startsWith("channel_")
 
     Card(
         shape = cardShape,
@@ -188,15 +196,17 @@ fun HeroVideoCard(
                         Text(if (video.isBookmarked) "Убрать из избранного" else "В избранное")
                     }
                     
-                    Button(
-                        onClick = { 
-                            showMenu = false
-                            onDownloadToggle()
-                        },
-                        modifier = btnModifier,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
-                    ) {
-                        Text(if (video.isDownloaded) "Удалить" else "Скачать")
+                    if (!isContainer) {
+                        Button(
+                            onClick = { 
+                                showMenu = false
+                                onDownloadToggle()
+                            },
+                            modifier = btnModifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                        ) {
+                            Text(if (video.isDownloaded) "Удалить" else "Скачать")
+                        }
                     }
                 }
             }
@@ -221,6 +231,14 @@ fun SleekVideoGridItem(
     val customTheme = com.example.ui.theme.LocalCustomTheme.current
     val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
     val cardShape = RoundedCornerShape(cardCornerRadius.dp)
+    val isContainer = video.duration == com.example.utils.VideoType.PLAYLIST ||
+            video.duration == com.example.utils.VideoType.SERIES ||
+            video.duration == com.example.utils.VideoType.CHANNEL ||
+            video.duration == com.example.utils.VideoType.FOLDER ||
+            video.duration == com.example.utils.VideoType.CATALOG ||
+            video.duration == com.example.utils.VideoType.PROMO ||
+            video.duration == "ПЛЕЙЛИСТ" ||
+            video.id.startsWith("channel_")
 
     Card(
         shape = cardShape,
@@ -352,15 +370,17 @@ fun SleekVideoGridItem(
                         Text(if (video.isBookmarked) "Убрать из избранного" else "В избранное")
                     }
                     
-                    Button(
-                        onClick = { 
-                            showMenu = false
-                            onDownloadToggle()
-                        },
-                        modifier = btnModifier,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
-                    ) {
-                        Text(if (video.isDownloaded) "Удалить" else "Скачать")
+                    if (!isContainer) {
+                        Button(
+                            onClick = { 
+                                showMenu = false
+                                onDownloadToggle()
+                            },
+                            modifier = btnModifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                        ) {
+                            Text(if (video.isDownloaded) "Удалить" else "Скачать")
+                        }
                     }
                 }
             }
@@ -383,6 +403,14 @@ fun SecondaryVideoItemRow(
     val customTheme = com.example.ui.theme.LocalCustomTheme.current
     val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
     val cardShape = RoundedCornerShape(cardCornerRadius.dp)
+    val isContainer = video.duration == com.example.utils.VideoType.PLAYLIST ||
+            video.duration == com.example.utils.VideoType.SERIES ||
+            video.duration == com.example.utils.VideoType.CHANNEL ||
+            video.duration == com.example.utils.VideoType.FOLDER ||
+            video.duration == com.example.utils.VideoType.CATALOG ||
+            video.duration == com.example.utils.VideoType.PROMO ||
+            video.duration == "ПЛЕЙЛИСТ" ||
+            video.id.startsWith("channel_")
 
     Row(
         modifier = modifier
@@ -473,18 +501,20 @@ fun SecondaryVideoItemRow(
                     )
                 }
                 
-                IconButton(
-                    onClick = onDownloadToggle,
-                    modifier = Modifier.size(24.dp)
-                        .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
-                        .testTag("quick_download_${video.id}")
-                ) {
-                    Icon(
-                        imageVector = if (video.isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
-                        contentDescription = "Скачать",
-                        tint = Primary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                if (!isContainer) {
+                    IconButton(
+                        onClick = onDownloadToggle,
+                        modifier = Modifier.size(24.dp)
+                            .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
+                            .testTag("quick_download_${video.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (video.isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
+                            contentDescription = "Скачать",
+                            tint = Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
                 if (onDeleteClick != null) {
