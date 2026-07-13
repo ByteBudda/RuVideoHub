@@ -38,6 +38,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.Video
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
+import kotlinx.coroutines.launch
 import com.example.viewmodel.VideoViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.testTag
@@ -193,8 +194,16 @@ fun RutubeVideoPlayer(
     var hudMessage by remember { mutableStateOf<String?>(null) }
 
     var retryTrigger by remember { mutableIntStateOf(0) }
+    var subtitles by remember(videoId) { mutableStateOf<List<com.example.data.SubtitleTrack>>(emptyList()) }
+    var activeSubtitleLanguage by remember(videoId) { mutableStateOf<String?>(null) }
+    var subtitleMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(videoId, selectedQuality, retryTrigger) {
+        // Fetch subtitles in parallel
+        launch {
+            subtitles = viewModel.fetchSubtitles(videoId)
+        }
+        
         if (isLive) {
             useEmbedPlayer = true
             isLoading = false
@@ -222,7 +231,7 @@ fun RutubeVideoPlayer(
         }
     }
 
-    val exoPlayer = remember(videoId, hlsUrl) {
+    val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
             val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
                 .setBufferDurationsMs(32000, 120000, 2500, 5000)
@@ -244,6 +253,20 @@ fun RutubeVideoPlayer(
                 } else {
                     android.net.Uri.parse(hlsUrl)
                 }
+                
+                val subtitleConfigs = subtitles.map { track ->
+                    val mimeType = if (track.format.lowercase() == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
+                    androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(track.url))
+                        .setMimeType(mimeType)
+                        .setLanguage(track.language)
+                        .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
+                        .build()
+                }
+
+                val mediaItem = androidx.media3.common.MediaItem.Builder()
+                    .setUri(uri)
+                    .setSubtitleConfigurations(subtitleConfigs)
+                    .build()
 
                 if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
                     val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
@@ -256,19 +279,32 @@ fun RutubeVideoPlayer(
                         .setReadTimeoutMs(5000)
                         .setAllowCrossProtocolRedirects(true)
                     val mediaSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(androidx.media3.common.MediaItem.fromUri(uri))
+                        .createMediaSource(mediaItem)
                     setMediaSource(mediaSource)
                 } else {
-                    setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
+                    setMediaItem(mediaItem)
                 }
-
                 prepare()
-
                 val savedPos = viewModel.getVideoPosition(videoId)
                 if (savedPos > 0L) {
                     seekTo(savedPos)
                     currentPos = savedPos
                 }
+            }
+        }
+    }
+
+    LaunchedEffect(activeSubtitleLanguage, exoPlayer) {
+        exoPlayer?.let { player ->
+            if (activeSubtitleLanguage == null) {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+                    .build()
+            } else {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+                    .setPreferredTextLanguage(activeSubtitleLanguage)
+                    .build()
             }
         }
     }
@@ -934,6 +970,56 @@ fun RutubeVideoPlayer(
                                                 onClick = {
                                                     selectedQuality = q
                                                     qualityMenuExpanded = false
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                },
+                                                modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (subtitles.isNotEmpty()) {
+                                Box {
+                                    Button(
+                                        onClick = {
+                                            lastInteractionTime = System.currentTimeMillis()
+                                            subtitleMenuExpanded = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Subtitles,
+                                            contentDescription = "Субтитры",
+                                            tint = if (activeSubtitleLanguage != null) Primary else Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(activeSubtitleLanguage ?: "Выкл", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    DropdownMenu(
+                                        expanded = subtitleMenuExpanded,
+                                        onDismissRequest = { subtitleMenuExpanded = false },
+                                        modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Выкл", color = if (activeSubtitleLanguage == null) Primary else Color.White, fontSize = 11.sp, fontWeight = if (activeSubtitleLanguage == null) FontWeight.Bold else FontWeight.Normal) },
+                                            onClick = {
+                                                activeSubtitleLanguage = null
+                                                subtitleMenuExpanded = false
+                                                lastInteractionTime = System.currentTimeMillis()
+                                            },
+                                            modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                        )
+                                        subtitles.forEach { track ->
+                                            DropdownMenuItem(
+                                                text = { Text(track.language, color = if (activeSubtitleLanguage == track.language) Primary else Color.White, fontSize = 11.sp, fontWeight = if (activeSubtitleLanguage == track.language) FontWeight.Bold else FontWeight.Normal) },
+                                                onClick = {
+                                                    activeSubtitleLanguage = track.language
+                                                    subtitleMenuExpanded = false
                                                     lastInteractionTime = System.currentTimeMillis()
                                                 },
                                                 modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
