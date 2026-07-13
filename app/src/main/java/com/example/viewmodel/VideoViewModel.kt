@@ -70,6 +70,8 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     val playerManager = PlayerManager()
     val libraryManager = LibraryManager(repository, viewModelScope)
     val downloadManager = DownloadManager(application, repository, viewModelScope)
+    val backupRestoreManager = BackupRestoreManager(repository, settingsManager, libraryManager)
+    val mediaResolver = RutubeMediaResolver(playerManager, viewModelScope)
 
     init {
         com.example.manager.DownloadManager.onDownloadCompletedListener = { completedId ->
@@ -299,10 +301,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setChannelActiveTab(tab: String) {
         navigationManager.setChannelActiveTab(tab)
     }
-
-    private val _streamUrlCache = android.util.LruCache<String, String>(100)
-    private val _masterUrlCache = android.util.LruCache<String, String>(100)
-    private val _parsedStreamsCache = android.util.LruCache<String, List<com.example.data.rutube.HlsStream>>(100)
 
     fun pushToHistory() {
         val currentSnapshot = NavigationSnapshot(
@@ -573,7 +571,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                             val info = com.example.data.vk.VkVideoLoader.getVideoInfo(q)
                             if (info != null) {
                                 val vkVideoId = "vk_${info.ownerId}_${info.videoId}"
-                                _masterUrlCache.put(vkVideoId, info.videoUrl)
+                                mediaResolver.masterUrlCache.put(vkVideoId, info.videoUrl)
                                 
                                 val vkVideo = Video(
                                     id = vkVideoId,
@@ -895,77 +893,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun exportBookmarksToJson(): String = libraryManager.exportBookmarksToJson()
     suspend fun importBookmarksFromJson(jsonStr: String): Result<Int> = libraryManager.importBookmarksFromJson(jsonStr)
 
-    fun exportBackupToJson(): String {
-        try {
-            val root = org.json.JSONObject()
+    fun exportBackupToJson(): String = backupRestoreManager.exportBackupToJson()
 
-            // 1. Settings
-            val settingsObj = org.json.JSONObject()
-            settingsObj.put("is_dark_theme", settingsManager.isDarkTheme.value)
-            settingsObj.put("is_tv_optimized", settingsManager.isTvOptimized.value)
-            settingsObj.put("is_large_cards_mode", settingsManager.isLargeCardsMode.value)
-            settingsObj.put("start_page_type", settingsManager.startPageType.value)
-            settingsObj.put("start_page_category", settingsManager.startPageCategory.value)
-            settingsObj.put("start_page_custom_url", settingsManager.startPageCustomUrl.value)
-            settingsObj.put("player_quality", settingsManager.playerQuality.value)
-            settingsObj.put("download_quality", settingsManager.downloadQuality.value)
-            settingsObj.put("tv_grid_columns", settingsManager.tvGridColumns.value)
-            settingsObj.put("mobile_grid_columns", settingsManager.mobileGridColumns.value)
-            settingsObj.put("focus_style", settingsManager.focusStyle.value)
-            settingsObj.put("app_theme", settingsManager.appTheme.value)
-            root.put("settings", settingsObj)
+    suspend fun importBackupFromJson(jsonStr: String): Result<String> = backupRestoreManager.importBackupFromJson(jsonStr)
 
-            // 1b. Custom Themes
-            val customThemesArray = org.json.JSONArray()
-            for (theme in settingsManager.customThemes.value) {
-                customThemesArray.put(org.json.JSONObject(theme.toJsonString()))
-            }
-            root.put("custom_themes", customThemesArray)
-
-            // 2. Bookmarks
-            val bookmarksArray = org.json.JSONArray()
-            for (video in libraryManager.bookmarkedVideos.value) {
-                val obj = org.json.JSONObject()
-                obj.put("id", video.id)
-                obj.put("title", video.title)
-                obj.put("channel", video.channel)
-                obj.put("views", video.views)
-                obj.put("timeAgo", video.timeAgo)
-                obj.put("duration", video.duration)
-                obj.put("isPro", video.isPro)
-                obj.put("category", video.category)
-                obj.put("thumbnailUrl", video.thumbnailUrl ?: "")
-                obj.put("savedAt", video.savedAt)
-                bookmarksArray.put(obj)
-            }
-            root.put("bookmarks", bookmarksArray)
-
-            // 3. Recents
-            val recentsArray = org.json.JSONArray()
-            for (video in libraryManager.recentVideos.value) {
-                val obj = org.json.JSONObject()
-                obj.put("id", video.id)
-                obj.put("title", video.title)
-                obj.put("channel", video.channel)
-                obj.put("views", video.views)
-                obj.put("timeAgo", video.timeAgo)
-                obj.put("duration", video.duration)
-                obj.put("isPro", video.isPro)
-                obj.put("category", video.category)
-                obj.put("thumbnailUrl", video.thumbnailUrl ?: "")
-                obj.put("savedAt", video.savedAt)
-                recentsArray.put(obj)
-            }
-            root.put("recents", recentsArray)
-
-            return root.toString(4)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return "{}"
-        }
-    }
-
-    suspend fun importBackupFromJson(jsonStr: String): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    /*
+    suspend fun oldImportBackupFromJson(jsonStr: String): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
             val trimmed = jsonStr.trim()
             if (trimmed.isBlank()) return@withContext Result.failure(Exception("Пустая строка"))
@@ -1111,6 +1044,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             Result.failure(e)
         }
     }
+    */
 
     private suspend fun fetchVideosResolvingTabs(apiUrl: String, defaultCategory: String): List<Video> {
         val finalUrl = if (apiUrl.contains("?")) {
@@ -1561,7 +1495,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                     val info = com.example.data.vk.VkVideoLoader.getVideoInfo(trimmed)
                     if (info != null) {
                         val vkVideoId = "vk_${info.ownerId}_${info.videoId}"
-                        _masterUrlCache.put(vkVideoId, info.videoUrl)
+                        mediaResolver.masterUrlCache.put(vkVideoId, info.videoUrl)
                         val vkVideo = Video(
                             id = vkVideoId,
                             title = info.title,
@@ -1716,35 +1650,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     // Helper functions to convert string duration parsed values (e.g. "12:44") to elapsed playback string
     fun getFormattedElapsedTime(durationStr: String, progress: Float): String {
-        val totalSeconds = parseDurationToSeconds(durationStr)
-        val elapsedSeconds = (progress * totalSeconds).toInt()
-        return formatSecondsToTimeString(elapsedSeconds)
-    }
-
-    private fun parseDurationToSeconds(duration: String): Int {
-        val parts = duration.split(":")
-        return try {
-            if (parts.size == 2) {
-                val minutes = parts[0].toInt()
-                val seconds = parts[1].toInt()
-                minutes * 60 + seconds
-            } else if (parts.size == 3) {
-                val hours = parts[0].toInt()
-                val minutes = parts[1].toInt()
-                val seconds = parts[2].toInt()
-                hours * 3600 + minutes * 60 + seconds
-            } else {
-                300 // fallback 5 min
-            }
-        } catch (e: Exception) {
-            300
-        }
-    }
-
-    private fun formatSecondsToTimeString(secondsValue: Int): String {
-        val m = secondsValue / 60
-        val s = secondsValue % 60
-        return String.format("%02d:%02d", m, s)
+        return com.example.utils.VideoDurationFormatter.getFormattedElapsedTime(durationStr, progress)
     }
 
     override fun onCleared() {
@@ -1753,11 +1659,19 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearHlsCache(videoId: String) {
-        _streamUrlCache.remove(videoId)
-        _masterUrlCache.remove(videoId)
+        mediaResolver.clearHlsCache(videoId)
     }
 
     suspend fun fetchSubtitles(videoId: String): List<com.example.data.SubtitleTrack> {
+        return mediaResolver.fetchSubtitles(videoId)
+    }
+
+    suspend fun fetchHlsStreamUrl(videoId: String, quality: String = "Авто"): String? {
+        return mediaResolver.fetchHlsStreamUrl(videoId, quality)
+    }
+
+    /*
+    suspend fun oldFetchSubtitles(videoId: String): List<com.example.data.SubtitleTrack> {
         return withContext(Dispatchers.IO) {
             try {
                 // If it's a VK video or other external, we skip for now
@@ -1959,6 +1873,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    */
 
 
     private fun mapResourceToVideo(resource: com.example.data.rutube.SmartRutubeParser.ResourceInfo, tabId: Int, categoryName: String): Video {
