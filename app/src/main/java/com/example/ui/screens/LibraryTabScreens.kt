@@ -168,6 +168,10 @@ fun RecentsTabScreen(
                                     onVideoClick = { viewModel.selectVideo(videoRuntime) },
                                     onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
                                     onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                    onDeleteClick = {
+                                        viewModel.deleteRecentItem(videoRuntime)
+                                        android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
                                     isDark = isDarkTheme,
                                     isTvOptimized = isTvOptimized,
                                     modifier = Modifier.weight(1f)
