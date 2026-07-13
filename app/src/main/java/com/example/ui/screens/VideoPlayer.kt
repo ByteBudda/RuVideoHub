@@ -7,6 +7,7 @@ import android.webkit.WebViewClient
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
@@ -159,6 +161,7 @@ fun RutubeVideoPlayer(
 
     var currentPos by remember { mutableLongStateOf(0L) }
     var totalDuration by remember { mutableLongStateOf(0L) }
+    var isTimelineDragging by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val playerFocusRequester = remember { FocusRequester() }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -377,9 +380,9 @@ fun RutubeVideoPlayer(
     }
 
     // Progress update loop
-    LaunchedEffect(exoPlayer, isPlayingState) {
+    LaunchedEffect(exoPlayer, isPlayingState, isTimelineDragging) {
         while (isPlayingState && exoPlayer != null) {
-            if (exoPlayer.isPlaying) {
+            if (exoPlayer.isPlaying && !isTimelineDragging) {
                 val pos = exoPlayer.currentPosition
                 if (pos > 0L) {
                     currentPos = pos
@@ -1253,23 +1256,94 @@ fun RutubeVideoPlayer(
                                 fontWeight = FontWeight.Bold
                             )
 
-                            androidx.compose.material3.Slider(
-                                value = currentPos.toFloat().coerceIn(0f, totalDuration.toFloat().coerceAtLeast(1f)),
-                                onValueChange = { newValue ->
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    exoPlayer?.seekTo(newValue.toLong())
-                                },
-                                valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
-                                colors = androidx.compose.material3.SliderDefaults.colors(
-                                    thumbColor = Primary,
-                                    activeTrackColor = Primary,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                                ),
+                            var isTimelineFocused by remember { mutableStateOf(false) }
+                            val isTimelineActive = isTimelineDragging || isTimelineFocused
+
+                            BoxWithConstraints(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(28.dp)
+                                    .height(32.dp)
+                                    .onFocusChanged { isTimelineFocused = it.isFocused }
+                                    .focusable()
                                     .sleekTvFocus(RoundedCornerShape(14.dp))
-                            )
+                                    .pointerInput(totalDuration) {
+                                        detectTapGestures(
+                                            onTap = { offset ->
+                                                if (totalDuration > 0) {
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    exoPlayer?.let { player ->
+                                                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                        val newPos = (totalDuration * fraction).toLong()
+                                                        player.seekTo(newPos)
+                                                        currentPos = newPos
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                    .pointerInput(totalDuration) {
+                                        detectDragGestures(
+                                            onDragStart = { _ ->
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                isTimelineDragging = true
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                if (totalDuration > 0) {
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                    val newPos = (totalDuration * fraction).toLong()
+                                                    currentPos = newPos
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                isTimelineDragging = false
+                                                exoPlayer?.let { player ->
+                                                    player.seekTo(currentPos)
+                                                    viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
+                                                }
+                                            },
+                                            onDragCancel = {
+                                                isTimelineDragging = false
+                                            }
+                                        )
+                                    }
+                                    .padding(horizontal = 4.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                val progress = if (totalDuration > 0) currentPos.toFloat() / totalDuration else 0f
+                                
+                                // Background track
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(if (isTimelineActive) 8.dp else 4.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.White.copy(alpha = 0.3f))
+                                )
+                                
+                                // Active progress track
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(progress)
+                                        .height(if (isTimelineActive) 8.dp else 4.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Primary)
+                                )
+                                
+                                // Glowing circle thumb
+                                val thumbSize = if (isTimelineActive) 16.dp else 10.dp
+                                val thumbOffset = maxWidth * progress - (thumbSize / 2)
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .offset(x = thumbOffset.coerceAtLeast(0.dp))
+                                        .size(thumbSize)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .border(2.dp, Primary, CircleShape)
+                                )
+                            }
 
                             Text(
                                 text = formatMillis(totalDuration),

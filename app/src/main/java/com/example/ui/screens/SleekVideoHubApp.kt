@@ -43,6 +43,9 @@ import kotlinx.coroutines.launch
 
 import androidx.compose.ui.graphics.graphicsLayer
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+
 val LocalFocusStyle = androidx.compose.runtime.compositionLocalOf { "glow" }
 val LocalTvGridColumns = androidx.compose.runtime.compositionLocalOf { 4 }
 val LocalTvVideoGridColumns = androidx.compose.runtime.compositionLocalOf { 4 }
@@ -139,6 +142,15 @@ fun Modifier.sleekTvFocus(
         }
         .focusable()
         .then(focusModifier)
+}
+
+fun Modifier.mouseDragScrollable(state: androidx.compose.foundation.lazy.LazyListState): Modifier = this.pointerInput(state) {
+    detectDragGestures(
+        onDrag = { change, dragAmount ->
+            change.consume()
+            state.dispatchRawDelta(-dragAmount.x)
+        }
+    )
 }
 
 @Composable
