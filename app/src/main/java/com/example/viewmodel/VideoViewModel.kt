@@ -14,6 +14,8 @@ import com.example.data.Video
 import com.example.data.VideoRepository
 import com.example.data.RutubeCategory
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -1378,11 +1380,114 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 fetchJob = viewModelScope.launch {
                     _isLoading.value = true
                     try {
-                        val videos = fetchVideosResolvingTabs(apiUrl, video.category)
+                        // Detailed meta info for SERIES
+                        if (video.duration == com.example.utils.VideoType.SERIES) {
+                            val seriesId = video.id.substringAfter("tv_").substringBefore("__")
+                            if (seriesId.isNotBlank() && seriesId.all { it.isDigit() }) {
+                                try {
+                                    val infoUrl = "https://rutube.ru/api/metainfo/tv/$seriesId/?format=json"
+                                    val infoResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(infoUrl)
+                                    val infoBody = infoResponse.string()
+                                    val infoObj = org.json.JSONObject(infoBody)
+                                    val description = infoObj.optString("description", video.description)
+                                    val year = infoObj.optString("year")
+                                    val picture = infoObj.optString("picture")
+                                    val appearance = infoObj.optJSONObject("appearance")
+                                    val coverImage = appearance?.optString("cover_image")?.takeIf { it.isNotBlank() && it != "null" }
+                                    val verticalPoster = infoObj.optString("vertical_poster_url").takeIf { it.isNotBlank() && it != "null" }
+                                    
+                                    val bannerUrl = coverImage ?: picture.takeIf { it.isNotBlank() && it != "null" } ?: video.thumbnailUrl
+                                    val posterUrl = verticalPoster ?: video.thumbnailUrl
+                                    
+                                    _currentSubfolderVideo.value = video.copy(
+                                        description = description,
+                                        thumbnailUrl = bannerUrl,
+                                        authorAvatarUrl = posterUrl,
+                                        views = if (year.isNotBlank() && year != "null") "Год выпуска: $year" else video.views
+                                    )
+                                } catch(e: Exception) {
+                                    android.util.Log.e("VideoViewModel", "Meta info fetch error", e)
+                                }
+                            }
+                        }
+
+                        // Detailed meta info for PLAYLIST
+                        if (video.duration == com.example.utils.VideoType.PLAYLIST || video.duration == "ПЛЕЙЛИСТ") {
+                            val playlistId = video.id.substringAfter("playlist_").substringBefore("__")
+                            if (playlistId.isNotBlank()) {
+                                try {
+                                    val infoUrl = "https://rutube.ru/api/playlist/custom/$playlistId/"
+                                    val infoResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(infoUrl)
+                                    val infoBody = infoResponse.string()
+                                    val infoObj = org.json.JSONObject(infoBody)
+                                    
+                                    val description = infoObj.optString("description", video.description)
+                                    val appearance = infoObj.optJSONObject("appearance")
+                                    val coverImage = appearance?.optString("cover_image")?.takeIf { it.isNotBlank() && it != "null" }
+                                    val picture = infoObj.optString("picture").takeIf { it.isNotBlank() && it != "null" }
+                                    val name = infoObj.optString("name", video.title).takeIf { it.isNotBlank() && it != "null" } ?: video.title
+                                    val videoCount = infoObj.optInt("video_count", -1)
+                                    
+                                    _currentSubfolderVideo.value = video.copy(
+                                        title = name,
+                                        description = description,
+                                        thumbnailUrl = coverImage ?: picture ?: video.thumbnailUrl,
+                                        views = if (videoCount > 0) "$videoCount видео" else video.views
+                                    )
+                                } catch (e: Exception) {
+                                    android.util.Log.e("VideoViewModel", "Playlist meta info fetch error", e)
+                                }
+                            }
+                        }
+
+                        var videos = fetchVideosResolvingTabs(apiUrl, video.category)
+                        
+                        if (video.duration == com.example.utils.VideoType.SERIES) {
+                            val allSeriesVideos = videos.toMutableList()
+                            try {
+                                val deferredPages = (2..15).map { seriesPage ->
+                                    viewModelScope.async {
+                                        try {
+                                            val pageUrl = if (apiUrl.contains("?")) {
+                                                "$apiUrl&format=json&page=$seriesPage"
+                                            } else {
+                                                "$apiUrl?format=json&page=$seriesPage"
+                                            }
+                                            val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
+                                            val pageResponse = apiService.getDynamicUrl(pageUrl)
+                                            repository.parseVideoListJson(pageResponse.string(), video.category)
+                                        } catch (e: Exception) {
+                                            emptyList<Video>()
+                                        }
+                                    }
+                                }
+                                val results = kotlinx.coroutines.awaitAll(*deferredPages.toTypedArray())
+                                for (pageVideos in results) {
+                                    allSeriesVideos.addAll(pageVideos)
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("VideoViewModel", "Parallel fetch for series failed", e)
+                            }
+                            
+                            isEndReached = true // Prevent further pagination since we fetched everything
+                            
+                            videos = allSeriesVideos.distinctBy { it.id }.sortedWith(Comparator { v1, v2 ->
+                                val extractNumbers = { s: String -> Regex("\\d+").findAll(s).map { it.value.toInt() }.toList() }
+                                val nums1 = extractNumbers(v1.title)
+                                val nums2 = extractNumbers(v2.title)
+                                for (i in 0 until minOf(nums1.size, nums2.size)) {
+                                    if (nums1[i] != nums2[i]) return@Comparator nums1[i].compareTo(nums2[i])
+                                }
+                                v1.title.compareTo(v2.title)
+                            })
+                        }
+                        
                         _dynamicVideos.value = videos
                         currentActiveApiEndpoint = apiUrl
                         currentPage = 1
-                        isEndReached = false
+                        if (video.duration != com.example.utils.VideoType.SERIES) {
+                            isEndReached = false
+                        }
                     } catch (e: Exception) {
                         android.util.Log.e("VideoViewModel", "Folder fetch error", e)
                     } finally {
@@ -1602,6 +1707,36 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun clearHlsCache(videoId: String) {
         _streamUrlCache.remove(videoId)
         _masterUrlCache.remove(videoId)
+    }
+
+    suspend fun fetchSubtitles(videoId: String): List<com.example.data.SubtitleTrack> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // If it's a VK video or other external, we skip for now
+                if (videoId.startsWith("vk_") || videoId.startsWith("channel_") || videoId.startsWith("playlist_")) {
+                    return@withContext emptyList()
+                }
+                
+                val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getSubtitles(videoId)
+                val bodyStr = response.string()
+                val jsonObject = org.json.JSONObject(bodyStr)
+                val list = jsonObject.optJSONArray("list") ?: return@withContext emptyList()
+                val result = mutableListOf<com.example.data.SubtitleTrack>()
+                for (i in 0 until list.length()) {
+                    val subObj = list.optJSONObject(i) ?: continue
+                    val lang = subObj.optString("langTitle", "Unknown")
+                    val format = subObj.optString("format", "srt")
+                    val url = subObj.optString("file", "")
+                    if (url.isNotBlank()) {
+                        result.add(com.example.data.SubtitleTrack(lang, format, url))
+                    }
+                }
+                result
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Error fetching subtitles", e)
+                emptyList()
+            }
+        }
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String, quality: String = "Авто"): String? {
