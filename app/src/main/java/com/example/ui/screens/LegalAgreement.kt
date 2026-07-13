@@ -52,10 +52,10 @@ data class LegalSubsection(
 object LegalContent {
     
     const val APP_NAME = "RuVideoHub"
-    const val GITHUB_URL = "https://github.com/ByteBudda"
+    const val GITHUB_URL = "https://github.com/yourusername/ru-video-hub"
     const val LICENSE = "GNU General Public License v3.0"
-    const val VERSION = "3.5.67"
-    const val CONTACT_EMAIL = "Bytebudda"
+    const val VERSION = "1.0.0"
+    const val CONTACT_EMAIL = "your.email@example.com"
     const val COPYRIGHT_YEAR = "2026"
 
     val sections = listOf(
@@ -220,7 +220,7 @@ object LegalContent {
                 Приложение взаимодействует со сторонними сервисами:
                 
                 1. RUTUBE API - для получения видео и данных
-                2. GitHub API - для получения обновлений
+                2. Yandex Metrica - для сбора анонимной статистики (можно отключить в настройках)
                 
                 Разработчик НЕ контролирует и НЕ несет ответственности за содержание, политику конфиденциальности или действия этих сторонних сервисов.
             """.trimIndent(),

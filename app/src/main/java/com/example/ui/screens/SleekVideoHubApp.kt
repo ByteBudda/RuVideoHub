@@ -426,7 +426,7 @@ fun RowScope.BottomTabItem(
         modifier = modifier
             .weight(1f)
             .fillMaxHeight()
-            .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.18f, onEnter = onClick)
+            .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.05f, onEnter = onClick)
             .clickable(onClick = onClick)
             .testTag(testTag)
     ) {
@@ -505,7 +505,7 @@ fun SleekTvNavigationRail(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .sleekTvFocus(shape = RoundedCornerShape(10.dp), scaleAmount = 1.18f, onEnter = { onTabSelected(tabId) })
+                        .sleekTvFocus(shape = RoundedCornerShape(10.dp), scaleAmount = 1.05f, onEnter = { onTabSelected(tabId) })
                         .fillMaxWidth()
                         .clickable { onTabSelected(tabId) }
                         .padding(vertical = 4.dp)
@@ -543,7 +543,7 @@ fun SleekTvNavigationRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .sleekTvFocus(shape = RoundedCornerShape(10.dp), scaleAmount = 1.18f, onEnter = { context.findActivity()?.finishAndRemoveTask() })
+                .sleekTvFocus(shape = RoundedCornerShape(10.dp), scaleAmount = 1.05f, onEnter = { context.findActivity()?.finishAndRemoveTask() })
                 .fillMaxWidth()
                 .clickable { context.findActivity()?.finishAndRemoveTask() }
                 .padding(vertical = 4.dp)

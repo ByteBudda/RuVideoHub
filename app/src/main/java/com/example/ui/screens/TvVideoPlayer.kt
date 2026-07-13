@@ -124,6 +124,8 @@ fun TvRutubeVideoPlayer(
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val latestIsMiniPlayer by rememberUpdatedState(isMiniPlayer)
+    val latestOnToggleFullscreen by rememberUpdatedState(onToggleFullscreen)
     val downloadFolder = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
     val offlineFile = java.io.File(downloadFolder, "$videoId.mp4")
 
@@ -213,11 +215,29 @@ fun TvRutubeVideoPlayer(
                 .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
                 .build()
 
-            androidx.media3.exoplayer.ExoPlayer.Builder(context)
+            // Strictly prioritize and configure hardware decoding by disabling software extensions and software fallback
+            val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context).apply {
+                setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                setEnableDecoderFallback(false)
+            }
+
+            // Configure track selector to force/prefer highest available supported bitrate for ideal quality
+            val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
+                parameters = buildUponParameters()
+                    .setForceHighestSupportedBitrate(true)
+                    .build()
+            }
+
+            androidx.media3.exoplayer.ExoPlayer.Builder(context, renderersFactory)
+                .setTrackSelector(trackSelector)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
                 .setLoadControl(loadControl)
                 .build().apply {
+                // Ensure track selection parameters also lock into the highest supported bitrate
+                trackSelectionParameters = trackSelectionParameters.buildUpon()
+                    .setForceHighestSupportedBitrate(true)
+                    .build()
                 playWhenReady = isPlayingState
                 val uri = if (offlineFile.exists()) {
                     android.net.Uri.fromFile(offlineFile)
@@ -330,9 +350,17 @@ fun TvRutubeVideoPlayer(
             .background(Color.Black)
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onDoubleTap = {
+                        if (latestIsMiniPlayer) {
+                            latestOnToggleFullscreen()
+                        } else {
+                            controlsVisible = !controlsVisible
+                            lastInteractionTime = System.currentTimeMillis()
+                        }
+                    },
                     onTap = {
-                        if (isMiniPlayer) {
-                            onToggleFullscreen()
+                        if (latestIsMiniPlayer) {
+                            latestOnToggleFullscreen()
                         } else {
                             controlsVisible = !controlsVisible
                             lastInteractionTime = System.currentTimeMillis()
@@ -448,15 +476,30 @@ fun TvRutubeVideoPlayer(
                     .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
             )
             
-            if (isMiniPlayer) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures(onTap = { onToggleFullscreen() })
-                        }
-                )
-            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                if (latestIsMiniPlayer) {
+                                    latestOnToggleFullscreen()
+                                } else {
+                                    controlsVisible = !controlsVisible
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            },
+                            onDoubleTap = {
+                                if (latestIsMiniPlayer) {
+                                    latestOnToggleFullscreen()
+                                } else {
+                                    controlsVisible = !controlsVisible
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
+                        )
+                    }
+            )
             
             AnimatedVisibility(
                 visible = controlsVisible && !isMiniPlayer,
@@ -525,8 +568,16 @@ fun TvRutubeVideoPlayer(
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onTap = {
-                                if (isMiniPlayer) {
-                                    onToggleFullscreen()
+                                if (latestIsMiniPlayer) {
+                                    latestOnToggleFullscreen()
+                                } else {
+                                    controlsVisible = !controlsVisible
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            },
+                            onDoubleTap = {
+                                if (latestIsMiniPlayer) {
+                                    latestOnToggleFullscreen()
                                 } else {
                                     controlsVisible = !controlsVisible
                                     lastInteractionTime = System.currentTimeMillis()

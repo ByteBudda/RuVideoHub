@@ -242,11 +242,29 @@ fun RutubeVideoPlayer(
                 .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
                 .build()
 
-            androidx.media3.exoplayer.ExoPlayer.Builder(context)
+            // Strictly prioritize and configure hardware decoding by disabling software extensions and software fallback
+            val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context).apply {
+                setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                setEnableDecoderFallback(false)
+            }
+
+            // Configure track selector to force/prefer highest available supported bitrate for ideal quality
+            val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
+                parameters = buildUponParameters()
+                    .setForceHighestSupportedBitrate(true)
+                    .build()
+            }
+
+            androidx.media3.exoplayer.ExoPlayer.Builder(context, renderersFactory)
+                .setTrackSelector(trackSelector)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
                 .setLoadControl(loadControl)
                 .build().apply {
+                // Ensure track selection parameters also lock into the highest supported bitrate
+                trackSelectionParameters = trackSelectionParameters.buildUpon()
+                    .setForceHighestSupportedBitrate(true)
+                    .build()
                 playWhenReady = isPlayingState
                 val uri = if (offlineFile.exists()) {
                     android.net.Uri.fromFile(offlineFile)
@@ -1107,7 +1125,7 @@ fun RutubeVideoPlayer(
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
-                                    onToggleFullscreen()
+                                    onShare()
                                 },
                                 modifier = Modifier.size(32.dp).sleekTvFocus(CircleShape)
                             ) {

@@ -88,7 +88,7 @@ fun ExploreTabScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(115.dp)
-                                    .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.18f, onEnter = {
+                                    .sleekTvFocus(shape = RoundedCornerShape(16.dp), scaleAmount = 1.05f, onEnter = {
                                         viewModel.selectCategory(item.title, item.target)
                                         viewModel.selectTab("home")
                                     })
