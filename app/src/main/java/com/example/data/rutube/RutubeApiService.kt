@@ -47,6 +47,11 @@ interface RutubeApiService {
         @Query("format") format: String = "json"
     ): ResponseBody
 
+    @GET("api/video/{videoid}/sub/")
+    suspend fun getSubtitles(
+        @retrofit2.http.Path("videoid") videoid: String
+    ): ResponseBody
+
     @GET
     suspend fun getDynamicUrl(
         @Url url: String
