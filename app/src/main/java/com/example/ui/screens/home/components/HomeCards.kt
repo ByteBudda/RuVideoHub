@@ -208,6 +208,19 @@ fun HeroVideoCard(
                             Text(if (video.isDownloaded) "Удалить" else "Скачать")
                         }
                     }
+                    
+                    if (onDeleteClick != null) {
+                        Button(
+                            onClick = { 
+                                showMenu = false
+                                onDeleteClick()
+                            },
+                            modifier = btnModifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
+                        ) {
+                            Text("Удалить из истории")
+                        }
+                    }
                 }
             }
         }
@@ -380,6 +393,19 @@ fun SleekVideoGridItem(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
                         ) {
                             Text(if (video.isDownloaded) "Удалить" else "Скачать")
+                        }
+                    }
+                    
+                    if (onDeleteClick != null) {
+                        Button(
+                            onClick = { 
+                                showMenu = false
+                                onDeleteClick()
+                            },
+                            modifier = btnModifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
+                        ) {
+                            Text("Удалить из истории")
                         }
                     }
                 }
