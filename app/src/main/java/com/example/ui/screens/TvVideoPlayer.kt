@@ -37,6 +37,7 @@ import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.viewmodel.VideoViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun TvTvSimulatedPlaybackBars(modifier: Modifier = Modifier) {
@@ -130,6 +131,8 @@ fun TvRutubeVideoPlayer(
     var selectedQuality by remember(globalQuality) { mutableStateOf(globalQuality) }
 
     var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
+    var subtitles by remember(videoId) { mutableStateOf<List<com.example.data.SubtitleTrack>>(emptyList()) }
+
     var isLoading by remember(videoId) { mutableStateOf(true) }
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
     var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
@@ -169,6 +172,11 @@ fun TvRutubeVideoPlayer(
     }
 
     LaunchedEffect(videoId, selectedQuality) {
+        // Fetch subtitles in parallel
+        launch {
+            subtitles = viewModel.fetchSubtitles(videoId)
+        }
+
         if (isLive) {
             isLoading = false
             return@LaunchedEffect
@@ -194,7 +202,7 @@ fun TvRutubeVideoPlayer(
         }
     }
 
-    val exoPlayer = remember(videoId, hlsUrl) {
+    val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
             val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
                 .setBufferDurationsMs(32000, 120000, 2500, 5000)
@@ -217,6 +225,20 @@ fun TvRutubeVideoPlayer(
                     android.net.Uri.parse(hlsUrl)
                 }
 
+                val subtitleConfigs = subtitles.map { track ->
+                    val mimeType = if (track.format.lowercase() == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
+                    androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(track.url))
+                        .setMimeType(mimeType)
+                        .setLanguage(track.language)
+                        .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
+                        .build()
+                }
+
+                val mediaItem = androidx.media3.common.MediaItem.Builder()
+                    .setUri(uri)
+                    .setSubtitleConfigurations(subtitleConfigs)
+                    .build()
+
                 if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
                     val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
                         .setUserAgent("Mozilla/5.0")
@@ -225,10 +247,10 @@ fun TvRutubeVideoPlayer(
                             "Referer" to "https://rutube.ru/"
                         ))
                     val mediaSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(androidx.media3.common.MediaItem.fromUri(uri))
+                        .createMediaSource(mediaItem)
                     setMediaSource(mediaSource)
                 } else {
-                    setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
+                    setMediaItem(mediaItem)
                 }
                 prepare()
                 
