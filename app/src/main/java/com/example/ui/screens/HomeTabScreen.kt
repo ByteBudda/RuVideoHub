@@ -305,12 +305,15 @@ fun HomeTabScreen(
                                 )
                             }
                             
-                            if (video.duration == "ПЛЕЙЛИСТ" || isChannelView) {
+                            if (video.duration == "ПЛЕЙЛИСТ" || video.duration == com.example.utils.VideoType.SERIES || isChannelView) {
                                 IconButton(
                                     onClick = {
                                         val shareUrl = if (isChannelView) {
                                             val rawChannelId = video.id.substringAfter("channel_").substringBefore("__")
                                             "https://rutube.ru/channel/$rawChannelId/"
+                                        } else if (video.duration == com.example.utils.VideoType.SERIES) {
+                                            val rawSeriesId = video.id.substringAfter("tv_").substringBefore("__")
+                                            "https://rutube.ru/metainfo/tv/$rawSeriesId/"
                                         } else {
                                             val id = video.id.substringAfter("playlist_").substringBefore("__")
                                             "https://rutube.ru/plst/$id/"
@@ -341,6 +344,18 @@ fun HomeTabScreen(
                 }
             }
             
+            // 3.4. Series / Playlist Header
+            if (!isChannelView && (currentSubfolderVideo?.duration == com.example.utils.VideoType.SERIES || currentSubfolderVideo?.duration == com.example.utils.VideoType.PLAYLIST || currentSubfolderVideo?.duration == "ПЛЕЙЛИСТ")) {
+                item {
+                    com.example.ui.screens.home.components.SeriesHeader(
+                        series = currentSubfolderVideo,
+                        isDark = isDarkTheme,
+                        isTvOptimized = isTvOptimized,
+                        focusRequester = null
+                    )
+                }
+            }
+
             // 3.5. Channel header
             if (isChannelView) {
                 item {
