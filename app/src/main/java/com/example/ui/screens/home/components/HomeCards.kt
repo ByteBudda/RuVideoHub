@@ -101,48 +101,50 @@ fun HeroVideoCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (onChannelClick != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            var channelModifier = Modifier
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                            
-                            if (!isTvOptimized) {
-                                channelModifier = Modifier
-                                    .clickable(onClick = onChannelClick)
-                                    .then(channelModifier)
+                    if (video.channel.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        if (onChannelClick != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                var channelModifier = Modifier
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                                
+                                if (!isTvOptimized) {
+                                    channelModifier = Modifier
+                                        .clickable(onClick = onChannelClick)
+                                        .then(channelModifier)
+                                }
+                                
+                                Text(
+                                    text = video.channel,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .then(channelModifier)
+                                )
                             }
-                            
-                            Text(
-                                text = video.channel,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .weight(1f, fill = false)
-                                    .then(channelModifier)
-                            )
-                        }
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = video.channel,
-                                color = GreyText,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = video.channel,
+                                    color = GreyText,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                            }
                         }
                     }
                 }
@@ -269,46 +271,46 @@ fun SleekVideoGridItem(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (onChannelClick != null) {
-                        var channelModifier = Modifier
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                        
-                        if (!isTvOptimized) {
-                            channelModifier = Modifier
-                                .clickable(onClick = onChannelClick)
-                                .then(channelModifier)
+                if (video.channel.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (onChannelClick != null) {
+                            var channelModifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                            
+                            if (!isTvOptimized) {
+                                channelModifier = Modifier
+                                    .clickable(onClick = onChannelClick)
+                                    .then(channelModifier)
+                            }
+                            
+                            Text(
+                                text = video.channel,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .then(channelModifier)
+                            )
+                        } else {
+                            Text(
+                                text = video.channel,
+                                color = GreyText,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
                         }
-                        
-                        Text(
-                            text = video.channel,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .weight(1f, fill = false)
-                                .then(channelModifier)
-                        )
-                    } else {
-                        Text(
-                            text = video.channel,
-                            color = GreyText,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
                     }
-
-
                 }
             }
         }
@@ -417,35 +419,37 @@ fun SecondaryVideoItemRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (onChannelClick != null) {
-                    Text(
-                        text = video.channel,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .sleekTvFocus(shape = RoundedCornerShape(8.dp), scaleAmount = 1.18f, onEnter = onChannelClick)
-                            .clickable(onClick = onChannelClick)
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
-                    )
-                } else {
-                    Text(
-                        text = video.channel,
-                        fontSize = 10.sp,
-                        color = GreyText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
+            if (video.channel.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (onChannelClick != null) {
+                        Text(
+                            text = video.channel,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .sleekTvFocus(shape = RoundedCornerShape(8.dp), scaleAmount = 1.18f, onEnter = onChannelClick)
+                                .clickable(onClick = onChannelClick)
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                        )
+                    } else {
+                        Text(
+                            text = video.channel,
+                            fontSize = 10.sp,
+                            color = GreyText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
                 }
             }
 

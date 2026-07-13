@@ -161,7 +161,7 @@ fun VideoThumbnail(
         }
 
         // Duration capsule
-        if (duration.isNotBlank() && duration != "СЕРИАЛ" && duration != "СЕРИАЛ") {
+        if (duration.isNotBlank() && duration != "СЕРИАЛ" && duration != "ПРОМО" && duration != "КАТАЛОГ") {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)

@@ -137,7 +137,7 @@ fun CategoryRow(
 
             Box(
                 modifier = Modifier
-                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), scaleAmount = 1.18f, onEnter = { onCategorySelected(cat) })
+                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), scaleAmount = 1.05f, onEnter = { onCategorySelected(cat) })
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isSelected) Primary else SurfaceVariant)
                     .clickable { onCategorySelected(cat) }
@@ -179,7 +179,7 @@ fun FeedTabRow(
             
             Box(
                 modifier = Modifier
-                    .sleekTvFocus(shape = RoundedCornerShape(100.dp), scaleAmount = 1.18f, onEnter = { onTabSelected(tab) })
+                    .sleekTvFocus(shape = RoundedCornerShape(100.dp), scaleAmount = 1.05f, onEnter = { onTabSelected(tab) })
                     .then(
                         if (isSelected && focusRequester != null) {
                             Modifier.focusRequester(focusRequester)
