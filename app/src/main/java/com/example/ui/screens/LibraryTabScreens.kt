@@ -146,8 +146,12 @@ fun RecentsTabScreen(
                 )
             }
 
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .mouseDragScrollable(listState, isVertical = true),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(top = 2.dp, bottom = 80.dp)
             ) {
@@ -304,8 +308,12 @@ fun DownloadsTabScreen(
                 )
             }
 
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .mouseDragScrollable(listState, isVertical = true),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(top = 2.dp, bottom = 80.dp)
             ) {
@@ -766,8 +774,12 @@ fun LibraryTabScreen(
             var subcategoriesExpanded by remember { mutableStateOf(true) }
             var playlistsExpanded by remember { mutableStateOf(true) }
 
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .mouseDragScrollable(listState, isVertical = true),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
@@ -1025,12 +1037,9 @@ fun BookmarkItemRow(
                 onLongEnter = onDelete
             )
             .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-            .then(
-                if (isTvOptimized) Modifier
-                else Modifier.combinedClickable(
-                    onClick = { viewModel.selectVideo(videoRuntime) },
-                    onLongClick = onDelete
-                )
+            .combinedClickable(
+                onClick = { viewModel.selectVideo(videoRuntime) },
+                onLongClick = onDelete
             )
     ) {
         Row(

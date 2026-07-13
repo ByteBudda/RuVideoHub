@@ -188,7 +188,9 @@ fun HomeTabScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .mouseDragScrollable(listState, isVertical = true),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             // 1. App search header

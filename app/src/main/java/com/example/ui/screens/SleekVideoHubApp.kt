@@ -144,11 +144,15 @@ fun Modifier.sleekTvFocus(
         .then(focusModifier)
 }
 
-fun Modifier.mouseDragScrollable(state: androidx.compose.foundation.lazy.LazyListState): Modifier = this.pointerInput(state) {
+fun Modifier.mouseDragScrollable(
+    state: androidx.compose.foundation.lazy.LazyListState,
+    isVertical: Boolean = false
+): Modifier = this.pointerInput(state, isVertical) {
     detectDragGestures(
         onDrag = { change, dragAmount ->
             change.consume()
-            state.dispatchRawDelta(-dragAmount.x)
+            val delta = if (isVertical) -dragAmount.y else -dragAmount.x
+            state.dispatchRawDelta(delta)
         }
     )
 }

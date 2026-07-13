@@ -17,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -54,8 +56,8 @@ object LegalContent {
     const val APP_NAME = "RuVideoHub"
     const val GITHUB_URL = "https://github.com/ByteBudda/RuVideoHub"
     const val LICENSE = "GNU General Public License v3.0"
-    const val VERSION = "3.5.68"
-    const val CONTACT_EMAIL = "nomail"
+    val VERSION = com.example.BuildConfig.VERSION_NAME
+    const val CONTACT_EMAIL = "your.email@example.com"
     const val COPYRIGHT_YEAR = "2026"
 
     val sections = listOf(
@@ -319,8 +321,12 @@ fun TermsAgreementScreen(
             ),
             shape = RoundedCornerShape(16.dp)
         ) {
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.padding(16.dp),
+                state = listState,
+                modifier = Modifier
+                    .padding(16.dp)
+                    .mouseDragScrollable(listState, isVertical = true),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Ключевые пункты
@@ -508,12 +514,15 @@ fun FullAgreementDialog(
                 )
             }
         ) { paddingValues ->
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
                     .padding(paddingValues)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .mouseDragScrollable(listState, isVertical = true),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
@@ -553,7 +562,7 @@ fun FullAgreementDialog(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
+                            LinkifiedText(
                                 text = section.content,
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -580,7 +589,7 @@ fun FullAgreementDialog(
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
+                                            LinkifiedText(
                                                 text = sub.content,
                                                 fontSize = 11.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -613,3 +622,88 @@ fun FullAgreementDialog(
         }
     }
 }
+
+@Composable
+fun LinkifiedText(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    color: androidx.compose.ui.graphics.Color,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier
+) {
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    
+    val urlRegex = Regex("(https?://[\\w\\d:#@%/;$()~_?\\+-=\\\\\\.&]*)")
+    val emailRegex = Regex("([\\w\\d._%+-]+@[\\w\\d.-]+\\.[\\w]{2,})")
+    
+    // Find matches
+    val matches = mutableListOf<Pair<IntRange, String>>()
+    urlRegex.findAll(text).forEach { matchResult ->
+        matches.add(matchResult.range to matchResult.value)
+    }
+    emailRegex.findAll(text).forEach { matchResult ->
+        matches.add(matchResult.range to "mailto:${matchResult.value}")
+    }
+    
+    // Sort matches by start index to avoid overlapping or out-of-order appends
+    matches.sortBy { it.first.first }
+    
+    val annotatedString = buildAnnotatedString {
+        var lastIndex = 0
+        for (match in matches) {
+            val range = match.first
+            val url = match.second
+            
+            // Check if there is overlap or if we already processed this range
+            if (range.first >= lastIndex) {
+                append(text.substring(lastIndex, range.first))
+                
+                pushStringAnnotation(tag = "URL", annotation = url)
+                withStyle(
+                    style = SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline
+                    )
+                ) {
+                    append(text.substring(range.first, range.last + 1))
+                }
+                pop()
+                
+                lastIndex = range.last + 1
+            }
+        }
+        if (lastIndex < text.length) {
+            append(text.substring(lastIndex))
+        }
+    }
+    
+    ClickableText(
+        text = annotatedString,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            color = color,
+            fontSize = fontSize,
+            lineHeight = lineHeight
+        ),
+        modifier = modifier,
+        onClick = { offset ->
+            annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                .firstOrNull()?.let { annotation ->
+                    try {
+                        val url = annotation.item
+                        if (url.startsWith("mailto:")) {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse(url)
+                            }
+                            context.startActivity(intent)
+                        } else {
+                            uriHandler.openUri(url)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+        }
+    )
+}
+

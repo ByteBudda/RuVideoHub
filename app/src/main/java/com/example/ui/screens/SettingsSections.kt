@@ -637,7 +637,7 @@ fun QualitySettingsSection(
                 onDismissRequest = { dropdownExpanded = false },
                 modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
-                listOf("Авто", "2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
+                listOf("Авто", "1080p", "720p", "480p", "360p").forEach { opt ->
                     DropdownMenuItem(
                         text = { Text(opt, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp) },
                         onClick = {
@@ -679,7 +679,7 @@ fun QualitySettingsSection(
                 onDismissRequest = { dlDropdownExpanded = false },
                 modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
-                listOf("2160p", "1440p", "1080p", "720p", "480p", "360p").forEach { opt ->
+                listOf("1080p", "720p", "480p", "360p").forEach { opt ->
                     DropdownMenuItem(
                         text = { Text(opt, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp) },
                         onClick = {

@@ -152,9 +152,13 @@ fun TvMiniPlayerScreen(
                             )
                         }
                     } else {
+                        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         LazyColumn(
+                            state = listState,
                             verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .mouseDragScrollable(listState, isVertical = true)
                         ) {
                             items(playableVideos.size) { index ->
                                 val video = playableVideos[index]
