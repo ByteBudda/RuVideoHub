@@ -52,10 +52,10 @@ data class LegalSubsection(
 object LegalContent {
     
     const val APP_NAME = "RuVideoHub"
-    const val GITHUB_URL = "https://github.com/yourusername/ru-video-hub"
+    const val GITHUB_URL = "https://github.com/ByteBudda/RuVideoHub"
     const val LICENSE = "GNU General Public License v3.0"
-    const val VERSION = "1.0.0"
-    const val CONTACT_EMAIL = "your.email@example.com"
+    const val VERSION = "3.5.68"
+    const val CONTACT_EMAIL = "nomail"
     const val COPYRIGHT_YEAR = "2026"
 
     val sections = listOf(
