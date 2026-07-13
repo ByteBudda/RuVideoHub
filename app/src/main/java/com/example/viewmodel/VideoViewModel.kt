@@ -1581,28 +1581,76 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // Rutube integration
-                val rtId = parseVideoIdFromRutubeUrl(trimmed)
-                if (rtId.isNotBlank()) {
-                    val apiUrl = "https://rutube.ru/api/video/$rtId/?format=json"
-                    val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(apiUrl)
-                    val bodyStr = response.string()
-                    val list = repository.parseVideoListJson(bodyStr, "Разное")
-                    if (list.isNotEmpty()) {
-                        selectVideo(list.first())
-                    } else {
-                        // Minimal video object if list parsing fails but ID was found
-                        val minimalVideo = Video(
-                            id = rtId,
-                            title = "Rutube Видео ($rtId)",
-                            channel = "Rutube",
-                            views = "",
-                            timeAgo = "Только что",
-                            duration = "00:00",
-                            category = "Разное",
-                            description = "Импортировано из ссылки Rutube.",
-                            thumbnailUrl = ""
-                        )
-                        selectVideo(minimalVideo)
+                val resolved = com.example.utils.UrlResolver.resolveUrl(trimmed)
+                if (resolved.type != com.example.utils.UrlResolver.EntityType.UNKNOWN) {
+                    when (resolved.type) {
+                        com.example.utils.UrlResolver.EntityType.VIDEO -> {
+                            val rtId = resolved.id
+                            val apiUrl = "https://rutube.ru/api/video/$rtId/?format=json"
+                            val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(apiUrl)
+                            val bodyStr = response.string()
+                            val list = repository.parseVideoListJson(bodyStr, "Разное")
+                            if (list.isNotEmpty()) {
+                                selectVideo(list.first())
+                            } else {
+                                // Minimal video object if list parsing fails but ID was found
+                                val minimalVideo = Video(
+                                    id = rtId,
+                                    title = "Rutube Видео ($rtId)",
+                                    channel = "Rutube",
+                                    views = "",
+                                    timeAgo = "Только что",
+                                    duration = "00:00",
+                                    category = "Разное",
+                                    description = "Импортировано из ссылки Rutube.",
+                                    thumbnailUrl = ""
+                                )
+                                selectVideo(minimalVideo)
+                            }
+                        }
+                        com.example.utils.UrlResolver.EntityType.CHANNEL -> {
+                            val dummyChannel = Video(
+                                id = "channel_${resolved.id}__",
+                                title = "Канал",
+                                channel = "Канал",
+                                duration = com.example.utils.VideoType.CHANNEL,
+                                thumbnailUrl = "",
+                                views = "",
+                                timeAgo = "",
+                                description = "",
+                                category = "Разное"
+                            )
+                            selectVideo(dummyChannel)
+                        }
+                        com.example.utils.UrlResolver.EntityType.PLAYLIST -> {
+                            val dummyPlaylist = Video(
+                                id = "playlist_${resolved.id}__${resolved.rawUrl ?: ""}",
+                                title = "Плейлист",
+                                channel = "Плейлист",
+                                duration = com.example.utils.VideoType.PLAYLIST,
+                                thumbnailUrl = "",
+                                views = "",
+                                timeAgo = "",
+                                description = "",
+                                category = "Разное"
+                            )
+                            selectVideo(dummyPlaylist)
+                        }
+                        com.example.utils.UrlResolver.EntityType.SERIES -> {
+                            val dummySeries = Video(
+                                id = "tv_${resolved.id}__${resolved.rawUrl ?: ""}",
+                                title = "Сериал / Шоу",
+                                channel = "Шоу",
+                                duration = com.example.utils.VideoType.SERIES,
+                                thumbnailUrl = "",
+                                views = "",
+                                timeAgo = "",
+                                description = "",
+                                category = "Разное"
+                            )
+                            selectVideo(dummySeries)
+                        }
+                        else -> {}
                     }
                     return@launch
                 }
