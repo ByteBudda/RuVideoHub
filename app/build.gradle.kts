@@ -14,8 +14,8 @@ android {
     applicationId = "com.bytebudda"
     minSdk = 24
     targetSdk = 36
-    versionCode = 4
-    versionName = "3.5.69"
+    versionCode = 5
+    versionName = "3.5.70"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
