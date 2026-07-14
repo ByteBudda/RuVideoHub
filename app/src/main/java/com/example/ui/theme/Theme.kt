@@ -50,72 +50,72 @@ private val LightColorScheme = lightColorScheme(
   onTertiaryContainer = LightProBadgeText
 )
 
-private val SlateColorScheme = darkColorScheme(
-  primary = SlatePrimary,
-  onPrimary = SlateOnPrimary,
-  primaryContainer = SlatePrimaryContainer,
-  onPrimaryContainer = SlateOnPrimaryContainer,
-  background = SlateBackground,
-  onBackground = SlateOnBackground,
-  surface = SlateSurface,
-  onSurface = SlateOnSurface,
-  surfaceVariant = SlateSurfaceVariant,
-  onSurfaceVariant = SlateOnSurfaceVariant,
-  outline = SlateOutline,
-  secondaryContainer = SlateSecondaryBackground,
-  tertiaryContainer = SlateProBadgeBg,
-  onTertiaryContainer = SlateProBadgeText
+private val SketchDarkColorScheme = darkColorScheme(
+  primary = SketchDarkPrimary,
+  onPrimary = SketchDarkOnPrimary,
+  primaryContainer = SketchDarkPrimaryContainer,
+  onPrimaryContainer = SketchDarkOnPrimaryContainer,
+  background = SketchDarkBackground,
+  onBackground = SketchDarkOnBackground,
+  surface = SketchDarkSurface,
+  onSurface = SketchDarkOnSurface,
+  surfaceVariant = SketchDarkSurfaceVariant,
+  onSurfaceVariant = SketchDarkOnSurfaceVariant,
+  outline = SketchDarkOutline,
+  secondaryContainer = SketchDarkSecondaryBackground,
+  tertiaryContainer = SketchDarkProBadgeBg,
+  onTertiaryContainer = SketchDarkProBadgeText
 )
 
-private val SepiaColorScheme = lightColorScheme(
-  primary = SepiaPrimary,
-  onPrimary = SepiaOnPrimary,
-  primaryContainer = SepiaPrimaryContainer,
-  onPrimaryContainer = SepiaOnPrimaryContainer,
-  background = SepiaBackground,
-  onBackground = SepiaOnBackground,
-  surface = SepiaSurface,
-  onSurface = SepiaOnSurface,
-  surfaceVariant = SepiaSurfaceVariant,
-  onSurfaceVariant = SepiaOnSurfaceVariant,
-  outline = SepiaOutline,
-  secondaryContainer = SepiaSecondaryBackground,
-  tertiaryContainer = SepiaProBadgeBg,
-  onTertiaryContainer = SepiaProBadgeText
+private val SketchLightColorScheme = lightColorScheme(
+  primary = SketchLightPrimary,
+  onPrimary = SketchLightOnPrimary,
+  primaryContainer = SketchLightPrimaryContainer,
+  onPrimaryContainer = SketchLightOnPrimaryContainer,
+  background = SketchLightBackground,
+  onBackground = SketchLightOnBackground,
+  surface = SketchLightSurface,
+  onSurface = SketchLightOnSurface,
+  surfaceVariant = SketchLightSurfaceVariant,
+  onSurfaceVariant = SketchLightOnSurfaceVariant,
+  outline = SketchLightOutline,
+  secondaryContainer = SketchLightSecondaryBackground,
+  tertiaryContainer = SketchLightProBadgeBg,
+  onTertiaryContainer = SketchLightProBadgeText
 )
 
-private val CyberpunkColorScheme = darkColorScheme(
-  primary = CyberpunkPrimary,
-  onPrimary = CyberpunkOnPrimary,
-  primaryContainer = CyberpunkPrimaryContainer,
-  onPrimaryContainer = CyberpunkOnPrimaryContainer,
-  background = CyberpunkBackground,
-  onBackground = CyberpunkOnBackground,
-  surface = CyberpunkSurface,
-  onSurface = CyberpunkOnSurface,
-  surfaceVariant = CyberpunkSurfaceVariant,
-  onSurfaceVariant = CyberpunkOnSurfaceVariant,
-  outline = CyberpunkOutline,
-  secondaryContainer = CyberpunkSecondaryBackground,
-  tertiaryContainer = CyberpunkProBadgeBg,
-  onTertiaryContainer = CyberpunkProBadgeText
+private val AeroVistaDarkColorScheme = darkColorScheme(
+  primary = AeroVistaDarkPrimary,
+  onPrimary = AeroVistaDarkOnPrimary,
+  primaryContainer = AeroVistaDarkPrimaryContainer,
+  onPrimaryContainer = AeroVistaDarkOnPrimaryContainer,
+  background = AeroVistaDarkBackground,
+  onBackground = AeroVistaDarkOnBackground,
+  surface = AeroVistaDarkSurface,
+  onSurface = AeroVistaDarkOnSurface,
+  surfaceVariant = AeroVistaDarkSurfaceVariant,
+  onSurfaceVariant = AeroVistaDarkOnSurfaceVariant,
+  outline = AeroVistaDarkOutline,
+  secondaryContainer = AeroVistaDarkSecondaryBackground,
+  tertiaryContainer = AeroVistaDarkProBadgeBg,
+  onTertiaryContainer = AeroVistaDarkProBadgeText
 )
 
-private val AmoledColorScheme = darkColorScheme(
-  primary = AmoledPrimary,
-  onPrimary = AmoledOnPrimary,
-  primaryContainer = AmoledPrimaryContainer,
-  onPrimaryContainer = AmoledOnPrimaryContainer,
-  background = AmoledBackground,
-  onBackground = AmoledOnBackground,
-  surface = AmoledSurface,
-  onSurface = AmoledOnSurface,
-  surfaceVariant = AmoledSurfaceVariant,
-  onSurfaceVariant = AmoledOnSurfaceVariant,
-  outline = AmoledOutline,
-  secondaryContainer = AmoledSecondaryBackground,
-  tertiaryContainer = AmoledProBadgeBg,
-  onTertiaryContainer = AmoledProBadgeText
+private val AeroVistaClassicColorScheme = lightColorScheme(
+  primary = AeroVistaClassicPrimary,
+  onPrimary = AeroVistaClassicOnPrimary,
+  primaryContainer = AeroVistaClassicPrimaryContainer,
+  onPrimaryContainer = AeroVistaClassicOnPrimaryContainer,
+  background = AeroVistaClassicBackground,
+  onBackground = AeroVistaClassicOnBackground,
+  surface = AeroVistaClassicSurface,
+  onSurface = AeroVistaClassicOnSurface,
+  surfaceVariant = AeroVistaClassicSurfaceVariant,
+  onSurfaceVariant = AeroVistaClassicOnSurfaceVariant,
+  outline = AeroVistaClassicOutline,
+  secondaryContainer = AeroVistaClassicSecondaryBackground,
+  tertiaryContainer = AeroVistaClassicProBadgeBg,
+  onTertiaryContainer = AeroVistaClassicProBadgeText
 )
 
 @Composable
@@ -134,17 +134,19 @@ fun MyApplicationTheme(
   } else {
       when (appTheme) {
           "light" -> LightColorScheme
-          "slate" -> SlateColorScheme
-          "sepia" -> SepiaColorScheme
-          "cyberpunk" -> CyberpunkColorScheme
-          "amoled" -> AmoledColorScheme
+          "slate" -> SketchDarkColorScheme
+          "sepia" -> SketchLightColorScheme
+          "cyberpunk" -> AeroVistaDarkColorScheme
+          "amoled" -> AeroVistaClassicColorScheme
           "dark" -> DarkColorScheme
           else -> if (darkTheme) DarkColorScheme else LightColorScheme
       }
   }
 
   val themeEffect = if (appEffect != "default") appEffect else (customTheme?.effect ?: when (appTheme) {
-      "dark", "light" -> "glassmorphism"
+      "dark", "light", "cyberpunk" -> "glassmorphism"
+      "amoled" -> "aurora"
+      "slate", "sepia" -> "neon"
       else -> "none"
   })
 

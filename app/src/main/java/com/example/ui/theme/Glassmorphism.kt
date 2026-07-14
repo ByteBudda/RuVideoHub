@@ -99,7 +99,7 @@ fun AmbientGlassBackground(
                         )
                     }
                     "aurora" -> {
-                        val alpha = if (isDark) 0.3f else 0.15f
+                        val alpha = if (isDark) 0.35f else 0.25f
                         drawRect(
                             brush = Brush.linearGradient(
                                 colors = listOf(
