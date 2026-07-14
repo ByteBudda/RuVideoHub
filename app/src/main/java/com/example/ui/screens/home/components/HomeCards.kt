@@ -38,6 +38,7 @@ fun HeroVideoCard(
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null,
+    onSaveToDeviceClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -209,6 +210,19 @@ fun HeroVideoCard(
                         }
                     }
                     
+                    if (video.isDownloaded && onSaveToDeviceClick != null) {
+                        Button(
+                            onClick = { 
+                                showMenu = false
+                                onSaveToDeviceClick()
+                            },
+                            modifier = btnModifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
+                        ) {
+                            Text("Сохранить на устройство")
+                        }
+                    }
+                    
                     if (onDeleteClick != null) {
                         Button(
                             onClick = { 
@@ -237,6 +251,7 @@ fun SleekVideoGridItem(
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null,
+    onSaveToDeviceClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -396,6 +411,19 @@ fun SleekVideoGridItem(
                         }
                     }
                     
+                    if (video.isDownloaded && onSaveToDeviceClick != null) {
+                        Button(
+                            onClick = { 
+                                showMenu = false
+                                onSaveToDeviceClick()
+                            },
+                            modifier = btnModifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
+                        ) {
+                            Text("Сохранить на устройство")
+                        }
+                    }
+                    
                     if (onDeleteClick != null) {
                         Button(
                             onClick = { 
@@ -423,6 +451,7 @@ fun SecondaryVideoItemRow(
     isDark: Boolean,
     onChannelClick: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null,
+    onSaveToDeviceClick: (() -> Unit)? = null,
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -540,6 +569,22 @@ fun SecondaryVideoItemRow(
                             tint = Primary,
                             modifier = Modifier.size(16.dp)
                         )
+                    }
+
+                    if (video.isDownloaded && onSaveToDeviceClick != null) {
+                        IconButton(
+                            onClick = onSaveToDeviceClick,
+                            modifier = Modifier.size(24.dp)
+                                .sleekTvFocus(CircleShape, scaleAmount = 1.18f)
+                                .testTag("save_to_device_${video.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SaveAlt,
+                                contentDescription = "Сохранить на устройство",
+                                tint = Primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
 
