@@ -150,6 +150,14 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         triggerDebouncedSearch(query, navigationManager.selectedCategory.value)
     }
 
+    fun setSearchSource(source: String) {
+        _searchSource.value = source
+        val q = navigationManager.searchQuery.value
+        if (q.isNotEmpty()) {
+            triggerDebouncedSearch(q, navigationManager.selectedCategory.value)
+        }
+    }
+
     fun togglePlayPause() = playerManager.togglePlayPause()
     fun setPlayingState(playing: Boolean) = playerManager.setPlayingState(playing)
     fun seekProgress(progress: Float) = playerManager.seekProgress(progress)
@@ -238,6 +246,9 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     // Dynamic list of real matching videos from network / offline database/built-in catalog
     private val _dynamicVideos = MutableStateFlow<List<Video>>(emptyList())
     val dynamicVideos = _dynamicVideos.asStateFlow()
+
+    private val _searchSource = MutableStateFlow("Rutube")
+    val searchSource = _searchSource.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading = _isLoading.asStateFlow()
@@ -563,55 +574,85 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
             try {
                 val q = query?.trim() ?: ""
+                val searchSrc = _searchSource.value
+                
+                if (q.isNotEmpty() && searchSrc != "Rutube") {
+                    val pluginResults = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val plugin = com.example.plugins.PluginManager.getPlugins().find { it.name == searchSrc }
+                        plugin?.search(q, 30) ?: emptyList()
+                    }
+                    
+                    val mapped = pluginResults.map { item ->
+                        val safeId = if (item.source == "VK Video" || item.url.contains("vk.com") || item.url.contains("vkvideo.ru")) {
+                            "vk_${item.id}"
+                        } else {
+                            "plugin_${item.source.replace(" ", "_")}_${item.id}"
+                        }
+                        mediaResolver.masterUrlCache.put(safeId + "_page", item.url)
+                        
+                        Video(
+                            id = safeId,
+                            title = item.title,
+                            channel = item.author.ifEmpty { item.source },
+                            views = item.views,
+                            timeAgo = "Только что",
+                            duration = formatDurationMs(item.duration),
+                            category = item.source,
+                            description = "Поиск ${item.source}",
+                            thumbnailUrl = item.thumbnail,
+                            isDownloaded = false,
+                            isBookmarked = false,
+                            pageUrl = item.url
+                        )
+                    }
+                    
+                    if (currentRequestId == requestId) {
+                        _dynamicVideos.value = mapped
+                        _feedTabs.value = emptyList()
+                        _isLoading.value = false
+                    }
+                    return@launch
+                }
                 if (q.isNotEmpty()) {
-                    // Check if VK url
-                    val parsedVk = com.example.data.vk.VkVideoLoader.parseVideoUrl(q)
-                    if (parsedVk != null) {
-                        try {
-                            val info = com.example.data.vk.VkVideoLoader.getVideoInfo(q)
-                            if (info != null) {
-                                val vkVideoId = "vk_${info.ownerId}_${info.videoId}"
-                                mediaResolver.masterUrlCache.put(vkVideoId, info.videoUrl)
-                                
-                                val vkVideo = Video(
-                                    id = vkVideoId,
-                                    title = info.title,
-                                    channel = "VK Видео (id: ${info.ownerId})",
-                                    views = "${info.views} просмотров",
-                                    timeAgo = "Только что",
-                                    duration = info.duration,
-                                    category = "VK",
-                                    description = "Видео из VK. Воспроизведение и скачивание.",
-                                    thumbnailUrl = info.thumbnail,
-                                    isDownloaded = false,
-                                    isBookmarked = false
-                                )
-                                val savedMap = repository.getSavedVideosOnly().first().associateBy { it.id }
-                                val saved = savedMap[vkVideoId]
-                                val finalVideo = vkVideo.copy(
-                                    isDownloaded = saved?.isDownloaded ?: false,
-                                    isBookmarked = saved?.isBookmarked ?: false
-                                )
-                                if (currentRequestId == requestId) {
-                                    _feedTabs.value = emptyList()
-                                    navigationManager.setFeedTab(null)
-                                    _dynamicVideos.value = listOf(finalVideo)
-                                }
-                            } else {
-                                if (currentRequestId == requestId) {
-                                    _dynamicVideos.value = emptyList()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("VideoViewModel", "Error fetching VK video in search", e)
-                            if (currentRequestId == requestId) {
-                                _dynamicVideos.value = emptyList()
-                            }
+                    // Check if plugin URL
+                    val pluginInfo = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        com.example.plugins.PluginManager.getVideoInfo(q)
+                    }
+                    if (pluginInfo != null) {
+                        val safeId = if (pluginInfo.source == "VK Video" || pluginInfo.url.contains("vk.com") || pluginInfo.url.contains("vkvideo.ru")) {
+                            "vk_${pluginInfo.id}"
+                        } else {
+                            "plugin_${pluginInfo.source.replace(" ", "_")}_${pluginInfo.id}"
+                        }
+                        mediaResolver.masterUrlCache.put(safeId + "_page", pluginInfo.url)
+                        
+                        val pluginVideo = Video(
+                            id = safeId,
+                            title = pluginInfo.title,
+                            channel = pluginInfo.author.ifEmpty { pluginInfo.source },
+                            views = pluginInfo.views,
+                            timeAgo = "Только что",
+                            duration = formatDurationMs(pluginInfo.duration),
+                            category = pluginInfo.source,
+                            description = "Видео из ${pluginInfo.source}. Воспроизведение и скачивание.",
+                            thumbnailUrl = pluginInfo.thumbnail,
+                            isDownloaded = false,
+                            isBookmarked = false,
+                            pageUrl = pluginInfo.url
+                        )
+                        val savedMap = repository.getSavedVideosOnly().first().associateBy { it.id }
+                        val saved = savedMap[safeId]
+                        val finalVideo = pluginVideo.copy(
+                            isDownloaded = saved?.isDownloaded ?: false,
+                            isBookmarked = saved?.isBookmarked ?: false
+                        )
+                        if (currentRequestId == requestId) {
+                            _feedTabs.value = emptyList()
+                            navigationManager.setFeedTab(null)
+                            _dynamicVideos.value = listOf(finalVideo)
                         }
                         return@launch
                     }
-
-                    // Check if Rutube url
                     if (q.contains("rutube.ru") || q.contains("rutube")) {
                         val rtVideoId = parseVideoIdFromRutubeUrl(q)
                         if (rtVideoId.isNotBlank()) {
@@ -742,6 +783,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val snapshotChannelView = navigationManager.isChannelView.value
         val snapshotChannelActiveTab = navigationManager.channelActiveTab.value
         
+        if (snapshotQuery != null && snapshotQuery.isNotEmpty() && _searchSource.value != "Rutube") {
+            return
+        }
+
         viewModelScope.launch {
             _isMoreLoading.value = true
             try {
@@ -1489,28 +1534,32 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // VK integration
-                val parsedVk = com.example.data.vk.VkVideoLoader.parseVideoUrl(trimmed)
-                if (parsedVk != null) {
-                    val info = com.example.data.vk.VkVideoLoader.getVideoInfo(trimmed)
-                    if (info != null) {
-                        val vkVideoId = "vk_${info.ownerId}_${info.videoId}"
-                        mediaResolver.masterUrlCache.put(vkVideoId, info.videoUrl)
-                        val vkVideo = Video(
-                            id = vkVideoId,
-                            title = info.title,
-                            channel = "VK Видео",
-                            views = "${info.views} просмотров",
-                            timeAgo = "Только что",
-                            duration = info.duration,
-                            category = "VK",
-                            description = "Видео из VK. Импортировано по ссылке.",
-                            thumbnailUrl = info.thumbnail,
-                            isDownloaded = false,
-                            isBookmarked = false
-                        )
-                        selectVideo(vkVideo)
+                // Check if plugin URL
+                val pluginInfo = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.example.plugins.PluginManager.getVideoInfo(trimmed)
+                }
+                if (pluginInfo != null) {
+                    val safeId = if (pluginInfo.source == "VK Video" || pluginInfo.url.contains("vk.com") || pluginInfo.url.contains("vkvideo.ru")) {
+                        "vk_${pluginInfo.id}"
+                    } else {
+                        "plugin_${pluginInfo.source.replace(" ", "_")}_${pluginInfo.id}"
                     }
+                    mediaResolver.masterUrlCache.put(safeId + "_page", pluginInfo.url)
+                    val pluginVideo = Video(
+                        id = safeId,
+                        title = pluginInfo.title,
+                        channel = pluginInfo.author.ifEmpty { pluginInfo.source },
+                        views = pluginInfo.views,
+                        timeAgo = "Только что",
+                        duration = formatDurationMs(pluginInfo.duration),
+                        category = pluginInfo.source,
+                        description = "Видео из ${pluginInfo.source}. Импортировано по ссылке.",
+                        thumbnailUrl = pluginInfo.thumbnail,
+                        isDownloaded = false,
+                        isBookmarked = false,
+                        pageUrl = pluginInfo.url
+                    )
+                    selectVideo(pluginVideo)
                     return@launch
                 }
 
@@ -1653,6 +1702,15 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         return com.example.utils.VideoDurationFormatter.getFormattedElapsedTime(durationStr, progress)
     }
 
+    private fun formatDurationMs(ms: Long): String {
+        if (ms <= 0) return ""
+        val totalSecs = ms / 1000
+        val h = totalSecs / 3600
+        val m = (totalSecs % 3600) / 60
+        val s = totalSecs % 60
+        return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%d:%02d", m, s)
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopPlaybackTicker()
@@ -1668,6 +1726,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun fetchHlsStreamUrl(videoId: String, quality: String = "Авто"): String? {
         return mediaResolver.fetchHlsStreamUrl(videoId, quality)
+    }
+    
+    fun getPluginPageUrl(videoId: String): String? {
+        return mediaResolver.masterUrlCache[videoId + "_page"]
     }
 
     /*
