@@ -997,7 +997,7 @@ fun RutubeVideoPlayer(
                                                 text = { 
                                                     Text(
                                                         text = q, 
-                                                        color = if (activeVideoQuality == q || selectedQuality == q) Primary else Color.White,
+                                                        color = if (activeVideoQuality == q || selectedQuality == q) Primary else MaterialTheme.colorScheme.onBackground,
                                                         fontSize = 11.sp,
                                                         fontWeight = if (activeVideoQuality == q || selectedQuality == q) FontWeight.Bold else FontWeight.Normal
                                                     ) 
@@ -1041,7 +1041,7 @@ fun RutubeVideoPlayer(
                                         modifier = Modifier.background(MaterialTheme.colorScheme.background)
                                     ) {
                                         DropdownMenuItem(
-                                            text = { Text("Выкл", color = if (activeSubtitleLanguage == null) Primary else Color.White, fontSize = 11.sp, fontWeight = if (activeSubtitleLanguage == null) FontWeight.Bold else FontWeight.Normal) },
+                                            text = { Text("Выкл", color = if (activeSubtitleLanguage == null) Primary else MaterialTheme.colorScheme.onBackground, fontSize = 11.sp, fontWeight = if (activeSubtitleLanguage == null) FontWeight.Bold else FontWeight.Normal) },
                                             onClick = {
                                                 activeSubtitleLanguage = null
                                                 subtitleMenuExpanded = false
@@ -1051,7 +1051,7 @@ fun RutubeVideoPlayer(
                                         )
                                         subtitles.forEach { track ->
                                             DropdownMenuItem(
-                                                text = { Text(track.language, color = if (activeSubtitleLanguage == track.language) Primary else Color.White, fontSize = 11.sp, fontWeight = if (activeSubtitleLanguage == track.language) FontWeight.Bold else FontWeight.Normal) },
+                                                text = { Text(track.language, color = if (activeSubtitleLanguage == track.language) Primary else MaterialTheme.colorScheme.onBackground, fontSize = 11.sp, fontWeight = if (activeSubtitleLanguage == track.language) FontWeight.Bold else FontWeight.Normal) },
                                                 onClick = {
                                                     activeSubtitleLanguage = track.language
                                                     subtitleMenuExpanded = false
@@ -1099,7 +1099,7 @@ fun RutubeVideoPlayer(
                                             text = { 
                                                 Text(
                                                     text = if (speed == 1.0f) "Обычная" else "${speed}x", 
-                                                    color = if (playbackSpeed == speed) Primary else Color.White,
+                                                    color = if (playbackSpeed == speed) Primary else MaterialTheme.colorScheme.onBackground,
                                                     fontSize = 11.sp,
                                                     fontWeight = if (playbackSpeed == speed) FontWeight.Bold else FontWeight.Normal
                                                 ) 
