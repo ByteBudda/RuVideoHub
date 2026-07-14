@@ -100,65 +100,79 @@ object UpdateManager {
         return false
     }
 
-    fun startDownloadAndInstall(context: Context, url: String, version: String) {
-        try {
-            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            val uri = Uri.parse(url)
-            val request = DownloadManager.Request(uri).apply {
-                setTitle("Загрузка обновления")
-                setDescription("Скачивание версии $version")
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "RuVideoHub_v$version.apk")
-                setMimeType("application/vnd.android.package-archive")
-            }
-            
-            val downloadId = downloadManager.enqueue(request)
-            downloadState.value = DownloadState.Downloading(-1f)
-            
-            CoroutineScope(Dispatchers.IO).launch {
-                var isDownloading = true
-                while (isDownloading) {
-                    val query = DownloadManager.Query().setFilterById(downloadId)
-                    val cursor = downloadManager.query(query)
-                    if (cursor != null && cursor.moveToFirst()) {
-                        val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                        val bytesDownloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                        val bytesTotalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                        
-                        if (statusIndex != -1 && bytesDownloadedIndex != -1 && bytesTotalIndex != -1) {
-                            val status = cursor.getInt(statusIndex)
-                            val bytesDownloaded = cursor.getLong(bytesDownloadedIndex)
-                            val bytesTotal = cursor.getLong(bytesTotalIndex)
-                            
-                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                                isDownloading = false
-                                downloadState.value = DownloadState.Finished
-                                delay(2000)
-                                downloadState.value = DownloadState.Idle
-                            } else if (status == DownloadManager.STATUS_FAILED) {
-                                isDownloading = false
-                                downloadState.value = DownloadState.Error("Download failed")
-                                delay(3000)
-                                downloadState.value = DownloadState.Idle
-                            } else {
-                                if (bytesTotal > 0) {
-                                    val progress = bytesDownloaded.toFloat() / bytesTotal.toFloat()
-                                    downloadState.value = DownloadState.Downloading(progress)
-                                } else {
-                                    downloadState.value = DownloadState.Downloading(-1f)
-                                }
-                            }
-                        }
-                    }
-                    cursor?.close()
-                    delay(100)
-                }
-            }
+    fun startDownloadAndInstall(context: Context, urlString: String, version: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                downloadState.value = DownloadState.Downloading(0f)
+                val url = URL(urlString)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connect()
 
-            // System DownloadManager handles the broadcast to open the APK automatically via the mime type,
-            // but we might need to listen to ACTION_DOWNLOAD_COMPLETE to trigger intent.
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    downloadState.value = DownloadState.Error("HTTP error: ${connection.responseCode}")
+                    delay(3000)
+                    downloadState.value = DownloadState.Idle
+                    return@launch
+                }
+
+                val fileLength = connection.contentLength
+                val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                if (downloadsDir != null && !downloadsDir.exists()) {
+                    downloadsDir.mkdirs()
+                }
+                val apkFile = File(downloadsDir, "RuVideoHub_v$version.apk")
+                if (apkFile.exists()) apkFile.delete()
+
+                val input = connection.inputStream
+                val output = java.io.FileOutputStream(apkFile)
+
+                val data = ByteArray(8192)
+                var total: Long = 0
+                var count: Int
+                while (input.read(data).also { count = it } != -1) {
+                    total += count
+                    if (fileLength > 0) {
+                        downloadState.value = DownloadState.Downloading(total.toFloat() / fileLength.toFloat())
+                    }
+                    output.write(data, 0, count)
+                }
+
+                output.flush()
+                output.close()
+                input.close()
+
+                downloadState.value = DownloadState.Finished
+                
+                // Trigger install
+                installApk(context, apkFile)
+                
+                delay(2000)
+                downloadState.value = DownloadState.Idle
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Download failed", e)
+                downloadState.value = DownloadState.Error(e.message ?: "Download failed")
+                delay(3000)
+                downloadState.value = DownloadState.Idle
+            }
+        }
+    }
+
+    private fun installApk(context: Context, file: File) {
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                file
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            context.startActivity(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start download", e)
+            Log.e(TAG, "Install failed", e)
         }
     }
 }
