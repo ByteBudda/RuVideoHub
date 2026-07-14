@@ -258,7 +258,22 @@ fun RutubeVideoPlayer(
                     .build()
             }
 
+            val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                .setDefaultRequestProperties(mapOf(
+                    "Accept" to "*/*",
+                    "Referer" to "https://rutube.ru/"
+                ))
+                .setConnectTimeoutMs(5000)
+                .setReadTimeoutMs(5000)
+                .setAllowCrossProtocolRedirects(true)
+            
+            val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
+            val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
+                .setDataSourceFactory(dataSourceFactory)
+
             androidx.media3.exoplayer.ExoPlayer.Builder(context, renderersFactory)
+                .setMediaSourceFactory(mediaSourceFactory)
                 .setTrackSelector(trackSelector)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
@@ -284,27 +299,15 @@ fun RutubeVideoPlayer(
                         .build()
                 }
 
-                val mediaItem = androidx.media3.common.MediaItem.Builder()
+                val mediaItemBuilder = androidx.media3.common.MediaItem.Builder()
                     .setUri(uri)
                     .setSubtitleConfigurations(subtitleConfigs)
-                    .build()
 
                 if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
-                    val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                        .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                        .setDefaultRequestProperties(mapOf(
-                            "Accept" to "*/*",
-                            "Referer" to "https://rutube.ru/"
-                        ))
-                        .setConnectTimeoutMs(5000)
-                        .setReadTimeoutMs(5000)
-                        .setAllowCrossProtocolRedirects(true)
-                    val mediaSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(mediaItem)
-                    setMediaSource(mediaSource)
-                } else {
-                    setMediaItem(mediaItem)
+                    mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
                 }
+                
+                setMediaItem(mediaItemBuilder.build())
                 prepare()
                 val savedPos = viewModel.getVideoPosition(videoId)
                 if (savedPos > 0L) {
