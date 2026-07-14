@@ -230,6 +230,7 @@ fun DownloadsTabScreen(
     viewModel: VideoViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
     val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
     val activeList = remember(activeDownloads) { activeDownloads.values.toList() }
@@ -433,6 +434,15 @@ fun DownloadsTabScreen(
                                     onVideoClick = { viewModel.selectVideo(videoRuntime) },
                                     onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
                                     onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                    onSaveToDeviceClick = {
+                                        if (android.os.Build.VERSION.SDK_INT >= 29) {
+                                            viewModel.saveToDevice(videoRuntime, context) { _, message ->
+                                                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                            }
+                                        } else {
+                                            android.widget.Toast.makeText(context, "Эта функция требует Android 10 и выше.", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
                                     isDark = isDarkTheme,
                                     isTvOptimized = isTvOptimized,
                                     modifier = Modifier.weight(1f)
@@ -451,6 +461,15 @@ fun DownloadsTabScreen(
                                 onVideoClick = { viewModel.selectVideo(videoRuntime) },
                                 onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
                                 onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                onSaveToDeviceClick = {
+                                    if (android.os.Build.VERSION.SDK_INT >= 29) {
+                                        viewModel.saveToDevice(videoRuntime, context) { _, message ->
+                                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    } else {
+                                        android.widget.Toast.makeText(context, "Эта функция требует Android 10 и выше.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                },
                                 isDark = isDarkTheme,
                                 isTvOptimized = isTvOptimized,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
@@ -464,6 +483,15 @@ fun DownloadsTabScreen(
                                 onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
                                 onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
                                 onDeleteClick = null,
+                                onSaveToDeviceClick = {
+                                    if (android.os.Build.VERSION.SDK_INT >= 29) {
+                                        viewModel.saveToDevice(videoRuntime, context) { _, message ->
+                                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    } else {
+                                        android.widget.Toast.makeText(context, "Эта функция требует Android 10 и выше.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                },
                                 isDark = isDarkTheme,
                                 isTvOptimized = isTvOptimized,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)

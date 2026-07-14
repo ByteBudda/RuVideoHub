@@ -94,10 +94,10 @@ fun InterfaceSettingsSection(
         val themeLabel = when (appTheme) {
             "dark" -> "Тёмная"
             "light" -> "Светлая"
-            "slate" -> "Тёмная нейтральная"
-            "sepia" -> "Светлая нейтральная"
-            "cyberpunk" -> "Киберпанк (Неон)"
-            "amoled" -> "Pure Black (AMOLED)"
+            "slate" -> "Скетч Dark"
+            "sepia" -> "Скетч"
+            "cyberpunk" -> "Aero Vista Dark"
+            "amoled" -> "Aero Vista Classic"
             else -> customThemes.find { it.id == appTheme }?.name ?: "Тёмная"
         }
 
@@ -181,10 +181,10 @@ fun InterfaceSettingsSection(
                 val baseThemes = listOf(
                     "dark" to "Тёмная",
                     "light" to "Светлая",
-                    "slate" to "Тёмная нейтральная",
-                    "sepia" to "Светлая нейтральная",
-                    "cyberpunk" to "Киберпанк (Неон)",
-                    "amoled" to "Pure Black (AMOLED)"
+                    "slate" to "Скетч Dark",
+                    "sepia" to "Скетч",
+                    "cyberpunk" to "Aero Vista Dark",
+                    "amoled" to "Aero Vista Classic"
                 )
                 val allThemes = baseThemes + customThemes.map { it.id to it.name }
                 allThemes.forEach { (id, label) ->

@@ -637,6 +637,8 @@ fun RutubeVideoPlayer(
                                 } else {
                                     "https://vk.com/video_ext.php?oid=$videoId&id=$videoId&autoplay=1"
                                 }
+                            } else if (videoId.startsWith("plugin_")) {
+                                viewModel.getPluginPageUrl(videoId) ?: "about:blank"
                             } else {
                                 "https://rutube.ru/play/embed/$videoId/?autoplay=1"
                             }
@@ -947,7 +949,8 @@ fun RutubeVideoPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (!offlineFile.exists()) {
+                            val isVkOrDzen = videoId.startsWith("vk_") || videoId.startsWith("plugin_Дзен_")
+                            if (!offlineFile.exists() && !isVkOrDzen) {
                                 var qualityMenuExpanded by remember { mutableStateOf(false) }
                                 val availableQualities by viewModel.currentAvailableQualities.collectAsStateWithLifecycle()
                                 val activeVideoQuality by viewModel.activeVideoQuality.collectAsStateWithLifecycle()

@@ -221,7 +221,8 @@ fun PlayerDetailsPanel(
             }
 
             // Quality Selection Pill
-            if (!video.isDownloaded && !isContainer) {
+            val isVkOrDzen = video.id.startsWith("vk_") || video.category == "VK Video" || video.category == "Дзен"
+            if (!video.isDownloaded && !isContainer && !isVkOrDzen) {
                 var qualityMenuExpanded by remember { mutableStateOf(false) }
                 val activeVideoQuality by viewModel.activeVideoQuality.collectAsStateWithLifecycle()
                 val currentQuality by viewModel.playerQuality.collectAsStateWithLifecycle()

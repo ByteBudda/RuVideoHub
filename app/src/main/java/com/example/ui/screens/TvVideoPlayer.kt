@@ -467,7 +467,20 @@ fun TvRutubeVideoPlayer(
                             isFocusable = false
                             isFocusableInTouchMode = false
                         }
-                        val url = "https://rutube.ru/play/embed/$videoId/"
+                        val url = if (videoId.startsWith("vk_")) {
+                            val parts = videoId.substringAfter("vk_").split("_")
+                            if (parts.size >= 2) {
+                                val ownerId = parts[0]
+                                val vkId = parts[1]
+                                "https://vk.com/video_ext.php?oid=$ownerId&id=$vkId&autoplay=1"
+                            } else {
+                                "https://vk.com/video_ext.php?oid=$videoId&id=$videoId&autoplay=1"
+                            }
+                        } else if (videoId.startsWith("plugin_")) {
+                            viewModel.getPluginPageUrl(videoId) ?: "about:blank"
+                        } else {
+                            "https://rutube.ru/play/embed/$videoId/?autoplay=1"
+                        }
                         loadUrl(url)
                     }
                 },
@@ -642,28 +655,31 @@ fun TvRutubeVideoPlayer(
                             modifier = Modifier.weight(1f)
                         )
                         
-                        val onQualityClick = {
-                            lastInteractionTime = System.currentTimeMillis()
-                            val qualities = listOf("Авто", "1080p", "720p", "480p")
-                            val nextIdx = (qualities.indexOf(selectedQuality) + 1) % qualities.size
-                            selectedQuality = qualities[nextIdx]
-                            viewModel.setPlayerQuality(selectedQuality)
+                        val isVkOrDzen = videoId.startsWith("vk_") || videoId.startsWith("plugin_Дзен_")
+                        if (!offlineFile.exists() && !isVkOrDzen) {
+                            val onQualityClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                val qualities = listOf("Авто", "1080p", "720p", "480p")
+                                val nextIdx = (qualities.indexOf(selectedQuality) + 1) % qualities.size
+                                selectedQuality = qualities[nextIdx]
+                                viewModel.setPlayerQuality(selectedQuality)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onQualityClick
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(selectedQuality, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
                         }
-                        Box(
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
-                                .clickable(
-                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                    indication = ripple(bounded = true),
-                                    onClick = onQualityClick
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(selectedQuality, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
                         
                         val onAspectClick = {
                             lastInteractionTime = System.currentTimeMillis()

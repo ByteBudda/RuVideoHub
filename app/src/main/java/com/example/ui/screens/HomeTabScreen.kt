@@ -52,6 +52,7 @@ fun HomeTabScreen(
     modifier: Modifier = Modifier
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchSource by viewModel.searchSource.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
     val isChannelView by viewModel.isChannelView.collectAsStateWithLifecycle()
     val channelActiveTab by viewModel.channelActiveTab.collectAsStateWithLifecycle()
@@ -210,7 +211,16 @@ fun HomeTabScreen(
             val shouldFocusContinueWatching = !shouldFocusFeedTab && !shouldFocusSubfolderBack && searchQuery.isBlank() && !isChannelView && selectedSubfolderName == null && continueWatchingVideos.isNotEmpty()
             val shouldFocusHeroCard = !shouldFocusFeedTab && !shouldFocusSubfolderBack && !shouldFocusContinueWatching && currentVideos.isNotEmpty()
 
-            if (feedTabs.isNotEmpty()) {
+            if (searchQuery.isNotEmpty()) {
+                item {
+                    val sources = listOf("Rutube", "VK Video", "Дзен")
+                    com.example.ui.screens.home.components.CategoryRow(
+                        categories = sources,
+                        selectedCategory = searchSource,
+                        onCategorySelected = { viewModel.setSearchSource(it) }
+                    )
+                }
+            } else if (feedTabs.isNotEmpty()) {
                 item {
                     FeedTabRow(
                         tabs = feedTabs,
