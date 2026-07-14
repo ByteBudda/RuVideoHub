@@ -234,6 +234,14 @@ fun RutubeVideoPlayer(
         }
     }
 
+    fun getBcp47Language(lang: String): String {
+        return when (lang.lowercase()) {
+            "русский", "russian", "ru" -> "ru"
+            "english", "английский", "en" -> "en"
+            else -> "ru"
+        }
+    }
+
     val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
             val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -294,7 +302,7 @@ fun RutubeVideoPlayer(
                     val mimeType = if (track.format.lowercase() == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
                     androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(track.url))
                         .setMimeType(mimeType)
-                        .setLanguage(track.language)
+                        .setLanguage(getBcp47Language(track.language))
                         .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
                         .build()
                 }
@@ -327,7 +335,7 @@ fun RutubeVideoPlayer(
             } else {
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                     .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
-                    .setPreferredTextLanguage(activeSubtitleLanguage)
+                    .setPreferredTextLanguage(getBcp47Language(activeSubtitleLanguage!!))
                     .build()
             }
         }
