@@ -17,5 +17,6 @@ data class Video(
     val isBookmarked: Boolean = false,
     val authorId: String? = null,
     val authorActionUrl: String? = null,
-    val authorAvatarUrl: String? = null
+    val authorAvatarUrl: String? = null,
+    val pageUrl: String? = null
 ) : Serializable
