@@ -158,6 +158,8 @@ class FloatingVideoService : Service() {
             } else {
                 "https://vk.com/video_ext.php?oid=$videoId&id=$videoId&autoplay=1"
             }
+        } else if (videoId.startsWith("plugin_")) {
+            "about:blank"
         } else {
             "https://rutube.ru/play/embed/$videoId/?autoplay=1"
         }

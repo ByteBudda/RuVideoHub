@@ -79,7 +79,14 @@ class DownloadService : Service() {
 
         val job = serviceScope.launch {
             try {
-                if (video.id.startsWith("vk_")) {
+                if (video.id.startsWith("plugin_")) {
+                    downloadPluginVideoDirect(video) { completedId ->
+                        val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
+                        queue.removeAll { it.first.id == completedId }
+                        DownloadManager.saveQueue(this@DownloadService, queue)
+                        DownloadManager.onDownloadCompletedListener?.invoke(completedId)
+                    }
+                } else if (video.id.startsWith("vk_")) {
                     downloadVkVideoDirect(video) { completedId ->
                         // Removed from queue upon completion
                         val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
@@ -158,6 +165,91 @@ class DownloadService : Service() {
         val queue = DownloadManager.loadQueue(this)
         for (item in queue) {
             startBackgroundDownload(item.first, item.second)
+        }
+    }
+
+    private suspend fun downloadPluginVideoDirect(video: Video, onCompleted: (String) -> Unit) {
+        val id = video.id
+        val logs = CopyOnWriteArrayList<String>().apply {
+            add("[Плагин Загрузчик] Начат прямой сбор потока...")
+        }
+
+        fun updateDl(progress: Float, speed: String, etaStr: String, status: String) {
+            val currentDl = YtDlpDownload(
+                id = id,
+                title = video.title,
+                channel = video.channel,
+                thumbnailUrl = video.thumbnailUrl,
+                progress = progress,
+                speed = speed,
+                eta = etaStr,
+                status = status,
+                logs = logs.toList()
+            )
+            DownloadManager.updateActiveDownload(id, currentDl)
+        }
+
+        updateDl(0f, "0 B/s", "--:--", "Downloading")
+        logs.add("[Плагин Загрузчик] Разрешение URL трансляции для $id...")
+        
+        val pageUrl = video.pageUrl ?: ""
+        if (pageUrl.isBlank()) {
+            logs.add("[Плагин Загрузчик] Ошибка: ссылка на страницу не найдена в видео!")
+            updateDl(0f, "0 B/s", "--:--", "Error")
+            delay(5000)
+            DownloadManager.removeActiveDownload(id)
+            return
+        }
+
+        val streamInfo = com.example.plugins.PluginManager.resolveStream(pageUrl, audioOnly = false)
+        val streamUrl = streamInfo?.streamUrl ?: ""
+
+        if (streamUrl.isBlank()) {
+            logs.add("[Плагин Загрузчик] Ошибка: ссылка на поток не найдена!")
+            updateDl(0f, "0 B/s", "--:--", "Error")
+            delay(5000)
+            DownloadManager.removeActiveDownload(id)
+            return
+        }
+
+        logs.add("[Плагин Загрузчик] Начинается скачивание...")
+        updateDl(0.01f, "0 B/s", "--:--", "Downloading")
+
+        val downloadFolder = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val targetFile = File(downloadFolder, "$id.mp4")
+
+        val success = com.example.data.vk.VkVideoLoader.downloadVideo(
+            videoUrl = streamUrl,
+            targetFile = targetFile,
+            onProgress = { progress, speed, etaStr ->
+                if ((progress * 100).toInt() % 10 == 0) {
+                    logs.add("[Плагин Загрузчик] Скачано ${(progress * 100).toInt()}% ($speed) ETA: $etaStr")
+                }
+                updateDl(progress, speed, etaStr, "Downloading")
+            }
+        )
+
+        if (success) {
+            try {
+                logs.add("[Плагин Загрузчик] Файл сохранен в ${targetFile.absolutePath}")
+                updateDl(1f, "0 B/s", "00:00", "Finished")
+
+                repository.toggleDownload(video)
+                onCompleted(id)
+
+                delay(3000)
+                DownloadManager.removeActiveDownload(id)
+            } catch (e: Exception) {
+                logs.add("[Плагин Загрузчик] Ошибка сохранения файла: ${e.message}")
+                updateDl(0f, "0 B/s", "--:--", "Error")
+                delay(5000)
+                DownloadManager.removeActiveDownload(id)
+            }
+        } else {
+            logs.add("[Плагин Загрузчик] Ошибка скачивания видео!")
+            updateDl(0f, "0 B/s", "--:--", "Error")
+            delay(5000)
+            DownloadManager.removeActiveDownload(id)
         }
     }
 
