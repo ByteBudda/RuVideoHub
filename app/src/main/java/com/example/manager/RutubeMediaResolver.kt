@@ -32,7 +32,7 @@ class RutubeMediaResolver(
         return withContext(Dispatchers.IO) {
             try {
                 // If it's a VK video or other external, we skip for now
-                if (videoId.startsWith("vk_") || videoId.startsWith("channel_") || videoId.startsWith("playlist_")) {
+                if (videoId.startsWith("vk_") || videoId.startsWith("plugin_") || videoId.startsWith("channel_") || videoId.startsWith("playlist_")) {
                     return@withContext emptyList()
                 }
                 
@@ -59,6 +59,26 @@ class RutubeMediaResolver(
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String, quality: String = "Авто"): String? {
+        if (videoId.startsWith("plugin_")) {
+            val cachedMaster = masterUrlCache[videoId]
+            if (cachedMaster != null) {
+                return cachedMaster
+            }
+            return withContext(Dispatchers.IO) {
+                try {
+                    val pageUrl = masterUrlCache[videoId + "_page"] ?: return@withContext null
+                    val streamInfo = com.example.plugins.PluginManager.resolveStream(pageUrl, audioOnly = false)
+                    val streamUrl = streamInfo?.streamUrl
+                    if (streamUrl != null) {
+                        masterUrlCache.put(videoId, streamUrl)
+                    }
+                    streamUrl
+                } catch (e: Exception) {
+                    android.util.Log.e("RutubeMediaResolver", "Error fetching stream for plugin video: $videoId", e)
+                    null
+                }
+            }
+        }
         if (videoId.startsWith("vk_")) {
             val cachedMaster = masterUrlCache[videoId]
             if (cachedMaster != null) {
