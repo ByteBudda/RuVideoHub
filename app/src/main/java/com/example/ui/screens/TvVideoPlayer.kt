@@ -134,6 +134,7 @@ fun TvRutubeVideoPlayer(
 
     var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
     var subtitles by remember(videoId) { mutableStateOf<List<com.example.data.SubtitleTrack>>(emptyList()) }
+    var activeSubtitleLanguage by remember(videoId) { mutableStateOf<String?>(null) }
 
     var isLoading by remember(videoId) { mutableStateOf(true) }
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
@@ -204,6 +205,14 @@ fun TvRutubeVideoPlayer(
         }
     }
 
+    fun getBcp47Language(lang: String): String {
+        return when (lang.lowercase()) {
+            "русский", "russian", "ru" -> "ru"
+            "english", "английский", "en" -> "en"
+            else -> "ru"
+        }
+    }
+
     val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
             val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -261,7 +270,7 @@ fun TvRutubeVideoPlayer(
                     val mimeType = if (track.format.lowercase() == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
                     androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(track.url))
                         .setMimeType(mimeType)
-                        .setLanguage(track.language)
+                        .setLanguage(getBcp47Language(track.language))
                         .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
                         .build()
                 }
@@ -280,6 +289,21 @@ fun TvRutubeVideoPlayer(
                     seekTo(savedPos)
                     currentPos = savedPos
                 }
+            }
+        }
+    }
+
+    LaunchedEffect(activeSubtitleLanguage, exoPlayer) {
+        exoPlayer?.let { player ->
+            if (activeSubtitleLanguage == null) {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+                    .build()
+            } else {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+                    .setPreferredTextLanguage(getBcp47Language(activeSubtitleLanguage!!))
+                    .build()
             }
         }
     }
@@ -681,7 +705,35 @@ fun TvRutubeVideoPlayer(
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                         }
-                        
+
+                        if (subtitles.isNotEmpty()) {
+                            val onSubtitleClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                val options = listOf(null) + subtitles.map { it.language }
+                                val nextIdx = (options.indexOf(activeSubtitleLanguage) + 1) % options.size
+                                activeSubtitleLanguage = options[nextIdx]
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(if (activeSubtitleLanguage != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onSubtitleClick)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onSubtitleClick
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Subtitles, "Субтитры", tint = if (activeSubtitleLanguage != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(activeSubtitleLanguage ?: "Выкл", color = if (activeSubtitleLanguage != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+
                         val onAspectClick = {
                             lastInteractionTime = System.currentTimeMillis()
                             val modes = VlcAspectRatio.values()
