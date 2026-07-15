@@ -36,10 +36,14 @@ fun GlobalUpdateChecker() {
     var showDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val info = UpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
-        if (info != null && info.hasUpdate) {
-            updateInfo = info
-            showDialog = true
+        try {
+            val info = UpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
+            if (info != null && info.hasUpdate) {
+                updateInfo = info
+                showDialog = true
+            }
+        } catch (e: Throwable) {
+            android.util.Log.e("GlobalUpdateChecker", "Error during automatic update check", e)
         }
     }
 
@@ -141,17 +145,23 @@ fun UpdateSection(isDarkTheme: Boolean, isTvOptimized: Boolean) {
                     if (isChecking) return@clickable
                     isChecking = true
                     coroutineScope.launch {
-                        val info = UpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
-                        isChecking = false
-                        if (info != null) {
-                            if (info.hasUpdate) {
-                                updateInfo = info
-                                showDialog = true
+                        try {
+                            val info = UpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
+                            isChecking = false
+                            if (info != null) {
+                                if (info.hasUpdate) {
+                                    updateInfo = info
+                                    showDialog = true
+                                } else {
+                                    Toast.makeText(context, "У вас установлена последняя версия", Toast.LENGTH_SHORT).show()
+                                }
                             } else {
-                                Toast.makeText(context, "У вас установлена последняя версия", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Не удалось проверить наличие обновлений", Toast.LENGTH_SHORT).show()
                             }
-                        } else {
-                            Toast.makeText(context, "Не удалось проверить наличие обновлений", Toast.LENGTH_SHORT).show()
+                        } catch (e: Throwable) {
+                            isChecking = false
+                            android.util.Log.e("UpdateSection", "Error during manual update check", e)
+                            Toast.makeText(context, "Ошибка проверки: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
