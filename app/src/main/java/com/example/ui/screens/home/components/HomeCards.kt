@@ -79,6 +79,8 @@ fun HeroVideoCard(
                 id = video.id,
                 duration = video.duration,
                 thumbnailUrl = video.thumbnailUrl,
+                isWatched = video.isWatched,
+                playbackProgress = video.playbackProgress,
                 viewsAndTimeAgo = if (video.views.isNotBlank() || video.timeAgo.isNotBlank()) "${video.views} • ${video.timeAgo}".trim(' ', '•') else null,
                 shape = RoundedCornerShape(
                     topStart = cardCornerRadius.dp,
@@ -291,6 +293,8 @@ fun SleekVideoGridItem(
                 id = video.id,
                 duration = video.duration,
                 thumbnailUrl = video.thumbnailUrl,
+                isWatched = video.isWatched,
+                playbackProgress = video.playbackProgress,
                 shape = RoundedCornerShape(
                     topStart = cardCornerRadius.dp,
                     topEnd = cardCornerRadius.dp,
@@ -483,6 +487,8 @@ fun SecondaryVideoItemRow(
             id = video.id,
             duration = video.duration,
             thumbnailUrl = video.thumbnailUrl,
+            isWatched = video.isWatched,
+            playbackProgress = video.playbackProgress,
             modifier = Modifier
                 .width(128.dp)
                 .height(78.dp)

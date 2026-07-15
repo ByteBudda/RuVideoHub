@@ -33,6 +33,8 @@ fun VideoThumbnail(
     thumbnailUrl: String? = null,
     hasPlayOverlay: Boolean = false,
     isPlaying: Boolean = false,
+    isWatched: Boolean = false,
+    playbackProgress: Float = 0f,
     onPlayClick: (() -> Unit)? = null,
     viewsAndTimeAgo: String? = null,
     shape: Shape? = null
@@ -177,6 +179,75 @@ fun VideoThumbnail(
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 0.5.sp
                 )
+            }
+        }
+
+        if (isWatched) {
+            // Subtle translucent dark overlay over the entire thumbnail
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+            // Beautiful checkmark icon in the top right corner
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Просмотрено",
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        } else if (playbackProgress > 0f) {
+            // Sleek progress bar overlay at the very bottom of the thumbnail
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .align(Alignment.BottomStart)
+                    .background(Color.White.copy(alpha = 0.3f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(playbackProgress)
+                        .background(Primary)
+                )
+            }
+
+            // Beautiful "Продолжить" badge in the top right corner
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Продолжить",
+                        tint = Color.White,
+                        modifier = Modifier.size(10.dp)
+                    )
+                    Text(
+                        text = "Продолжить",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
         
