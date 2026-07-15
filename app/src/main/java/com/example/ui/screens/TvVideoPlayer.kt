@@ -241,8 +241,17 @@ fun TvRutubeVideoPlayer(
         }
     }
 
-    DisposableEffect(exoPlayer) {
-        onDispose { exoPlayer?.release() }
+    DisposableEffect(exoPlayer, videoId) {
+        onDispose {
+            exoPlayer?.let { player ->
+                val pos = player.currentPosition
+                val dur = player.duration.coerceAtLeast(0L)
+                if (pos > 0L) {
+                    viewModel.saveVideoPosition(videoId, pos, dur)
+                }
+            }
+            exoPlayer?.release()
+        }
     }
 
     var isBufferingState by remember { mutableStateOf(false) }
@@ -276,17 +285,32 @@ fun TvRutubeVideoPlayer(
         }
     }
 
-    LaunchedEffect(exoPlayer, isPlayingState) {
-        while (isPlayingState && exoPlayer != null) {
-            currentPos = exoPlayer.currentPosition
-            totalDuration = exoPlayer.duration.coerceAtLeast(0)
-            delay(1000)
+    LaunchedEffect(isPlayingState) {
+        if (!isPlayingState) {
+            exoPlayer?.let { player ->
+                val pos = player.currentPosition
+                val dur = player.duration.coerceAtLeast(0L)
+                if (pos > 0L) {
+                    viewModel.saveVideoPosition(videoId, pos, dur)
+                }
+            }
         }
     }
 
-    LaunchedEffect(currentPos) {
-        if (currentPos > 0 && currentPos % 10000 < 1500) {
-            viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
+    LaunchedEffect(exoPlayer, isPlayingState) {
+        var lastSavedPos = 0L
+        while (isPlayingState && exoPlayer != null) {
+            val pos = exoPlayer.currentPosition
+            val dur = exoPlayer.duration.coerceAtLeast(0L)
+            if (pos > 0L) {
+                currentPos = pos
+                totalDuration = dur
+                if (Math.abs(pos - lastSavedPos) >= 5000L) {
+                    viewModel.saveVideoPosition(videoId, pos, dur)
+                    lastSavedPos = pos
+                }
+            }
+            delay(1000)
         }
     }
     

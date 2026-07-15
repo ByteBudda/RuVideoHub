@@ -62,6 +62,7 @@ fun TvMiniPlayerScreen(
     val localIsFullscreen by viewModel.isTvMiniFullscreen.collectAsStateWithLifecycle()
     
     val firstItemFocusRequester = remember { FocusRequester() }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     
     // Filter out non-playable items like folders/channels/playlists
     val playableVideos = remember(dynamicVideos, currentVideo) {
@@ -75,6 +76,18 @@ fun TvMiniPlayerScreen(
             listOf(current) + filtered
         } else {
             filtered
+        }
+    }
+    
+    // Auto-scroll to current video in list when shown or changed
+    LaunchedEffect(currentVideo, playableVideos) {
+        val index = playableVideos.indexOfFirst { it.id == currentVideo?.id }
+        if (index >= 0) {
+            try {
+                listState.scrollToItem(index)
+            } catch (e: Throwable) {
+                // Fail-safe
+            }
         }
     }
     
@@ -174,7 +187,6 @@ fun TvMiniPlayerScreen(
                             )
                         }
                     } else {
-                        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         LazyColumn(
                             state = listState,
                             verticalArrangement = Arrangement.spacedBy(10.dp),
