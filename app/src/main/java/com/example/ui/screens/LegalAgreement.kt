@@ -59,7 +59,7 @@ object LegalContent {
     const val GITHUB_URL = "https://github.com/ByteBudda/RuVideoHub"
     const val LICENSE = "GNU General Public License v3.0"
     val VERSION = com.example.BuildConfig.VERSION_NAME
-    const val CONTACT_EMAIL = "your.email@example.com"
+    const val CONTACT_EMAIL = "bytebudda@proton.me"
     const val COPYRIGHT_YEAR = "2026"
 
     val sections = listOf(
@@ -224,7 +224,7 @@ object LegalContent {
                 Приложение взаимодействует со сторонними сервисами:
                 
                 1. RUTUBE API - для получения видео и данных
-                2. Yandex Metrica - для сбора анонимной статистики (можно отключить в настройках)
+                2. GitHub API - для скачивания и установки обновлений
                 
                 Разработчик НЕ контролирует и НЕ несет ответственности за содержание, политику конфиденциальности или действия этих сторонних сервисов.
             """.trimIndent(),
