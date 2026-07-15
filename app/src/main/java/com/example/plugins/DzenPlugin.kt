@@ -390,11 +390,27 @@ class DzenPlugin : VideoPlugin {
     }
     
     private fun findDzenId(url: String): String {
-        val marker = "/video/watch/"
-        val start = url.indexOf(marker)
-        if (start < 0) throw Exception("Не найден ID Дзен")
+        val watchMarker = "/video/watch/"
+        var start = url.indexOf(watchMarker)
+        var markerLength = watchMarker.length
         
-        val idStart = start + marker.length
+        if (start < 0) {
+            val videoMarker = "/video/"
+            start = url.indexOf(videoMarker)
+            markerLength = videoMarker.length
+        }
+        
+        if (start < 0) {
+            // Fallback: look for a 24-char hex string
+            val regex = Regex("""[a-fA-F0-9]{24}""")
+            val match = regex.find(url)
+            if (match != null) {
+                return match.value
+            }
+            throw Exception("Не найден ID Дзен")
+        }
+        
+        val idStart = start + markerLength
         var idEnd = idStart
         while (idEnd < url.length && isIdChar(url[idEnd])) {
             idEnd++

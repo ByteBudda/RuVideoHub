@@ -131,43 +131,30 @@ class VKVideoPlugin : VideoPlugin {
      */
     private suspend fun fetchVideoInfo(url: String): VideoItem? {
         try {
-            val id = findVkId(url)
-            val (ownerId, videoId) = parseVkId(id)
-            val pageUrl = "https://vkvideo.ru/video${ownerId}_${videoId}"
-            
-            // Получаем данные через API
-            val address = "https://api.vkvideo.ru/method/video.get" +
-                    "?v=$API_VERSION" +
-                    "&client_id=$CLIENT_ID" +
-                    "&owner_id=$ownerId" +
-                    "&videos=$ownerId" +
-                    "&access_token=${Uri.encode(getAnonymousToken())}"
-            
-            val root = getJson(address)
-            val response = root.optJSONObject("response")
-            val items = response?.optJSONArray("items")
-            val video = items?.optJSONObject(0)
-            
-            if (video == null) {
-                return null
-            }
-            
-            val duration = video.optLong("duration") * 1000L
-            val thumbnail = bestImage(video.optJSONArray("image"), 320)
-            val title = video.optString("title", "Видео VK")
-            val author = video.optString("author_name", "")
-            
+            val info = com.example.data.vk.VkVideoLoader.getVideoInfo(url) ?: return null
+            val parts = info.duration.split(":")
+            var sec = 0L
+            try {
+                if (parts.size == 2) {
+                    sec = parts[0].toLong() * 60 + parts[1].toLong()
+                } else if (parts.size == 3) {
+                    sec = parts[0].toLong() * 3600 + parts[1].toLong() * 60 + parts[2].toLong()
+                }
+            } catch (_: Exception) {}
+            val durationMs = sec * 1000L
+
             return VideoItem(
-                id = "${ownerId}_${videoId}",
-                title = title,
-                author = author,
-                thumbnail = thumbnail,
-                url = pageUrl,
-                duration = duration,
-                views = formatViews(video.optLong("views")),
+                id = "${info.ownerId}_${info.videoId}",
+                title = info.title,
+                author = "VK Video",
+                thumbnail = info.thumbnail,
+                url = "https://vkvideo.ru/video${info.ownerId}_${info.videoId}",
+                duration = durationMs,
+                views = info.views,
                 source = name
             )
         } catch (e: Exception) {
+            android.util.Log.e("VKVideoPlugin", "Error in fetchVideoInfo", e)
             return null
         }
     }
