@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
@@ -40,81 +43,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun TvTvSimulatedPlaybackBars(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "audio_visualizer")
-    val p1 by transition.animateFloat(
-        initialValue = 0.2f, targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p1"
-    )
-    val p2 by transition.animateFloat(
-        initialValue = 0.8f, targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(tween(550, easing = LinearOutSlowInEasing), RepeatMode.Reverse),
-        label = "p2"
-    )
-    val p3 by transition.animateFloat(
-        initialValue = 0.4f, targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(350, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p3"
-    )
-
-    Row(
-        modifier = modifier
-            
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        for (i in 0 until 12) {
-            val scale = when (i % 3) {
-                0 -> p1
-                1 -> p2
-                else -> p3
-            }
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 2.dp)
-                    .width(4.dp)
-                    .fillMaxHeight(scale * 0.4f)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Primary.copy(alpha = 0.35f))
-            )
-        }
-    }
-}
-
-private fun forceResizeViewAndDescendants(v: android.view.View) {
-    v.forceLayout()
-    v.requestLayout()
-    v.invalidate()
-    if (v is ViewGroup) {
-        for (i in 0 until v.childCount) {
-            forceResizeViewAndDescendants(v.getChildAt(i))
-        }
-    }
-}
-
-private fun forceFullResize(view: android.view.View) {
-    view.layoutParams = ViewGroup.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.MATCH_PARENT
-    )
-    forceResizeViewAndDescendants(view)
-    var parent = view.parent as? ViewGroup
-    while (parent != null) {
-        parent.forceLayout()
-        parent.requestLayout()
-        parent.invalidate()
-        parent = parent.parent as? ViewGroup
-    }
-}
-
-@Composable
 fun TvRutubeVideoPlayer(
     videoId: String,
     viewModel: VideoViewModel,
     videoTitle: String = "",
-    aspectMode: VlcAspectRatio = VlcAspectRatio.FIT,
+    aspectMode: VlcAspectRatio = VlcAspectRatio.BEST_FIT,
     isFullscreen: Boolean = false,
     isMiniPlayer: Boolean = false,
     isLive: Boolean = false,
@@ -325,6 +258,13 @@ fun TvRutubeVideoPlayer(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     isBufferingState = playbackState == androidx.media3.common.Player.STATE_BUFFERING ||
                                        playbackState == androidx.media3.common.Player.STATE_IDLE
+                    if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                        val currentVideo = viewModel.playerManager.currentSelectedVideo.value
+                        if (currentVideo != null) {
+                            viewModel.markAsWatched(currentVideo, exoPlayer.duration)
+                        }
+                        viewModel.playerManager.playNext()
+                    }
                 }
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     android.util.Log.e("TvVideoPlayer", "ExoPlayer error", error)
@@ -461,7 +401,7 @@ fun TvRutubeVideoPlayer(
             )
     ) {
         if (isLive) {
-            TvTvSimulatedPlaybackBars(modifier = Modifier.fillMaxSize())
+            SimulatedPlaybackBars(modifier = Modifier.fillMaxSize())
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -586,7 +526,7 @@ fun TvRutubeVideoPlayer(
                     playerView.keepScreenOn = true
                     playerView.resizeMode = when (aspectMode) {
                         VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-                        VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
@@ -672,7 +612,7 @@ fun TvRutubeVideoPlayer(
                         }
                         
                         Text(
-                            text = if (offlineFile.exists()) "$videoTitle (Offline)" else videoTitle,
+                            text = if (offlineFile.exists()) "$videoTitle (Офлайн)" else videoTitle,
                             color = Color.White,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
@@ -777,9 +717,28 @@ fun TvRutubeVideoPlayer(
                     // Center Controls
                     Row(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(48.dp),
+                        horizontalArrangement = Arrangement.spacedBy(28.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val onPrevClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            viewModel.playerManager.playPrevious()
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onPrevClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onPrevClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SkipPrevious, "Предыдущее видео", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                        }
+
                         val onRewindClick: () -> Unit = {
                             lastInteractionTime = System.currentTimeMillis()
                             exoPlayer?.let {
@@ -859,6 +818,25 @@ fun TvRutubeVideoPlayer(
                         ) {
                             Icon(Icons.Default.FastForward, "Вперед", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
                         }
+
+                        val onNextClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            viewModel.playerManager.playNext()
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onNextClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onNextClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SkipNext, "Следующее видео", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                        }
                     }
 
                     // Bottom Bar (Timeline)
@@ -871,7 +849,7 @@ fun TvRutubeVideoPlayer(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = formatTvMillis(currentPos),
+                            text = formatMillis(currentPos),
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium
@@ -989,7 +967,7 @@ fun TvRutubeVideoPlayer(
                         
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = formatTvMillis(totalDuration),
+                            text = formatMillis(totalDuration),
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium
@@ -1001,14 +979,4 @@ fun TvRutubeVideoPlayer(
     }
 }
 
-private fun formatTvMillis(millis: Long): String {
-    val totalSeconds = millis / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        String.format("%d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format("%02d:%02d", minutes, seconds)
-    }
-}
+

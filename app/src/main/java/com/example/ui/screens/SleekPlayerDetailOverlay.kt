@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import android.app.Activity
 import android.content.Intent
 import androidx.compose.animation.animateContentSize
@@ -110,9 +113,9 @@ fun SleekPlayerDetailOverlay(
 
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val isPlayerActive = true
-    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
+    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.BEST_FIT) }
 
-    val currentEpList = viewModel.filteredVideos.collectAsStateWithLifecycle().value.take(5)
+    val currentEpList = viewModel.filteredVideos.collectAsStateWithLifecycle().value
     var showDownloadOptionsDialog by remember { mutableStateOf(false) }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -410,11 +413,18 @@ fun SleekPlayerDetailOverlay(
                 }
             }
 
+            val detailScrollState1 = rememberScrollState()
+            LaunchedEffect(detailScrollState1.value, detailScrollState1.maxValue) {
+                if (detailScrollState1.maxValue > 0 && detailScrollState1.value >= detailScrollState1.maxValue - 300) {
+                    viewModel.loadNextPage()
+                }
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(detailScrollState1)
+                    .mouseDragScrollable(detailScrollState1, isVertical = true)
                     .focusGroup()
             ) {
                 PlayerDetailsPanel(
@@ -523,11 +533,18 @@ fun SleekPlayerDetailOverlay(
                 }
             }
             if (!isFullscreen) {
+                val detailScrollState2 = rememberScrollState()
+                LaunchedEffect(detailScrollState2.value, detailScrollState2.maxValue) {
+                    if (detailScrollState2.maxValue > 0 && detailScrollState2.value >= detailScrollState2.maxValue - 300) {
+                        viewModel.loadNextPage()
+                    }
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(detailScrollState2)
+                        .mouseDragScrollable(detailScrollState2, isVertical = true)
                         .focusGroup()
                 ) {
                     PlayerDetailsPanel(

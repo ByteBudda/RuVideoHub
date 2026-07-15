@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -91,7 +94,7 @@ fun TvMiniPlayerScreen(
         }
     }
 
-    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.FIT) }
+    var selectedAspectRatio by remember { mutableStateOf(VlcAspectRatio.BEST_FIT) }
 
     DisposableEffect(Unit) {
         onDispose {

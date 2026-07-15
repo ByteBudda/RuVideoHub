@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
@@ -100,10 +103,12 @@ fun FullBackupRestoreDialog(
             }
         },
         text = {
+            val backupScrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(backupScrollState)
+                    .mouseDragScrollable(backupScrollState, isVertical = true),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -155,7 +160,7 @@ fun FullBackupRestoreDialog(
                     Button(
                         onClick = {
                             try {
-                                createDocumentLauncher.launch("ruvideohub_backup.json")
+                                createDocumentLauncher.launch("sleek_video_hub_backup.json")
                             } catch (e: Exception) {
                                 statusMessage = "Не удалось запустить выбор сохранения: ${e.localizedMessage}"
                             }

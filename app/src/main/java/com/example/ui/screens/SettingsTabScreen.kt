@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
+import com.example.ui.screens.settings.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -20,10 +24,13 @@ fun SettingsTabScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
+            .mouseDragScrollable(scrollState, isVertical = true)
             .padding(16.dp)
             .padding(bottom = 80.dp) // extra padding to avoid overlapping with bottom bar
     ) {

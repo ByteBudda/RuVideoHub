@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape

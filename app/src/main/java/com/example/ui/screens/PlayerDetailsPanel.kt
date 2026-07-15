@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -486,6 +489,22 @@ fun PlayerDetailsPanel(
                         )
                     }
                 }
+            }
+        }
+
+        val isMoreLoading by viewModel.isMoreLoading.collectAsStateWithLifecycle()
+        if (isMoreLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Primary,
+                    strokeWidth = 2.dp
+                )
             }
         }
     }

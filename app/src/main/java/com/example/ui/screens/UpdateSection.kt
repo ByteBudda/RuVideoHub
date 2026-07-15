@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background

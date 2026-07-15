@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
+import com.example.ui.screens.library.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -145,7 +149,7 @@ fun Modifier.sleekTvFocus(
 }
 
 fun Modifier.mouseDragScrollable(
-    state: androidx.compose.foundation.lazy.LazyListState,
+    state: androidx.compose.foundation.gestures.ScrollableState,
     isVertical: Boolean = false
 ): Modifier = this.pointerInput(state, isVertical) {
     detectDragGestures(
@@ -157,6 +161,7 @@ fun Modifier.mouseDragScrollable(
     )
 }
 
+@androidx.compose.foundation.ExperimentalFoundationApi
 @Composable
 fun SleekVideoHubApp(
     viewModel: VideoViewModel,

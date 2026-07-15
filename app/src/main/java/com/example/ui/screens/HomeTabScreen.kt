@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
+import com.example.ui.screens.library.*
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.*
@@ -32,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.data.SavedVideo
 import com.example.data.Video
+import com.example.data.SearchHistory
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import com.example.ui.theme.liquidGlass
@@ -53,6 +58,7 @@ fun HomeTabScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchSource by viewModel.searchSource.collectAsStateWithLifecycle()
+    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
     val filteredVideos by viewModel.filteredVideos.collectAsStateWithLifecycle()
     val isChannelView by viewModel.isChannelView.collectAsStateWithLifecycle()
     val channelActiveTab by viewModel.channelActiveTab.collectAsStateWithLifecycle()
@@ -201,7 +207,10 @@ fun HomeTabScreen(
                     onSearchQueryChanged = { viewModel.setSearchQuery(it) },
                     onMicClick = { isVoiceSearchActive = true },
                     isDark = isDarkTheme,
-                    isTvOptimized = isTvOptimized
+                    isTvOptimized = isTvOptimized,
+                    searchHistory = searchHistory,
+                    onDeleteQuery = { viewModel.deleteSearchQuery(it) },
+                    onClearAll = { viewModel.clearSearchHistory() }
                 )
             }
 
@@ -533,3 +542,106 @@ fun HomeTabScreen(
     }
 }
 }
+
+@Composable
+fun SearchHistorySection(
+    history: List<SearchHistory>,
+    onQueryClick: (String) -> Unit,
+    onDeleteQuery: (String) -> Unit,
+    onClearAll: () -> Unit,
+    isDark: Boolean,
+    isTvOptimized: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = "История поиска",
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "История поиска",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            TextButton(
+                onClick = onClearAll,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier
+                    .height(28.dp)
+                    .testTag("clear_history_button")
+            ) {
+                Text(
+                    text = "Очистить всё",
+                    color = Primary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(6.dp))
+        
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(history, key = { it.query }) { item ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (isDark) Color.White.copy(alpha = 0.08f)
+                            else Color.Black.copy(alpha = 0.05f)
+                        )
+                        .clickable { onQueryClick(item.query) }
+                        .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                        .testTag("history_item_${item.query}")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = item.query,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        IconButton(
+                            onClick = { onDeleteQuery(item.query) },
+                            modifier = Modifier
+                                .size(18.dp)
+                                .testTag("delete_history_item_${item.query}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Удалить ${item.query} из истории",
+                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

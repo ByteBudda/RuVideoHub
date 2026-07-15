@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,11 +45,14 @@ fun ExploreTabScreen(
         Brush.linearGradient(colors = colors[index])
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
+            .mouseDragScrollable(scrollState, isVertical = true)
     ) {
         Text(
             text = "Проводник",

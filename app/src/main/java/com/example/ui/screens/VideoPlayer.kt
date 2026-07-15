@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.ui.screens.player.*
+
+import com.example.viewmodel.*
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -46,87 +49,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.testTag
 
 @Composable
-fun SimulatedPlaybackBars(modifier: Modifier = Modifier) {
-    // Generate simple pulsing lines at the bottom of the black player background
-    val transition = rememberInfiniteTransition(label = "audio_visualizer")
-    val p1 by transition.animateFloat(
-        initialValue = 0.2f, targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p1"
-    )
-    val p2 by transition.animateFloat(
-        initialValue = 0.8f, targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(tween(550, easing = LinearOutSlowInEasing), RepeatMode.Reverse),
-        label = "p2"
-    )
-    val p3 by transition.animateFloat(
-        initialValue = 0.4f, targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(350, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p3"
-    )
-
-    Row(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        val barCount = 12
-        for (i in 0 until barCount) {
-            val scale = when (i % 3) {
-                0 -> p1
-                1 -> p2
-                else -> p3
-            }
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 2.dp)
-                    .width(4.dp)
-                    .fillMaxHeight(scale * 0.4f)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Primary.copy(alpha = 0.35f))
-            )
-        }
-    }
-}
-
-private fun forceResizeViewAndDescendants(v: android.view.View) {
-    v.forceLayout()
-    v.requestLayout()
-    v.invalidate()
-    if (v is android.view.ViewGroup) {
-        for (i in 0 until v.childCount) {
-            forceResizeViewAndDescendants(v.getChildAt(i))
-        }
-    }
-}
-
-private fun forceFullResize(view: android.view.View) {
-    view.layoutParams = android.view.ViewGroup.LayoutParams(
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-    )
-    
-    // Force layout on the view and all descendants
-    forceResizeViewAndDescendants(view)
-    
-    // Walk up the parent chain and force layout on all ancestors
-    var parent = view.parent as? android.view.ViewGroup
-    while (parent != null) {
-        parent.forceLayout()
-        parent.requestLayout()
-        parent.invalidate()
-        parent = parent.parent as? android.view.ViewGroup
-    }
-}
-
-@Composable
 fun RutubeVideoPlayer(
     videoId: String,
     viewModel: VideoViewModel,
     videoTitle: String = "",
-    aspectMode: VlcAspectRatio = VlcAspectRatio.FIT,
+    aspectMode: VlcAspectRatio = VlcAspectRatio.BEST_FIT,
     isFullscreen: Boolean = false,
     isMiniPlayer: Boolean = false,
     isLive: Boolean = false,
@@ -362,6 +289,13 @@ fun RutubeVideoPlayer(
         exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 isBufferingState = playbackState == androidx.media3.common.Player.STATE_BUFFERING
+                if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                    val currentVideo = viewModel.playerManager.currentSelectedVideo.value
+                    if (currentVideo != null) {
+                        viewModel.markAsWatched(currentVideo, exoPlayer?.duration ?: 0L)
+                    }
+                    viewModel.playerManager.playNext()
+                }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 android.util.Log.e("VideoPlayer", "ExoPlayer error, falling back to embed", error)
@@ -813,7 +747,7 @@ fun RutubeVideoPlayer(
                         keepScreenOn = true
                         resizeMode = when (aspectMode) {
                             VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-                            VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                             VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                             else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         }
@@ -847,7 +781,7 @@ fun RutubeVideoPlayer(
                     playerView.keepScreenOn = true
                     playerView.resizeMode = when (aspect) {
                         VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-                        VlcAspectRatio.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
@@ -946,7 +880,7 @@ fun RutubeVideoPlayer(
                                 }
                             }
                             Text(
-                                text = if (offlineFile.exists()) "$videoTitle • Offline" else videoTitle.ifBlank { "Онлайн-превью" },
+                                text = if (offlineFile.exists()) "$videoTitle • Офлайн" else videoTitle.ifBlank { "Онлайн-превью" },
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -1156,7 +1090,7 @@ fun RutubeVideoPlayer(
                         }
                     }
 
-                    // Center playback buttons (Rewind, Play/Pause, Forward)
+                    // Center playback buttons (SkipPrev, Rewind, Play/Pause, Forward, SkipNext)
                     Row(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -1164,9 +1098,27 @@ fun RutubeVideoPlayer(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
                             ) {}, // consume clicks to avoid hiding controls
-                        horizontalArrangement = Arrangement.spacedBy(28.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        IconButton(
+                            onClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                viewModel.playerManager.playPrevious()
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                .sleekTvFocus(CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SkipPrevious,
+                                contentDescription = "Предыдущее видео",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
                         IconButton(
                             onClick = {
                                 lastInteractionTime = System.currentTimeMillis()
@@ -1233,6 +1185,24 @@ fun RutubeVideoPlayer(
                             Icon(
                                 imageVector = Icons.Default.FastForward,
                                 contentDescription = "Вперед 10с",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                viewModel.playerManager.playNext()
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                .sleekTvFocus(CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SkipNext,
+                                contentDescription = "Следующее видео",
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -1412,20 +1382,6 @@ fun RutubeVideoPlayer(
     }
 }
 
-// VLC-style aspect ratios enum
-enum class VlcAspectRatio(val displayName: String) {
-    FIT("Вписать"),
-    FILL("Заполнить"),
-    STRETCH("Растянуть"),
-    RATIO_16_9("16:9"),
-    RATIO_4_3("4:3");
-
-    fun next(): VlcAspectRatio {
-        val entries = values()
-        return entries[(ordinal + 1) % entries.size]
-    }
-}
-
 // Share Video Intent launcher
 fun shareVideo(context: android.content.Context, video: Video) {
     val sendIntent = android.content.Intent().apply {
@@ -1438,19 +1394,4 @@ fun shareVideo(context: android.content.Context, video: Video) {
 }
 
 // Format duration helper
-fun formatMillis(ms: Long): String {
-    val totalSec = ms / 1000
-    val min = totalSec / 60
-    val sec = totalSec % 60
-    return String.format("%02d:%02d", min, sec)
-}
 
-// Helper extension function to unwrap Activity from any wrapped Context
-fun android.content.Context.findActivity(): android.app.Activity? {
-    var ctx = this
-    while (ctx is android.content.ContextWrapper) {
-        if (ctx is android.app.Activity) return ctx
-        ctx = ctx.baseContext
-    }
-    return null
-}
