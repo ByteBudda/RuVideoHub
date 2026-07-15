@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.viewmodel.*
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,6 +12,7 @@ import com.example.ui.screens.SleekVideoHubApp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.VideoViewModel
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
 
   private val viewModel: VideoViewModel by viewModels {
@@ -23,6 +25,7 @@ class MainActivity : ComponentActivity() {
     android.widget.Toast.makeText(this, "Удерживайте кнопку НАЗАД 3 секунды для выхода", android.widget.Toast.LENGTH_SHORT).show()
   }
 
+  @android.annotation.SuppressLint("GestureBackNavigation")
   override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
     if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
       if (event?.repeatCount == 0) {
