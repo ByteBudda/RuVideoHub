@@ -661,6 +661,19 @@ class VideoRepository(private val dao: SavedVideoDao) {
         val originId = video.originId ?: saved?.originId
         val originTitle = video.originTitle ?: saved?.originTitle
 
+        // Fix: preserve previous duration if currently passed duration is 0 or invalid
+        val finalDuration = if (durationMs > 0L) {
+            durationMs
+        } else if (saved != null && saved.lastDuration > 0L) {
+            saved.lastDuration
+        } else {
+            try {
+                com.example.utils.VideoDurationFormatter.parseDurationToSeconds(video.duration) * 1000L
+            } catch (e: Throwable) {
+                0L
+            }
+        }
+
         dao.insertOrUpdate(SavedVideo(
             id = video.id, title = video.title, channel = video.channel,
             views = video.views, timeAgo = video.timeAgo, duration = video.duration,
@@ -669,10 +682,26 @@ class VideoRepository(private val dao: SavedVideoDao) {
             thumbnailUrl = video.thumbnailUrl, isWatched = true,
             savedAt = System.currentTimeMillis(),
             lastProgress = position,
-            lastDuration = durationMs,
+            lastDuration = finalDuration,
             originType = originType,
             originId = originId,
             originTitle = originTitle
+        ))
+    }
+
+    suspend fun saveVideoProgressById(videoId: String, position: Long, durationMs: Long) {
+        val saved = dao.getVideoById(videoId) ?: return
+        val finalDuration = if (durationMs > 0L) {
+            durationMs
+        } else if (saved.lastDuration > 0L) {
+            saved.lastDuration
+        } else {
+            0L
+        }
+        dao.insertOrUpdate(saved.copy(
+            lastProgress = position,
+            lastDuration = finalDuration,
+            savedAt = System.currentTimeMillis()
         ))
     }
 
