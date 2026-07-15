@@ -1,7 +1,7 @@
 package com.example.manager
 
 import com.example.data.Video
-import com.example.data.rutube.SmartRutubeParser
+import com.example.data.rutube.parser.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Stack
@@ -9,7 +9,7 @@ import java.util.Stack
 data class NavigationSnapshot(
     val tab: String,
     val category: String,
-    val feedTab: SmartRutubeParser.TabInfo?,
+    val feedTab: TabInfo?,
     val subfolderName: String?,
     val searchQuery: String,
     val selectedVideo: Video?,
@@ -37,7 +37,7 @@ class NavigationManager {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    private val _selectedFeedTab = MutableStateFlow<SmartRutubeParser.TabInfo?>(null)
+    private val _selectedFeedTab = MutableStateFlow<TabInfo?>(null)
     val selectedFeedTab = _selectedFeedTab.asStateFlow()
 
     private val _selectedSubfolderName = MutableStateFlow<String?>(null)
@@ -68,7 +68,7 @@ class NavigationManager {
         _searchQuery.value = query
     }
 
-    fun setFeedTab(tab: SmartRutubeParser.TabInfo?) {
+    fun setFeedTab(tab: TabInfo?) {
         _selectedFeedTab.value = tab
     }
 

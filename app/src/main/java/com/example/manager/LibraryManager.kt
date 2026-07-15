@@ -58,7 +58,12 @@ class LibraryManager(
                 isDownloaded = existing?.isDownloaded ?: false,
                 isBookmarked = existing?.isBookmarked ?: false,
                 savedAt = System.currentTimeMillis(),
-                isWatched = true
+                isWatched = true,
+                lastProgress = existing?.lastProgress ?: 0L,
+                lastDuration = existing?.lastDuration ?: 0L,
+                originType = video.originType ?: existing?.originType,
+                originId = video.originId ?: existing?.originId,
+                originTitle = video.originTitle ?: existing?.originTitle
             )
             repository.insertOrUpdate(toSave)
         }

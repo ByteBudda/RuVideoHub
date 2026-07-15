@@ -29,6 +29,9 @@ class PlayerManager {
     // Playback progress tracking (videoId -> playback position in milliseconds)
     private val _videoPositions = mutableMapOf<String, Long>()
 
+    var currentPlaylist: List<Video> = emptyList()
+    var currentIndex: Int = -1
+
     fun selectVideo(video: Video?) {
         _currentSelectedVideo.value = video
         if (video == null) {
@@ -40,6 +43,28 @@ class PlayerManager {
             // _isMiniPlayer remains as is, or reset it to false?
             // When selecting a new video, we should probably expand to full player
             _isMiniPlayer.value = false
+
+            // Auto-update currentIndex if video is found in the playlist
+            if (currentPlaylist.isNotEmpty()) {
+                val idx = currentPlaylist.indexOfFirst { it.id == video.id }
+                if (idx != -1) {
+                    currentIndex = idx
+                }
+            }
+        }
+    }
+
+    fun playNext() {
+        if (currentIndex + 1 < currentPlaylist.size) {
+            currentIndex += 1
+            selectVideo(currentPlaylist[currentIndex])
+        }
+    }
+
+    fun playPrevious() {
+        if (currentIndex - 1 >= 0) {
+            currentIndex -= 1
+            selectVideo(currentPlaylist[currentIndex])
         }
     }
 
