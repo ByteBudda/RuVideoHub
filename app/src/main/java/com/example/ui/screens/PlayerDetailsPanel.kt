@@ -272,7 +272,7 @@ fun PlayerDetailsPanel(
                                 text = {
                                     Text(
                                         text = q,
-                                        color = if (activeVideoQuality == q || currentQuality == q) Primary else Color.White,
+                                        color = if (activeVideoQuality == q || currentQuality == q) Primary else MaterialTheme.colorScheme.onBackground,
                                         fontSize = 11.sp,
                                         fontWeight = if (activeVideoQuality == q || currentQuality == q) FontWeight.Bold else FontWeight.Normal
                                     )
