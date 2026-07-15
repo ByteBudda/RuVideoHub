@@ -263,6 +263,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 repository.saveVideoProgress(currentVideo, position, duration)
             }
+        } else {
+            viewModelScope.launch {
+                repository.saveVideoProgressById(videoId, position, duration)
+            }
         }
     }
     fun getVideoPosition(videoId: String): Long = playerManager.getVideoPosition(videoId)
