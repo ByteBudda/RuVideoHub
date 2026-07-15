@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
       try {
           val stableDpi = android.util.DisplayMetrics::class.java.getField("DENSITY_DEVICE_STABLE").getInt(null)
           stableDensity = stableDpi / 160f
-      } catch (e: Exception) {
+      } catch (e: Throwable) {
       }
       val customDensity = androidx.compose.ui.unit.Density(density = stableDensity, fontScale = 1.0f)
       
