@@ -673,13 +673,9 @@ private fun shareVideoOverlay(context: android.content.Context, video: Video) {
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         val prefix = if (video.duration == com.example.utils.VideoType.CHANNEL) "Канал" else "Видео"
-        val url = if (video.duration == com.example.utils.VideoType.CHANNEL && !video.authorActionUrl.isNullOrBlank()) {
-            video.authorActionUrl
-        } else {
-            "https://rutube.ru/video/${video.id}/"
-        }
+        val url = video.getShareUrl()
         putExtra(Intent.EXTRA_SUBJECT, "$prefix: ${video.title}")
-        putExtra(Intent.EXTRA_TEXT, "Смотри '$prefix: ${video.title}' на Rutube: $url")
+        putExtra(Intent.EXTRA_TEXT, "Смотри '$prefix: ${video.title}': $url")
     }
     context.startActivity(Intent.createChooser(shareIntent, "Поделиться..."))
 }
