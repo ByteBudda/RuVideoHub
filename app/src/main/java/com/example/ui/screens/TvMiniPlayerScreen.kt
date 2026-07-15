@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
@@ -77,13 +78,28 @@ fun TvMiniPlayerScreen(
         }
     }
     
+    var isScreenFocused by remember { mutableStateOf(false) }
     val playableVideosCount = playableVideos.size
+    
     LaunchedEffect(currentVideo, localIsFullscreen, playableVideosCount) {
         if (currentVideo != null && !localIsFullscreen) {
-            kotlinx.coroutines.delay(350)
-            try {
-                firstItemFocusRequester.requestFocus()
-            } catch(e: Exception) {}
+            // Attempt to request focus multiple times to guarantee focus is captured
+            // on devices with different performance characteristics and animation durations.
+            // We stop retrying as soon as the screen or any of its descendants gets focus,
+            // to avoid stealing focus back if the user starts navigating.
+            val retryDelays = listOf(100L, 150L, 200L, 250L, 300L, 400L, 500L, 600L, 800L, 1000L)
+            for (delayMs in retryDelays) {
+                kotlinx.coroutines.delay(delayMs)
+                if (!isScreenFocused) {
+                    try {
+                        firstItemFocusRequester.requestFocus()
+                    } catch (e: Throwable) {
+                        // Fail-safe
+                    }
+                } else {
+                    break
+                }
+            }
         }
     }
     
@@ -116,6 +132,9 @@ fun TvMiniPlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .onFocusChanged { state ->
+                isScreenFocused = state.hasFocus
+            }
             .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {})
