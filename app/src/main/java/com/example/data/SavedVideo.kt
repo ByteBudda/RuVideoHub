@@ -19,5 +19,8 @@ data class SavedVideo(
     val savedAt: Long = System.currentTimeMillis(),
     val isWatched: Boolean = true,
     val lastProgress: Long = 0L,
-    val lastDuration: Long = 0L
+    val lastDuration: Long = 0L,
+    val originType: String? = null,
+    val originId: String? = null,
+    val originTitle: String? = null
 )

@@ -40,7 +40,6 @@ class VideoRepository(private val dao: SavedVideoDao) {
         RutubeCategory(1002, "Сериалы", "https://pic.rtbcdn.ru/promoitem/55/c1/55c106e53da7e36f144347990cb39885.png", "/api/feeds/serials/"),
         RutubeCategory(1003, "Телепередачи", "https://pic.rtbcdn.ru/promoitem/11/4b/114b0e5e339a889c31ee106e9b986c53.png", "/api/feeds/tv/"),
         RutubeCategory(2001, "Онлайн ТВ", "https://pic.rtbcdn.ru/promoitem/3f/e6/3fe614a9cfa0e1c2f25d71102558109d.png", "/api/feeds/tvchannels/"),
-        RutubeCategory(2002, "Развлекательные", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/entertainment/"),
         RutubeCategory(2003, "Реалити", "https://pic.rtbcdn.ru/promoitem/12/0a/120a7630bcb1ca858abd529d474fc35d.png", "/api/feeds/reality/"),
         RutubeCategory(2004, "Ток-шоу", "https://pic.rtbcdn.ru/promoitem/11/4b/114b0e5e339a889c31ee106e9b986c53.png", "/api/feeds/talk-show/"),
         RutubeCategory(1004, "Мультфильмы", "https://pic.rtbcdn.ru/promoitem/2025-06-06/64/73/64734dadd906cefa63183b96cd260e1b.png", "/api/feeds/cartoons/"),
@@ -88,7 +87,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
         try {
             val jsonObj = JSONObject(trimmed)
             // Используем парсер с endpointHint для самообучения
-            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.parser.ResponseAnalyzer.parse(jsonObj, url)
 
             android.util.Log.d("VideoRepository", "Parsed ${parsed.items.size} items from $url (type=${parsed.type})")
 
@@ -114,21 +113,19 @@ class VideoRepository(private val dao: SavedVideoDao) {
     /**
      * Проверка на блокируемый контент (платные партнёры)
      */
-    private fun isBlockedContent(video: Video): Boolean {
-        val checkText = (video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
-        return checkText.contains("premier") ||
-               checkText.contains("start") ||
-               checkText.contains("viju")
+    internal fun isBlockedContent(video: Video): Boolean {
+        val checkText = (video.id + " " + video.title + " " + video.channel + " " + video.description + " " + video.category).lowercase()
+        return isBlockedText(checkText, includeTvOnline = false)
     }
 
     // ==================== MAPPING ====================
 
     private fun mapNormalizedCardToVideo(
-        card: com.example.data.rutube.SmartRutubeParser.NormalizedCard,
+        card: com.example.data.rutube.parser.NormalizedCard,
         defaultCategoryName: String
     ): Video {
         return when (card) {
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
+            is com.example.data.rutube.parser.NormalizedCard.VideoCard -> {
                 Video(
                     id = card.id,
                     title = card.title,
@@ -145,7 +142,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.channelAvatar
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
+            is com.example.data.rutube.parser.NormalizedCard.TvSeriesCard -> {
                 val ratingStr = if (card.rating != null && card.rating > 0.05) " • Кинопоиск: ${card.rating}" else ""
                 val yearVal = card.year ?: "Передача"
                 val viewsText = if (card.episodesCount > 0 && card.seasonsCount <= 1) "${card.episodesCount} серий" else "${card.seasonsCount} сезонов"
@@ -162,7 +159,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.poster
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
+            is com.example.data.rutube.parser.NormalizedCard.PlaylistCard -> {
                 Video(
                     id = "playlist_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
@@ -176,7 +173,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.thumbnail
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.ChannelCard -> {
+            is com.example.data.rutube.parser.NormalizedCard.ChannelCard -> {
                 Video(
                     id = "channel_${card.id}__${card.actionUrl ?: ""}",
                     title = card.name,
@@ -192,7 +189,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     authorAvatarUrl = card.avatar
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
+            is com.example.data.rutube.parser.NormalizedCard.PromoCard -> {
                 Video(
                     id = "promo_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
@@ -206,7 +203,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                     thumbnailUrl = card.thumbnail
                 )
             }
-            is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
+            is com.example.data.rutube.parser.NormalizedCard.UnknownCard -> {
                 Video(
                     id = "unknown_${card.id}__${card.actionUrl ?: ""}",
                     title = card.title,
@@ -394,7 +391,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 val feedResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(showcaseUrl)
                 val feedJsonStr = feedResponse.string()
                 val feedObj = JSONObject(feedJsonStr)
-                val parsedFeed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(feedObj, showcaseUrl)
+                val parsedFeed = com.example.data.rutube.parser.ResponseAnalyzer.parse(feedObj, showcaseUrl)
 
                 val resourceUrls = mutableListOf<String>()
                 for (tab in parsedFeed.tabs) {
@@ -526,7 +523,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
         }
 
         val categoriesList = mutableListOf<RutubeCategory>()
-        categoriesList.addAll(defaultCategories)
+        categoriesList.addAll(defaultCategories.filter { 
+            !isBlockedText(it.title, includeTvOnline = true) && 
+            !isBlockedText(it.target ?: "", includeTvOnline = true)
+        })
 
         // Refresh slug mappings
         for (defaultCat in defaultCategories) {
@@ -545,7 +545,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val url = "https://rutube.ru/api/v1/feeds/promogroup/382/?format=json&limit=100"
             val bodyStr = apiService.getDynamicUrl(url).string()
             val jsonObj = JSONObject(bodyStr)
-            val parsed = com.example.data.rutube.SmartRutubeParser.ResponseAnalyzer.parse(jsonObj, url)
+            val parsed = com.example.data.rutube.parser.ResponseAnalyzer.parse(jsonObj, url)
 
             for (card in parsed.items) {
                 var title = ""
@@ -554,27 +554,27 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 val idVal = card.hashCode()
 
                 when (card) {
-                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PromoCard -> {
+                    is com.example.data.rutube.parser.NormalizedCard.PromoCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.UnknownCard -> {
+                    is com.example.data.rutube.parser.NormalizedCard.UnknownCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.TvSeriesCard -> {
+                    is com.example.data.rutube.parser.NormalizedCard.TvSeriesCard -> {
                         title = card.title
                         thumbnail = card.poster ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.PlaylistCard -> {
+                    is com.example.data.rutube.parser.NormalizedCard.PlaylistCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: ""
                     }
-                    is com.example.data.rutube.SmartRutubeParser.NormalizedCard.VideoCard -> {
+                    is com.example.data.rutube.parser.NormalizedCard.VideoCard -> {
                         title = card.title
                         thumbnail = card.thumbnail ?: ""
                         actionUrl = card.actionUrl ?: "/feeds/video/"
@@ -657,6 +657,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
         val termDownload = saved?.isDownloaded ?: false
         val termBookmark = saved?.isBookmarked ?: false
         
+        val originType = video.originType ?: saved?.originType
+        val originId = video.originId ?: saved?.originId
+        val originTitle = video.originTitle ?: saved?.originTitle
+
         dao.insertOrUpdate(SavedVideo(
             id = video.id, title = video.title, channel = video.channel,
             views = video.views, timeAgo = video.timeAgo, duration = video.duration,
@@ -665,7 +669,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
             thumbnailUrl = video.thumbnailUrl, isWatched = true,
             savedAt = System.currentTimeMillis(),
             lastProgress = position,
-            lastDuration = durationMs
+            lastDuration = durationMs,
+            originType = originType,
+            originId = originId,
+            originTitle = originTitle
         ))
     }
 
@@ -675,22 +682,93 @@ class VideoRepository(private val dao: SavedVideoDao) {
         return parseAnyResponse(bodyString, defaultCategoryName, url)
     }
 
-    private fun isBlockedText(text: String): Boolean {
+    private fun containsPremierBrand(lower: String): Boolean {
+        var idxEng = lower.indexOf("premier")
+        while (idxEng != -1) {
+            val nextCharIdx = idxEng + "premier".length
+            if (nextCharIdx < lower.length) {
+                val nextChar = lower[nextCharIdx]
+                if (nextChar == 'e') {
+                    idxEng = lower.indexOf("premier", nextCharIdx)
+                    continue
+                }
+            }
+            return true
+        }
+
+        var idxRus = lower.indexOf("премьер")
+        while (idxRus != -1) {
+            val nextCharIdx = idxRus + "премьер".length
+            if (nextCharIdx < lower.length) {
+                val nextChar = lower[nextCharIdx]
+                if (nextChar in 'а'..'я' || nextChar == 'ё') {
+                    idxRus = lower.indexOf("премьер", nextCharIdx)
+                    continue
+                }
+            }
+            return true
+        }
+        return false
+    }
+
+    private fun containsBrandWithBoundaries(lowerText: String, brand: String): Boolean {
+        var index = lowerText.indexOf(brand)
+        while (index != -1) {
+            val prevCharSafe = if (index > 0) lowerText[index - 1] else ' '
+            val nextCharSafe = if (index + brand.length < lowerText.length) lowerText[index + brand.length] else ' '
+            
+            val isPrevAlnum = prevCharSafe in 'a'..'z' || prevCharSafe in '0'..'9' || prevCharSafe in 'а'..'я' || prevCharSafe == 'ё'
+            val isNextAlnum = nextCharSafe in 'a'..'z' || nextCharSafe in '0'..'9' || nextCharSafe in 'а'..'я' || nextCharSafe == 'ё'
+            
+            if (!isPrevAlnum && !isNextAlnum) {
+                return true
+            }
+            index = lowerText.indexOf(brand, index + 1)
+        }
+        return false
+    }
+
+    internal fun isBlockedText(text: String, includeTvOnline: Boolean = true): Boolean {
         val lower = text.lowercase()
-        return lower.contains("premier") ||
-               lower.contains("start") ||
+        val baseBlocked = containsPremierBrand(lower) ||
+               containsBrandWithBoundaries(lower, "start") ||
                lower.contains("viju") ||
                lower.contains("kion") ||
                lower.contains("кион") ||
-               lower.contains("ivi") ||
-               lower.contains("иви") ||
+               containsBrandWithBoundaries(lower, "ivi") ||
+               containsBrandWithBoundaries(lower, "иви") ||
                lower.contains("okko") ||
                lower.contains("окко") ||
-               lower.contains("wink") ||
-               lower.contains("винк") ||
+               containsBrandWithBoundaries(lower, "wink") ||
+               containsBrandWithBoundaries(lower, "винк") ||
                lower.contains("amediateka") ||
                lower.contains("амедиатека") ||
                lower.contains("more.tv") ||
-               lower.contains("тв онлайн") 
+               lower.contains("онлайн-кинотеатр") ||
+               lower.contains("онлайн кинотеатр") ||
+               lower.contains("онлайн-кинотеатры") ||
+               lower.contains("онлайн кинотеатры") ||
+               lower.contains("online cinema") ||
+               lower.contains("online-cinema") ||
+               lower.contains("online-cinemas") ||
+               lower.contains("online cinemas") ||
+               lower.contains("feeds/kion") ||
+               lower.contains("25841652")
+
+        if (baseBlocked) return true
+
+        if (includeTvOnline) {
+            return lower.contains("тв онлайн") ||
+                   lower.contains("телеканалы") ||
+                   lower.contains("тв-каналы") ||
+                   lower.contains("тв каналы") ||
+                   lower.contains("tvchannels") ||
+                   lower.contains("tv-channels") ||
+                   lower.contains("онлайн тв") ||
+                   lower.contains("онлайн-тв") ||
+                   lower.contains("online tv") ||
+                   lower.contains("online-tv")
+        }
+        return false
     }
 }

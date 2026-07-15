@@ -15,8 +15,13 @@ data class Video(
     val thumbnailUrl: String? = null,
     val isDownloaded: Boolean = false,
     val isBookmarked: Boolean = false,
+    val isWatched: Boolean = false,
+    val playbackProgress: Float = 0f,
     val authorId: String? = null,
     val authorActionUrl: String? = null,
     val authorAvatarUrl: String? = null,
-    val pageUrl: String? = null
+    val pageUrl: String? = null,
+    val originType: String? = null,
+    val originId: String? = null,
+    val originTitle: String? = null
 ) : Serializable
