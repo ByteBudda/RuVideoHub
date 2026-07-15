@@ -9,6 +9,7 @@ object UrlResolver {
         CHANNEL,
         PLAYLIST,
         SERIES,
+        FEED,
         UNKNOWN
     }
     
@@ -48,7 +49,14 @@ object UrlResolver {
             }
         }
         
-        // 4. VIDEO
+        // 4. FEED
+        val feedPattern = "rutube\\.ru/(?:api/)?feeds/([^/]+)".toRegex()
+        val feedMatch = feedPattern.find(cleanUrl)
+        if (feedMatch != null) {
+            return ResolvedEntity(EntityType.FEED, feedMatch.groupValues[1], trimmed)
+        }
+
+        // 5. VIDEO
         // Matches https://rutube.ru/video/XXXX/ or private/XXXX/
         val videoPattern = "rutube\\.ru/video/(?:private/)?([a-fA-F0-9]+)".toRegex()
         val match1 = videoPattern.find(cleanUrl)
