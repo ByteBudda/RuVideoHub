@@ -268,8 +268,15 @@ fun RutubeVideoPlayer(
         }
     }
 
-    DisposableEffect(exoPlayer) {
+    DisposableEffect(exoPlayer, videoId) {
         onDispose {
+            exoPlayer?.let { player ->
+                val pos = player.currentPosition
+                val dur = player.duration.coerceAtLeast(0L)
+                if (pos > 0L) {
+                    viewModel.saveVideoPosition(videoId, pos, dur)
+                }
+            }
             exoPlayer?.release()
         }
     }
@@ -324,21 +331,35 @@ fun RutubeVideoPlayer(
         }
     }
 
+    LaunchedEffect(isPlayingState) {
+        if (!isPlayingState) {
+            exoPlayer?.let { player ->
+                val pos = player.currentPosition
+                val dur = player.duration.coerceAtLeast(0L)
+                if (pos > 0L) {
+                    viewModel.saveVideoPosition(videoId, pos, dur)
+                }
+            }
+        }
+    }
+
     // Progress update loop
     LaunchedEffect(exoPlayer, isPlayingState, isTimelineDragging) {
+        var lastSavedPos = 0L
         while (isPlayingState && exoPlayer != null) {
             if (exoPlayer.isPlaying && !isTimelineDragging) {
                 val pos = exoPlayer.currentPosition
+                val dur = exoPlayer.duration.coerceAtLeast(0L)
                 if (pos > 0L) {
                     currentPos = pos
-                    val dur = exoPlayer.duration
-                    if (dur > 0L) {
-                        totalDuration = dur
+                    totalDuration = dur
+                    if (Math.abs(pos - lastSavedPos) >= 5000L) {
+                        viewModel.saveVideoPosition(videoId, pos, dur)
+                        lastSavedPos = pos
                     }
-                    viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                 }
             }
-            kotlinx.coroutines.delay(250)
+            kotlinx.coroutines.delay(1000)
         }
     }
 
