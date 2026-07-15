@@ -1,7 +1,7 @@
 
 # 🎬 RuVideoHub
 
-**Неофициальный open-source клиент для просмотра видео**
+**Неофициальный  клиент для просмотра видео**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-blue)
