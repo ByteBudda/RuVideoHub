@@ -1386,7 +1386,8 @@ fun RutubeVideoPlayer(
 fun shareVideo(context: android.content.Context, video: Video) {
     val sendIntent = android.content.Intent().apply {
         action = android.content.Intent.ACTION_SEND
-        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в RuVideoHub: \"${video.title}\"\n\nПосмотреть: https://rutube.ru/video/${video.id}/")
+        val url = video.getShareUrl()
+        putExtra(android.content.Intent.EXTRA_TEXT, "Смотрю видео в RuVideoHub: \"${video.title}\"\n\nПосмотреть: $url")
         type = "text/plain"
     }
     val shareIntent = android.content.Intent.createChooser(sendIntent, "Поделиться видео")
