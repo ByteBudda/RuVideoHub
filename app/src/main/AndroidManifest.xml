@@ -84,6 +84,22 @@
                 <data android:host="vkvideo.ru" />
                 <data android:host="www.vkvideo.ru" />
                 <data android:host="m.vk.com" />
+                <data android:host="m.vkvideo.ru" />
+
+                <data android:pathPattern=".*" />
+            </intent-filter>
+
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="dzen.ru" />
+                <data android:host="www.dzen.ru" />
+                <data android:host="zen.yandex.ru" />
+                <data android:host="www.zen.yandex.ru" />
 
                 <data android:pathPattern=".*" />
             </intent-filter>
