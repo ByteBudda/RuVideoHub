@@ -42,7 +42,10 @@ object UpdateManager {
             val url = URL(GITHUB_API_URL)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
             connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) RuVideoHub")
             
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
@@ -77,7 +80,7 @@ object UpdateManager {
             } else {
                 Log.e(TAG, "Failed to check for updates. Response code: ${connection.responseCode}")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error checking for updates", e)
         }
         null
@@ -94,7 +97,7 @@ object UpdateManager {
                 if (pLatest > pCurr) return true
                 if (pLatest < pCurr) return false
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error comparing versions", e)
         }
         return false
@@ -107,6 +110,9 @@ object UpdateManager {
                 val url = URL(urlString)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) RuVideoHub")
                 connection.connect()
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
@@ -150,7 +156,7 @@ object UpdateManager {
                 delay(2000)
                 downloadState.value = DownloadState.Idle
                 
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Download failed", e)
                 downloadState.value = DownloadState.Error(e.message ?: "Download failed")
                 delay(3000)
@@ -171,7 +177,7 @@ object UpdateManager {
                 flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
             }
             context.startActivity(intent)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Install failed", e)
         }
     }
