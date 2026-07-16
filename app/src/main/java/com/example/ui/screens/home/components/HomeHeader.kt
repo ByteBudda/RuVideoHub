@@ -9,6 +9,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
@@ -51,6 +54,7 @@ fun SleekHeader(
     searchHistory: List<SearchHistory> = emptyList(),
     onDeleteQuery: (String) -> Unit = {},
     onClearAll: () -> Unit = {},
+    onSearchConfirmed: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -107,6 +111,15 @@ fun SleekHeader(
                         .onFocusChanged { isFocused = it.isFocused }
                         .testTag("search_input"),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            if (searchQuery.isNotBlank()) {
+                                onSearchConfirmed(searchQuery)
+                            }
+                            focusManager.clearFocus()
+                        }
+                    ),
                     decorationBox = { innerTextField ->
                         if (searchQuery.isEmpty()) {
                             Text(
@@ -226,6 +239,7 @@ fun SleekHeader(
                                             .fillMaxWidth()
                                             .clickable {
                                                 onSearchQueryChanged(item.query)
+                                                onSearchConfirmed(item.query)
                                                 focusManager.clearFocus()
                                             }
                                             .padding(horizontal = 14.dp, vertical = 10.dp)
