@@ -210,7 +210,8 @@ fun HomeTabScreen(
                     isTvOptimized = isTvOptimized,
                     searchHistory = searchHistory,
                     onDeleteQuery = { viewModel.deleteSearchQuery(it) },
-                    onClearAll = { viewModel.clearSearchHistory() }
+                    onClearAll = { viewModel.clearSearchHistory() },
+                    onSearchConfirmed = { viewModel.saveSearchQuery(it) }
                 )
             }
 
@@ -517,6 +518,7 @@ fun HomeTabScreen(
                 val matches = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
                 if (!matches.isNullOrEmpty()) {
                     viewModel.setSearchQuery(matches[0])
+                    viewModel.saveSearchQuery(matches[0])
                 }
             }
             isVoiceSearchActive = false
@@ -535,6 +537,7 @@ fun HomeTabScreen(
                     // Simulation mode if no Speech Recognizer exists
                     kotlinx.coroutines.delay(1000)
                     viewModel.setSearchQuery("смешные коты")
+                    viewModel.saveSearchQuery("смешные коты")
                     isVoiceSearchActive = false
                 }
             }
