@@ -235,6 +235,15 @@ fun VideoViewModel.fetchRealVideos(query: String? = null, category: String? = nu
         } finally {
             if (currentRequestId == requestId) {
                 _isLoading.value = false
+                // Eagerly prefetch page 2 in advance right after completing the page 1 load
+                if (_dynamicVideos.value.isNotEmpty() && currentPage == 1 && !isEndReached) {
+                    viewModelScope.launch {
+                        delay(200)
+                        if (currentRequestId == requestId) {
+                            loadNextPage()
+                        }
+                    }
+                }
             }
         }
     }
@@ -416,6 +425,13 @@ fun VideoViewModel.selectFeedTabInternal(tab: com.example.data.rutube.parser.Tab
             android.util.Log.e("VideoViewModel", "Select feed tab exception", e)
         } finally {
             _isLoading.value = false
+            // Eagerly prefetch page 2 in advance right after completing the tab load
+            if (_dynamicVideos.value.isNotEmpty() && currentPage == 1 && !isEndReached) {
+                viewModelScope.launch {
+                    delay(200)
+                    loadNextPage()
+                }
+            }
         }
     }
 }
@@ -578,6 +594,13 @@ fun VideoViewModel.selectVideo(video: Video?) {
                     } finally {
                         _isLoading.value = false
                         _isLoadingPlaylists.value = false
+                        // Eagerly prefetch page 2 in advance right after completing the channel load
+                        if (_channelVideos.value.isNotEmpty() && currentPage == 1 && !isEndReached) {
+                            viewModelScope.launch {
+                                delay(200)
+                                loadNextPage()
+                            }
+                        }
                     }
                 }
             }
@@ -709,6 +732,13 @@ fun VideoViewModel.selectVideo(video: Video?) {
                     android.util.Log.e("VideoViewModel", "Folder fetch error", e)
                 } finally {
                     _isLoading.value = false
+                    // Eagerly prefetch page 2 in advance right after completing the folder load
+                    if (_dynamicVideos.value.isNotEmpty() && currentPage == 1 && !isEndReached) {
+                        viewModelScope.launch {
+                            delay(200)
+                            loadNextPage()
+                        }
+                    }
                 }
             }
         }
