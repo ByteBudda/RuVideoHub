@@ -112,7 +112,8 @@ fun HomeTabScreen(
             derivedStateOf {
                 val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
                     ?: return@derivedStateOf false
-                lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
+                // Eagerly prefetch the next page when the user is 20 items from the bottom
+                lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 20
             }
         }
 
