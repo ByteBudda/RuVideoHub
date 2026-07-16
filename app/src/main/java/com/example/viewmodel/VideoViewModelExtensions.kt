@@ -34,9 +34,6 @@ fun VideoViewModel.fetchRealVideos(query: String? = null, category: String? = nu
         _isLoading.value = true
         try {
             val q = query?.trim() ?: ""
-            if (q.isNotEmpty()) {
-                saveSearchQuery(q)
-            }
             val searchSrc = _searchSource.value
             
             if (q.isNotEmpty() && searchSrc != "Rutube") {
@@ -499,6 +496,11 @@ fun VideoViewModel.selectVideo(video: Video?) {
     if (video == null) {
         playerManager.selectVideo(null)
         return
+    }
+
+    val q = currentQuery?.trim() ?: ""
+    if (q.isNotEmpty()) {
+        saveSearchQuery(q)
     }
 
     // Logic for handling "folders" or Rutube-specific entity types which are NOT real videos yet
