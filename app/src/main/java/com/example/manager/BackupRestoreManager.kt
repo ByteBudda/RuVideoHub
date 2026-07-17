@@ -186,7 +186,13 @@ class BackupRestoreManager(
                         isBookmarked = true,
                         isDownloaded = existing?.isDownloaded ?: false,
                         isWatched = existing?.isWatched ?: false,
-                        savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+                        savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
+                        originType = existing?.originType,
+                        originId = existing?.originId,
+                        originTitle = existing?.originTitle,
+                        description = existing?.description,
+                        pageUrl = existing?.pageUrl,
+                        page = existing?.page ?: 1
                     )
                     repository.insertOrUpdate(imported)
                     importedBookmarksCount++
@@ -216,7 +222,13 @@ class BackupRestoreManager(
                         isBookmarked = existing?.isBookmarked ?: false,
                         isDownloaded = existing?.isDownloaded ?: false,
                         isWatched = true,
-                        savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+                        savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
+                        originType = existing?.originType,
+                        originId = existing?.originId,
+                        originTitle = existing?.originTitle,
+                        description = existing?.description,
+                        pageUrl = existing?.pageUrl,
+                        page = existing?.page ?: 1
                     )
                     repository.insertOrUpdate(imported)
                     importedRecentsCount++

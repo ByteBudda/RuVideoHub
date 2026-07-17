@@ -42,7 +42,7 @@ class LibraryManager(
         }
     }
 
-    fun addToRecentHistory(video: Video) {
+    fun addToRecentHistory(video: Video, page: Int = 1) {
         scope.launch(Dispatchers.IO) {
             val existing = repository.getVideoById(video.id)
             val toSave = SavedVideo(
@@ -63,7 +63,12 @@ class LibraryManager(
                 lastDuration = existing?.lastDuration ?: 0L,
                 originType = video.originType ?: existing?.originType,
                 originId = video.originId ?: existing?.originId,
-                originTitle = video.originTitle ?: existing?.originTitle
+                originTitle = video.originTitle ?: existing?.originTitle,
+                description = video.description,
+                pageUrl = video.pageUrl,
+                page = page,
+                authorId = video.authorId ?: existing?.authorId,
+                authorAvatarUrl = video.authorAvatarUrl ?: existing?.authorAvatarUrl
             )
             repository.insertOrUpdate(toSave)
         }
@@ -129,7 +134,13 @@ class LibraryManager(
                     isBookmarked = true,
                     isDownloaded = existing?.isDownloaded ?: false,
                     isWatched = existing?.isWatched ?: false,
-                    savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+                    savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
+                    originType = existing?.originType,
+                    originId = existing?.originId,
+                    originTitle = existing?.originTitle,
+                    description = existing?.description,
+                    pageUrl = existing?.pageUrl,
+                    page = existing?.page ?: 1
                 )
                 repository.insertOrUpdate(imported)
                 count++

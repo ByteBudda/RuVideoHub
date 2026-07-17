@@ -9,6 +9,7 @@ import android.app.UiModeManager
 import android.content.pm.PackageManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.core.content.edit
 
 class SettingsManager(private val application: Application) {
     private val sharedPrefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
@@ -73,6 +74,7 @@ class SettingsManager(private val application: Application) {
     val customThemes = _customThemes.asStateFlow()
 
     init {
+        SettingsMigrator(sharedPrefs).migrate()
         val savedTheme = sharedPrefs.getString("app_theme", null)
         _appEffect.value = sharedPrefs.getString("app_effect", "default") ?: "default"
         if (savedTheme != null) {
@@ -130,61 +132,61 @@ class SettingsManager(private val application: Application) {
 
     fun setAppEffect(effect: String) {
         _appEffect.value = effect
-        sharedPrefs.edit().putString("app_effect", effect).apply()
+        sharedPrefs.edit { putString("app_effect", effect) }
     }
     
     fun setAppTheme(theme: String) {
         _appTheme.value = theme
         val isDark = (theme == "dark" || theme == "slate")
         _isDarkTheme.value = isDark
-        sharedPrefs.edit()
-            .putString("app_theme", theme)
-            .putBoolean("is_dark_theme", isDark)
-            .apply()
+        sharedPrefs.edit {
+            putString("app_theme", theme)
+            putBoolean("is_dark_theme", isDark)
+        }
     }
 
     fun toggleTvOptimized() {
         val newValue = !_isTvOptimized.value
         _isTvOptimized.value = newValue
-        sharedPrefs.edit().putBoolean("is_tv_optimized", newValue).apply()
+        sharedPrefs.edit { putBoolean("is_tv_optimized", newValue) }
     }
 
     fun toggleLargeCardsMode() {
         val newValue = !_isLargeCardsMode.value
         _isLargeCardsMode.value = newValue
-        sharedPrefs.edit().putBoolean("is_large_cards_mode", newValue).apply()
+        sharedPrefs.edit { putBoolean("is_large_cards_mode", newValue) }
     }
 
     fun toggleHistoryLargeCardsMode() {
         val newValue = !_isHistoryLargeCardsMode.value
         _isHistoryLargeCardsMode.value = newValue
-        sharedPrefs.edit().putBoolean("is_history_large_cards_mode", newValue).apply()
+        sharedPrefs.edit { putBoolean("is_history_large_cards_mode", newValue) }
     }
 
     fun toggleDownloadsLargeCardsMode() {
         val newValue = !_isDownloadsLargeCardsMode.value
         _isDownloadsLargeCardsMode.value = newValue
-        sharedPrefs.edit().putBoolean("is_downloads_large_cards_mode", newValue).apply()
+        sharedPrefs.edit { putBoolean("is_downloads_large_cards_mode", newValue) }
     }
 
     fun agreeToTerms() {
         _isTermsAgreed.value = true
-        sharedPrefs.edit().putBoolean("terms_agreed", true).apply()
+        sharedPrefs.edit { putBoolean("terms_agreed", true) }
     }
 
     fun setStartPageType(type: String) {
         _startPageType.value = type
-        sharedPrefs.edit().putString("start_page_type", type).apply()
+        sharedPrefs.edit { putString("start_page_type", type) }
     }
 
     fun setStartPageCategory(category: String) {
         _startPageCategory.value = category
-        sharedPrefs.edit().putString("start_page_category", category).apply()
+        sharedPrefs.edit { putString("start_page_category", category) }
     }
 
     fun setStartPageCustomUrl(url: String) {
         _startPageCustomUrl.value = url
-        sharedPrefs.edit().putString("start_page_custom_url", url).apply()
+        sharedPrefs.edit { putString("start_page_custom_url", url) }
     }
 
     fun setStartPageFavorite(id: String, title: String) {
@@ -198,32 +200,32 @@ class SettingsManager(private val application: Application) {
 
     fun setPlayerQuality(quality: String) {
         _playerQuality.value = quality
-        sharedPrefs.edit().putString("player_quality", quality).apply()
+        sharedPrefs.edit { putString("player_quality", quality) }
     }
 
     fun setDownloadQuality(quality: String) {
         _downloadQuality.value = quality
-        sharedPrefs.edit().putString("download_quality", quality).apply()
+        sharedPrefs.edit { putString("download_quality", quality) }
     }
 
     fun setTvGridColumns(cols: Int) {
         _tvGridColumns.value = cols
-        sharedPrefs.edit().putInt("tv_grid_columns", cols).apply()
+        sharedPrefs.edit { putInt("tv_grid_columns", cols) }
     }
 
     fun setTvVideoGridColumns(cols: Int) {
         _tvVideoGridColumns.value = cols
-        sharedPrefs.edit().putInt("tv_video_grid_columns", cols).apply()
+        sharedPrefs.edit { putInt("tv_video_grid_columns", cols) }
     }
 
     fun setMobileGridColumns(cols: Int) {
         _mobileGridColumns.value = cols
-        sharedPrefs.edit().putInt("mobile_grid_columns", cols).apply()
+        sharedPrefs.edit { putInt("mobile_grid_columns", cols) }
     }
 
     fun setFocusStyle(style: String) {
         _focusStyle.value = style
-        sharedPrefs.edit().putString("focus_style", style).apply()
+        sharedPrefs.edit { putString("focus_style", style) }
     }
     fun addCustomTheme(theme: CustomTheme) {
         val list = _customThemes.value.toMutableList()
