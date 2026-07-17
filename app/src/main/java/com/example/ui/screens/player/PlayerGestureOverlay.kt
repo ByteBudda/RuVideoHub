@@ -2,6 +2,7 @@ package com.example.ui.screens.player
 
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.media.AudioManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,9 +25,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+
+// Helper function to find Activity from Context
+fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+// Форматирование миллисекунд в красивую строку (например 01:23)
+private fun formatDuration(timeMs: Long): String {
+    val totalSeconds = (timeMs / 1000).toInt()
+    val seconds = totalSeconds % 60
+    val minutes = (totalSeconds / 60) % 60
+    val hours = totalSeconds / 3600
+    return if (hours > 0) {
+        String.format(java.util.Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
+    }
+}
 
 /**
  * Stateful Gesture catcher overlay supporting tap, double taps,
@@ -216,7 +240,7 @@ fun PlayerGestureOverlay(
             }
         }
 
-        // 3. Перемотка (Снизу - аккуратный прогрессбар)
+        // 3. Перемотка (Снизу - аккуратный прогрессбар с тайм-метками)
         AnimatedVisibility(
             visible = hudSeekPosition != null && hudSeekDuration != null,
             enter = fadeIn(),
@@ -230,19 +254,45 @@ fun PlayerGestureOverlay(
                     (hudSeekPosition!!.toFloat() / hudSeekDuration!!.toFloat()).coerceIn(0f, 1f)
                 } else 0f
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.White.copy(alpha = 0.2f))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Тайм-метки над ползунком
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = formatDuration(hudSeekPosition!!),
+                            color = Color(0xFF00E5FF),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = formatDuration(hudSeekDuration!!),
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Сам прогресс-бар
                     Box(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(progress)
-                            .background(Color(0xFF00E5FF))
-                    )
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.White.copy(alpha = 0.2f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progress)
+                                .background(Color(0xFF00E5FF))
+                        )
+                    }
                 }
             }
         }
