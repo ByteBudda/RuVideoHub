@@ -621,7 +621,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     // List of ALL viewed/saved items (Recent/History list), sorted by savedAt DESC
     val recentSavedVideos: StateFlow<List<SavedVideo>> = libraryManager.recentVideos
 
-    fun addToRecentHistory(video: Video) = libraryManager.addToRecentHistory(video)
+    fun addToRecentHistory(video: Video) = libraryManager.addToRecentHistory(video, currentPage)
 
     fun deleteRecentItem(video: Video) {
         libraryManager.deleteRecentItem(video) { videoId ->
@@ -641,109 +641,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
 
 
-    internal fun cleanRutubeUrl(rawUrl: String): String {
-        var url = rawUrl.trim()
-        if (url.contains("?")) {
-            url = url.substringBefore("?")
-        }
-        val trimmed = url.trimEnd('/')
-        return if (trimmed.startsWith("http")) trimmed else "https://rutube.ru${if (trimmed.startsWith("/")) "" else "/"}$trimmed"
-    }
-
-    internal fun toRutubeApiUrl(rawUrl: String): String {
-        var url = rawUrl.trim()
-        if (url.isBlank()) return ""
-        val absoluteUrl = if (url.startsWith("http")) {
-            url
-        } else {
-            "https://rutube.ru${if (url.startsWith("/")) "" else "/"}$url"
-        }
-        
-        val baseWithoutQuery = absoluteUrl.substringBefore("?")
-        val queryPart = if (absoluteUrl.contains("?")) "?" + absoluteUrl.substringAfter("?") else ""
-        
-        val cleanedBase = baseWithoutQuery.removeSuffix("/")
-        val domainPrefix = "https://rutube.ru/"
-        if (!cleanedBase.startsWith(domainPrefix)) {
-            return absoluteUrl
-        }
-        
-        val path = cleanedBase.substring(domainPrefix.length)
-        val apiPath = when {
-            path.startsWith("plst/") -> {
-                val plId = path.substringAfter("plst/").removeSuffix("/")
-                "api/playlist/custom/$plId/videos/"
-            }
-            path.startsWith("api/video/playlist/") -> {
-                val plId = path.substringAfter("api/video/playlist/").removeSuffix("/")
-                "api/playlist/custom/$plId/videos/"
-            }
-            path.startsWith("playlist/") -> {
-                val plId = path.substringAfter("playlist/").removeSuffix("/")
-                "api/playlist/custom/$plId/videos/"
-            }
-            path.startsWith("api/playlist/custom/") -> {
-                if (path.endsWith("/videos") || path.endsWith("/videos/")) {
-                    path
-                } else {
-                    "${path.removeSuffix("/")}/videos/"
-                }
-            }
-            path.startsWith("api/playlist/") && !path.startsWith("api/playlist/user/") -> {
-                if (path.endsWith("/videos") || path.endsWith("/videos/")) {
-                    path
-                } else {
-                    "${path.removeSuffix("/")}/videos/"
-                }
-            }
-            path.startsWith("tv/") -> {
-                val tvId = path.substringAfter("tv/")
-                if (tvId.contains("video")) "api/metainfo/$path" else "api/metainfo/tv/$tvId/video/"
-            }
-            path.startsWith("metainfo/tv/") -> {
-                val tvId = path.substringAfter("metainfo/tv/")
-                if (tvId.contains("video")) "api/$path" else "api/metainfo/tv/$tvId/video/"
-            }
-            path.startsWith("series/") -> {
-                val seriesId = path.substringAfter("series/")
-                if (seriesId.contains("video")) "api/metainfo/$path" else "api/metainfo/tv/$seriesId/video/"
-            }
-            path.startsWith("brand/") -> {
-                val brandId = path.substringAfter("brand/")
-                if (brandId.contains("video")) "api/metainfo/$path" else "api/metainfo/tv/$brandId/video/"
-            }
-            path.startsWith("channel/") -> {
-                val chId = path.substringAfter("channel/")
-                "api/video/person/$chId/"
-            }
-            path.startsWith("person/") -> {
-                val pId = path.substringAfter("person/")
-                "api/video/person/$pId/"
-            }
-            path.startsWith("video/person/") -> {
-                val pId = path.substringAfter("video/person/")
-                "api/video/person/$pId/"
-            }
-            path.startsWith("video/") -> {
-                val vidId = path.substringAfter("video/")
-                "api/video/$vidId/"
-            }
-            path.startsWith("api/") -> path
-            else -> "api/$path/"
-        }
-        
-        val finalApiUrl = "https://rutube.ru/$apiPath".replace("https://rutube.ru//", "https://rutube.ru/").replace("https://rutube.ru/api/api/", "https://rutube.ru/api/")
-        val result = if (queryPart.isNotBlank()) {
-            if (finalApiUrl.contains("?")) {
-                finalApiUrl + "&" + queryPart.removePrefix("?")
-            } else {
-                finalApiUrl + queryPart
-            }
-        } else {
-            finalApiUrl
-        }
-        return result
-    }
 
 
 
@@ -949,6 +846,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 android.util.Log.e("VideoViewModel", "Failed to update db thumbnail for $videoId", e)
+                viewModelScope.launch { com.example.manager.ErrorHandler.reportError("Failed to update database: ${e.message}") }
             }
         }
     }
