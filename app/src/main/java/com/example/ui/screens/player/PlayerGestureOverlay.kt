@@ -4,17 +4,20 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioManager
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -26,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,90 +37,98 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
-// Format duration helper (e.g. 01:23)
-private fun formatDuration(timeMs: Long): String {
-    val totalSeconds = (timeMs / 1000).toInt()
-    val seconds = totalSeconds % 60
-    val minutes = (totalSeconds / 60) % 60
-    val hours = totalSeconds / 3600
-    return if (hours > 0) {
-        String.format(java.util.Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
-    }
+/**
+ * Find Activity from Context (helper)
+ */
+fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /**
- * A beautiful, wide semi-transparent slider-indicator HUD for Volume/Brightness.
+ * Вертикальная полупрозрачная полоска для громкости (справа)
+ * или яркости (слева)
  */
 @Composable
-fun VolumeBrightnessHud(
-    type: String, // "volume" or "brightness"
-    value: Float, // 0f..1f
+fun VerticalIndicatorBar(
+    value: Float,           // 0f..1f
+    type: String,           // "volume" или "brightness"
     modifier: Modifier = Modifier
 ) {
-    Row(
+    val isVolume = type == "volume"
+    val icon = if (isVolume) {
+        if (value == 0f) Icons.AutoMirrored.Filled.VolumeOff
+        else Icons.AutoMirrored.Filled.VolumeUp
+    } else {
+        Icons.Default.LightMode
+    }
+    
+    // Цвета для градиента
+    val gradientColors = if (isVolume) {
+        listOf(Color(0xFF4FC3F7), Color(0xFF00E5FF))  // Голубой для громкости
+    } else {
+        listOf(Color(0xFFFFD54F), Color(0xFFFFAB00))  // Желтый для яркости
+    }
+    
+    Column(
         modifier = modifier
-            .width(320.dp) // Wide and gorgeous semi-transparent bar
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.Black.copy(alpha = 0.65f))
-            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+            .width(48.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.Black.copy(alpha = 0.4f))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = if (type == "volume") {
-                if (value == 0f) Icons.AutoMirrored.Filled.VolumeOff
-                else if (value < 0.5f) Icons.AutoMirrored.Filled.VolumeDown
-                else Icons.AutoMirrored.Filled.VolumeUp
-            } else {
-                Icons.Default.LightMode
-            },
+            imageVector = icon,
             contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(22.dp)
+            tint = Color.White.copy(alpha = 0.8f),
+            modifier = Modifier.size(20.dp)
         )
         
-        // Custom colorful modern track bar
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Вертикальная полоска прогресса
         Box(
             modifier = Modifier
-                .weight(1f)
-                .height(6.dp)
+                .width(6.dp)
+                .height(140.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color.White.copy(alpha = 0.25f))
+                .background(Color.White.copy(alpha = 0.2f))
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(value)
+                    .fillMaxWidth()
+                    .fillMaxHeight(value)
+                    .align(Alignment.BottomCenter)
                     .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color(0xFF42A5F5), // Electric Blue
-                                Color(0xFF00E5FF)  // Bright Cyan
-                            )
+                        brush = Brush.verticalGradient(
+                            colors = gradientColors,
+                            startY = 1f,
+                            endY = 0f
                         )
                     )
             )
         }
         
+        Spacer(modifier = Modifier.height(8.dp))
+        
         Text(
             text = "${(value * 100).toInt()}%",
-            color = Color.White,
-            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(40.dp),
-            textAlign = TextAlign.End
+            textAlign = TextAlign.Center
         )
     }
 }
 
 /**
- * A gorgeous Seek overlay HUD showing when the user is dragging along the bottom.
+ * Горизонтальная полоска перемотки снизу
  */
 @Composable
-fun SeekProgressHud(
+fun SeekProgressBar(
     positionMs: Long,
     durationMs: Long,
     isSeekingForward: Boolean,
@@ -124,46 +136,35 @@ fun SeekProgressHud(
 ) {
     val progress = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
     
-    Column(
+    Row(
         modifier = modifier
-            .width(280.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.Black.copy(alpha = 0.75f))
-            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.Black.copy(alpha = 0.5f))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = if (isSeekingForward) Icons.Default.FastForward else Icons.Default.FastRewind,
             contentDescription = null,
             tint = Color(0xFF00E5FF),
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(24.dp)
         )
         
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = formatDuration(positionMs),
-                color = Color(0xFF00E5FF),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = formatDuration(durationMs),
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        Text(
+            text = formatDuration(positionMs),
+            color = Color(0xFF00E5FF),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(50.dp)
+        )
         
-        // Beautiful bottom-seek progress bar
+        // Горизонтальная полоска прогресса
         Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp))
                 .background(Color.White.copy(alpha = 0.2f))
@@ -174,20 +175,25 @@ fun SeekProgressHud(
                     .fillMaxWidth(progress.coerceIn(0f, 1f))
                     .background(
                         brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color(0xFF29B6F6),
-                                Color(0xFF00E5FF)
-                            )
+                            colors = listOf(Color(0xFF29B6F6), Color(0xFF00E5FF))
                         )
                     )
             )
         }
+        
+        Text(
+            text = formatDuration(durationMs),
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.width(50.dp),
+            textAlign = TextAlign.End
+        )
     }
 }
 
 /**
- * Stateful Gesture catcher overlay supporting tap, double taps,
- * vertical gestures for volume and brightness, and horizontal swipes along the bottom 25% for seeking.
+ * Основной обработчик жестов
  */
 @Composable
 fun PlayerGestureOverlay(
@@ -200,6 +206,7 @@ fun PlayerGestureOverlay(
     onTap: () -> Unit
 ) {
     val context = LocalContext.current
+    val viewConfiguration = LocalViewConfiguration.current
     
     var hudVolume by remember { mutableStateOf<Float?>(null) }
     var hudBrightness by remember { mutableStateOf<Float?>(null) }
@@ -210,7 +217,7 @@ fun PlayerGestureOverlay(
     
     var lastInteractionTime by remember { mutableStateOf(0L) }
     
-    // Automatic dismissal of visual gestures HUDs
+    // Автоматическое скрытие HUD через 1.5 секунды
     LaunchedEffect(lastInteractionTime) {
         if (lastInteractionTime > 0L) {
             delay(1500)
@@ -221,164 +228,188 @@ fun PlayerGestureOverlay(
         }
     }
     
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { onTap() },
-                    onDoubleTap = { offset ->
-                        if (offset.x < size.width / 3) {
-                            onDoubleTapLeft()
-                        } else if (offset.x > size.width * 2 / 3) {
-                            onDoubleTapRight()
+    Box(modifier = modifier.fillMaxSize()) {
+        // Прозрачный оверлей для обработки жестов
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { onTap() },
+                        onDoubleTap = { offset ->
+                            if (offset.x < size.width / 3) {
+                                onDoubleTapLeft()
+                            } else if (offset.x > size.width * 2 / 3) {
+                                onDoubleTapRight()
+                            }
                         }
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val down = awaitPointerEvent().changes.firstOrNull() ?: continue
-                        if (down.pressed) {
-                            val downPos = down.position
-                            // bottom 25% of the screen triggers horizontal scroll seeking
-                            val isSeekDrag = downPos.y > size.height * 0.75f
-                            
-                            var dragStarted = false
-                            var accumulatedDragX = 0f
-                            var accumulatedDragY = 0f
-                            var dragType = 0 // 0: undecided, 1: seek, 2: brightness, 3: volume
-                            val touchSlop = viewConfiguration.touchSlop
-                            
-                            var startPlaybackPos = 0L
-                            var videoDuration = 0L
-                            
-                            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat()
-                            
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) break
+                    )
+                }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val down = awaitPointerEvent().changes.firstOrNull() ?: continue
+                            if (down.pressed) {
+                                val downPos = down.position
+                                // Нижние 25% экрана - перемотка
+                                val isSeekDrag = downPos.y > size.height * 0.75f
                                 
-                                val posChange = change.positionChange()
-                                accumulatedDragX += posChange.x
-                                accumulatedDragY += posChange.y
+                                var dragStarted = false
+                                var accumulatedDragX = 0f
+                                var accumulatedDragY = 0f
+                                var dragType = 0 // 0: не определено, 1: seek, 2: brightness, 3: volume
+                                val touchSlop = viewConfiguration.touchSlop
                                 
-                                if (!dragStarted) {
-                                    if (abs(accumulatedDragX) > touchSlop || abs(accumulatedDragY) > touchSlop) {
-                                        dragStarted = true
-                                        if (isSeekDrag) {
-                                            dragType = 1
-                                            startPlaybackPos = currentPositionProvider()
-                                            videoDuration = durationProvider()
-                                            lastInteractionTime = System.currentTimeMillis()
-                                        } else {
-                                            if (abs(accumulatedDragY) > abs(accumulatedDragX)) {
-                                                dragType = if (downPos.x < size.width / 2f) 2 else 3
+                                var startPlaybackPos = 0L
+                                var videoDuration = 0L
+                                
+                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat()
+                                
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) break
+                                    
+                                    val posChange = change.positionChange()
+                                    accumulatedDragX += posChange.x
+                                    accumulatedDragY += posChange.y
+                                    
+                                    if (!dragStarted) {
+                                        if (abs(accumulatedDragX) > touchSlop || abs(accumulatedDragY) > touchSlop) {
+                                            dragStarted = true
+                                            if (isSeekDrag) {
+                                                dragType = 1  // Перемотка
+                                                startPlaybackPos = currentPositionProvider()
+                                                videoDuration = durationProvider()
                                                 lastInteractionTime = System.currentTimeMillis()
                                             } else {
-                                                break
+                                                // Вертикальный свайп
+                                                if (abs(accumulatedDragY) > abs(accumulatedDragX)) {
+                                                    dragType = if (downPos.x < size.width / 2f) 2 else 3
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (dragStarted) {
+                                        change.consume()
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        
+                                        when (dragType) {
+                                            1 -> { // SEEK - горизонтальная перемотка снизу
+                                                if (videoDuration > 0) {
+                                                    val maxSeekSpan = if (videoDuration < 300000L) videoDuration else 300000L
+                                                    val deltaMs = ((accumulatedDragX / size.width) * maxSeekSpan).toLong()
+                                                    val targetPos = (startPlaybackPos + deltaMs).coerceIn(0, videoDuration)
+                                                    isSeekingForward = deltaMs >= 0
+                                                    hudSeekPosition = targetPos
+                                                    hudSeekDuration = videoDuration
+                                                }
+                                            }
+                                            2 -> { // BRIGHTNESS - левая половина
+                                                context.findActivity()?.window?.let { window ->
+                                                    val attrs = window.attributes
+                                                    val currentBrightness = if (attrs.screenBrightness < 0f) 0.5f else attrs.screenBrightness
+                                                    val diff = -(posChange.y / size.height) * 1.2f
+                                                    val newBrightness = (currentBrightness + diff).coerceIn(0f, 1f)
+                                                    attrs.screenBrightness = newBrightness
+                                                    window.attributes = attrs
+                                                    hudBrightness = newBrightness
+                                                    hudVolume = null
+                                                }
+                                            }
+                                            3 -> { // VOLUME - правая половина
+                                                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+                                                val diff = -(posChange.y / size.height) * maxVol * 1.2f
+                                                val newVol = (currentVol + diff).coerceIn(0f, maxVol)
+                                                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol.toInt(), 0)
+                                                hudVolume = newVol / maxVol
+                                                hudBrightness = null
                                             }
                                         }
                                     }
                                 }
                                 
-                                if (dragStarted) {
-                                    change.consume()
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    
-                                    when (dragType) {
-                                        1 -> { // SEEK
-                                            if (videoDuration > 0) {
-                                                // Dragging full screen width can seek up to 5 minutes or total duration, whichever is smaller
-                                                val maxSeekSpan = if (videoDuration < 300000L) videoDuration else 300000L
-                                                val deltaMs = ((accumulatedDragX / size.width) * maxSeekSpan).toLong()
-                                                val targetPos = (startPlaybackPos + deltaMs).coerceIn(0, videoDuration)
-                                                isSeekingForward = deltaMs >= 0
-                                                hudSeekPosition = targetPos
-                                                hudSeekDuration = videoDuration
-                                            }
-                                        }
-                                        2 -> { // BRIGHTNESS
-                                            context.findActivity()?.window?.let { window ->
-                                                val attrs = window.attributes
-                                                val currentBrightness = if (attrs.screenBrightness < 0) 0.5f else attrs.screenBrightness
-                                                val diff = -(posChange.y / size.height) * 1.5f
-                                                val newBrightness = (currentBrightness + diff).coerceIn(0f, 1f)
-                                                attrs.screenBrightness = newBrightness
-                                                window.attributes = attrs
-                                                hudBrightness = newBrightness
-                                                hudVolume = null
-                                            }
-                                        }
-                                        3 -> { // VOLUME
-                                            val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
-                                            val diff = -(posChange.y / size.height) * maxVol * 1.5f
-                                            val newVol = (currentVol + diff).coerceIn(0f, maxVol)
-                                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol.toInt(), 0)
-                                            hudVolume = newVol / maxVol
-                                            hudBrightness = null
-                                        }
+                                if (dragStarted && dragType == 1) {
+                                    hudSeekPosition?.let { finalPos ->
+                                        onSeekCompleted(finalPos)
                                     }
-                                }
-                            }
-                            
-                            if (dragStarted && dragType == 1) {
-                                hudSeekPosition?.let { finalPos ->
-                                    onSeekCompleted(finalPos)
                                 }
                             }
                         }
                     }
                 }
-            }
-    ) {
-        // Render HUD Overlays when active
+        )
         
-        // 1. Volume Overlay (Top Center)
-        AnimatedVisibility(
-            visible = hudVolume != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 80.dp)
-        ) {
-            hudVolume?.let { vol ->
-                VolumeBrightnessHud(type = "volume", value = vol)
-            }
-        }
+        // === HUD Overlays ===
         
-        // 2. Brightness Overlay (Top Center)
+        // 1. Яркость - слева, вертикально
         AnimatedVisibility(
             visible = hudBrightness != null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 80.dp)
+                .align(Alignment.CenterStart)
+                .padding(start = 20.dp)
         ) {
             hudBrightness?.let { bri ->
-                VolumeBrightnessHud(type = "brightness", value = bri)
+                VerticalIndicatorBar(
+                    value = bri,
+                    type = "brightness"
+                )
             }
         }
         
-        // 3. Seek Progress Overlay (Center)
+        // 2. Громкость - справа, вертикально
+        AnimatedVisibility(
+            visible = hudVolume != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 20.dp)
+        ) {
+            hudVolume?.let { vol ->
+                VerticalIndicatorBar(
+                    value = vol,
+                    type = "volume"
+                )
+            }
+        }
+        
+        // 3. Перемотка - снизу, горизонтально
         AnimatedVisibility(
             visible = hudSeekPosition != null && hudSeekDuration != null,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 60.dp)
         ) {
             if (hudSeekPosition != null && hudSeekDuration != null) {
-                SeekProgressHud(
+                SeekProgressBar(
                     positionMs = hudSeekPosition!!,
                     durationMs = hudSeekDuration!!,
                     isSeekingForward = isSeekingForward
                 )
             }
         }
+    }
+}
+
+// Форматирование времени
+private fun formatDuration(timeMs: Long): String {
+    val totalSeconds = (timeMs / 1000).toInt()
+    val seconds = totalSeconds % 60
+    val minutes = (totalSeconds / 60) % 60
+    val hours = totalSeconds / 3600
+    return if (hours > 0) {
+        String.format(java.util.Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
     }
 }
