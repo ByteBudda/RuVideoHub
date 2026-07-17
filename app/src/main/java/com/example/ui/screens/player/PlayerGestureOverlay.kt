@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioManager
-import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -125,7 +124,7 @@ fun VerticalIndicatorBar(
 }
 
 /**
- * Горизонтальная полоска перемотки снизу
+ * Горизонтальная полоска перемотки снизу (заменяет SeekProgressHud)
  */
 @Composable
 fun SeekProgressBar(
@@ -381,7 +380,7 @@ fun PlayerGestureOverlay(
             }
         }
         
-        // 3. Перемотка - снизу, горизонтально
+        // 3. Перемотка - снизу, горизонтально (используем SeekProgressBar вместо SeekProgressHud)
         AnimatedVisibility(
             visible = hudSeekPosition != null && hudSeekDuration != null,
             enter = fadeIn(),
