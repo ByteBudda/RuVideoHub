@@ -610,59 +610,80 @@ fun VideoViewModel.selectVideo(video: Video?) {
                             resolveNumericChannelId(channelId)
                         }
 
-                        try {
-                            val channelProfileUrl = "https://rutube.ru/api/profile/user/$channelIdResolved/?format=json"
-                            val profileResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(channelProfileUrl)
-                            val profileBody = profileResponse.string()
-                            val jsonObject = org.json.JSONObject(profileBody)
-                            val name = jsonObject.optString("name", video.channel) ?: ""
-                            val description = jsonObject.optString("description", video.description)
-                            val subCount = jsonObject.optInt("subscribers_count", 0)
-                            val avatarUrl = jsonObject.optString("avatar_url", video.authorAvatarUrl ?: "")
-                            val appearance = jsonObject.optJSONObject("appearance")
-                            val coverImage = appearance?.optString("cover_image", video.thumbnailUrl ?: "") ?: video.thumbnailUrl ?: ""
+                        // 1. Channel Profile Info (Parallel)
+                        launch {
+                            try {
+                                val channelProfileUrl = "https://rutube.ru/api/profile/user/$channelIdResolved/?format=json"
+                                val profileResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(channelProfileUrl)
+                                val profileBody = profileResponse.string()
+                                val jsonObject = org.json.JSONObject(profileBody)
+                                val name = jsonObject.optString("name", video.channel) ?: ""
+                                val description = jsonObject.optString("description", video.description)
+                                val subCount = jsonObject.optInt("subscribers_count", 0)
+                                val avatarUrl = jsonObject.optString("avatar_url", video.authorAvatarUrl ?: "")
+                                val appearance = jsonObject.optJSONObject("appearance")
+                                val coverImage = appearance?.optString("cover_image", video.thumbnailUrl ?: "") ?: video.thumbnailUrl ?: ""
 
-                            val updatedVideo = video.copy(
-                                id = "channel_${channelIdResolved}__",
-                                title = name,
-                                channel = name,
-                                description = description,
-                                views = if (subCount > 0) "$subCount подписчиков" else video.views,
-                                authorAvatarUrl = avatarUrl,
-                                thumbnailUrl = coverImage
-                            )
-                            _currentChannelVideo.value = updatedVideo
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                                val updatedVideo = video.copy(
+                                    id = "channel_${channelIdResolved}__",
+                                    title = name,
+                                    channel = name,
+                                    description = description,
+                                    views = if (subCount > 0) "$subCount подписчиков" else video.views,
+                                    authorAvatarUrl = avatarUrl,
+                                    thumbnailUrl = coverImage
+                                )
+                                _currentChannelVideo.value = updatedVideo
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
 
                         val vidUrl = "https://rutube.ru/api/video/person/$channelIdResolved/?format=json"
                         val plUrl = "https://rutube.ru/api/playlist/user/$channelIdResolved/?format=json"
-                        
-                        val vidResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(vidUrl)
-                        val vidBody = vidResponse.string()
-                        _channelVideos.value = repository.parseVideoListJson(vidBody, video.category)
-                        currentActiveApiEndpoint = vidUrl
-                        channelVideosPage = 1
-                        channelVideosEndReached = false
 
-                        val plResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(plUrl)
-                        val plBody = plResponse.string()
-                        _channelPlaylists.value = repository.parseVideoListJson(plBody, video.category)
-                        channelPlaylistsPage = 1
-                        channelPlaylistsEndReached = false
-                    } catch (e: Exception) {
-                        android.util.Log.e("VideoViewModel", "Channel fetch error", e)
-                    } finally {
-                        _isLoading.value = false
-                        _isLoadingPlaylists.value = false
-                        // Eagerly prefetch page 2 in advance right after completing the channel load
-                        if (_channelVideos.value.isNotEmpty() && channelVideosPage == 1 && !channelVideosEndReached) {
-                            viewModelScope.launch {
-                                delay(200)
-                                loadNextPage()
+                        // 2. Channel Videos (Parallel)
+                        launch {
+                            try {
+                                val vidResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(vidUrl)
+                                val vidBody = vidResponse.string()
+                                _channelVideos.value = repository.parseVideoListJson(vidBody, video.category)
+                                currentActiveApiEndpoint = vidUrl
+                                channelVideosPage = 1
+                                channelVideosEndReached = false
+                            } catch (e: Exception) {
+                                android.util.Log.e("VideoViewModel", "Channel videos fetch error", e)
+                            } finally {
+                                _isLoading.value = false
+                                // Eagerly prefetch page 2 in advance right after completing the channel load
+                                if (_channelVideos.value.isNotEmpty() && channelVideosPage == 1 && !channelVideosEndReached) {
+                                    viewModelScope.launch {
+                                        delay(200)
+                                        loadNextPage()
+                                    }
+                                }
                             }
                         }
+
+                        // 3. Channel Playlists (Parallel)
+                        launch {
+                            try {
+                                val plResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(plUrl)
+                                val plBody = plResponse.string()
+                                _channelPlaylists.value = repository.parseVideoListJson(plBody, video.category)
+                                channelPlaylistsPage = 1
+                                channelPlaylistsEndReached = false
+                            } catch (e: Exception) {
+                                android.util.Log.e("VideoViewModel", "Channel playlists fetch error", e)
+                            } finally {
+                                _isLoadingPlaylists.value = false
+                            }
+                        }
+
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoViewModel", "Channel ID resolve error", e)
+                        _isLoading.value = false
+                        _isLoadingPlaylists.value = false
                     }
                 }
             }
