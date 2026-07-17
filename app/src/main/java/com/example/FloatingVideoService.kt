@@ -199,6 +199,7 @@ class FloatingVideoService : Service() {
         var initialTouchX = 0f
         var initialTouchY = 0f
 
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
         dragBar.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -284,6 +285,7 @@ class FloatingVideoService : Service() {
         var initialResizeTouchX = 0f
         var initialResizeTouchY = 0f
 
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
         resizeHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
