@@ -109,17 +109,15 @@ fun HomeTabScreen(
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
         val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
         
-        val shouldLoadMore by remember {
+        val lastVisibleItemIndex by remember {
             derivedStateOf {
-                val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                    ?: return@derivedStateOf false
-                // Eagerly prefetch the next page when the user is 20 items from the bottom
-                lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 20
+                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
             }
         }
 
-        LaunchedEffect(shouldLoadMore, channelActiveTab, selectedFeedTab, selectedSubfolderName) {
-            if (shouldLoadMore) {
+        LaunchedEffect(lastVisibleItemIndex, channelActiveTab, selectedFeedTab, selectedSubfolderName) {
+            val total = listState.layoutInfo.totalItemsCount
+            if (total > 0 && lastVisibleItemIndex >= total - 12) {
                 viewModel.loadNextPage()
             }
         }
