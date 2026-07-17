@@ -27,13 +27,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 
 enum class VlcAspectRatio(val displayName: String) {
-    BEST_FIT("Оптимально"),
-    FIT_HORIZONTAL("По горизонтали"),
-    FIT_VERTICAL("По вертикали"),
-    FILL("Заполнение"),
-    SIXTEEN_NINE("16:9"),
-    FOUR_THREE("4:3"),
-    CENTER("По центру"),
+    BEST_FIT("Вписать"),
+    FILL("Заполнить"),
     STRETCH("Растянуть");
 
     fun next(): VlcAspectRatio {
