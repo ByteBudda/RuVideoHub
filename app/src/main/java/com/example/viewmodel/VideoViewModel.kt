@@ -379,6 +379,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setChannelActiveTab(tab: String) {
         navigationManager.setChannelActiveTab(tab)
+        if (tab == "Плейлисты" && channelPlaylistsPage == 1 && !channelPlaylistsEndReached) {
+            viewModelScope.launch {
+                delay(200)
+                loadNextPage()
+            }
+        }
     }
 
     fun pushToHistory() {
