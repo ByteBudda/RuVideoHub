@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,7 +52,7 @@ fun DisplaySettingsSection(
         if (!isTvOptimized) {
             // Large Cards Switch (only for Mobile)
             SettingsRow(
-                icon = Icons.Default.ViewList,
+                icon = Icons.AutoMirrored.Filled.ViewList,
                 title = "Крупные карточки в каталоге",
                 description = "Использовать большой размер для видео в списках",
                 onClick = { viewModel.toggleLargeCardsMode() },
