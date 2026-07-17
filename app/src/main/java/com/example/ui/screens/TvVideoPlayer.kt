@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ import androidx.compose.material3.ripple
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.theme.GreyText
+import com.example.manager.ExoPlayerHandler
 import com.example.ui.theme.Primary
 import com.example.viewmodel.VideoViewModel
 import kotlinx.coroutines.delay
@@ -132,7 +134,7 @@ fun TvRutubeVideoPlayer(
                 hlsUrl = resolvedUrl
                 isLoading = false
             } else {
-                useEmbedPlayer = true
+                loadError = "Видео недоступно"
                 isLoading = false
             }
         }
@@ -146,102 +148,20 @@ fun TvRutubeVideoPlayer(
         }
     }
 
+    val exoPlayerHandler = remember { ExoPlayerHandler(context) }
+    
     val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
-            val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-                .setBufferDurationsMs(32000, 120000, 2500, 5000)
-                .build()
-            
-            val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
-                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
-                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
-                .build()
-
-            // Strictly prioritize and configure hardware decoding by disabling software extensions and software fallback
-            val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context).apply {
-                setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-                setEnableDecoderFallback(false)
-            }
-
-            // Configure track selector to force/prefer highest available supported bitrate for ideal quality
-            val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
-                parameters = buildUponParameters()
-                    .setForceHighestSupportedBitrate(true)
-                    .build()
-            }
-
-            val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0")
-                .setDefaultRequestProperties(mapOf(
-                    "Accept" to "*/*",
-                    "Referer" to "https://rutube.ru/"
-                ))
-            
-            val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
-            val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
-                .setDataSourceFactory(dataSourceFactory)
-
-            androidx.media3.exoplayer.ExoPlayer.Builder(context, renderersFactory)
-                .setMediaSourceFactory(mediaSourceFactory)
-                .setTrackSelector(trackSelector)
-                .setAudioAttributes(audioAttributes, true)
-                .setHandleAudioBecomingNoisy(true)
-                .setLoadControl(loadControl)
-                .build().apply {
-                // Ensure track selection parameters also lock into the highest supported bitrate
-                trackSelectionParameters = trackSelectionParameters.buildUpon()
-                    .setForceHighestSupportedBitrate(true)
-                    .build()
-                playWhenReady = isPlayingState
-                val uri = if (offlineFile.exists()) {
-                    android.net.Uri.fromFile(offlineFile)
-                } else {
-                    android.net.Uri.parse(hlsUrl)
-                }
-
-                val subtitleConfigs = subtitles.map { track ->
-                    val mimeType = if (track.format.lowercase() == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
-                    androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(track.url))
-                        .setMimeType(mimeType)
-                        .setLanguage(getBcp47Language(track.language))
-                        .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
-                        .build()
-                }
-
-                val mediaItemBuilder = androidx.media3.common.MediaItem.Builder()
-                    .setUri(uri)
-                    .setSubtitleConfigurations(subtitleConfigs)
-                if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
-                    mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
-                }
-                setMediaItem(mediaItemBuilder.build())
-                prepare()
-                
-                val savedPos = viewModel.getVideoPosition(videoId)
-                if (savedPos > 0L) {
-                    seekTo(savedPos)
-                    currentPos = savedPos
-                }
-            }
+            exoPlayerHandler.initialize(hlsUrl, offlineFile, subtitles, isPlayingState, viewModel.getVideoPosition(videoId))
         }
     }
 
     LaunchedEffect(activeSubtitleLanguage, exoPlayer) {
-        exoPlayer?.let { player ->
-            if (activeSubtitleLanguage == null) {
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
-                    .build()
-            } else {
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
-                    .setPreferredTextLanguage(getBcp47Language(activeSubtitleLanguage!!))
-                    .build()
-            }
-        }
+        val track = subtitles.find { it.language == activeSubtitleLanguage }
+        exoPlayerHandler.setSubtitleTrack(track)
     }
 
-    DisposableEffect(exoPlayer, videoId) {
+    DisposableEffect(videoId) {
         onDispose {
             exoPlayer?.let { player ->
                 val pos = player.currentPosition
@@ -250,7 +170,7 @@ fun TvRutubeVideoPlayer(
                     viewModel.saveVideoPosition(videoId, pos, dur)
                 }
             }
-            exoPlayer?.release()
+            exoPlayerHandler.release()
         }
     }
 
@@ -277,7 +197,7 @@ fun TvRutubeVideoPlayer(
                 }
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     android.util.Log.e("TvVideoPlayer", "ExoPlayer error", error)
-                    useEmbedPlayer = true
+                    loadError = "Ошибка воспроизведения: ${error.message}"
                 }
             })
         } else {
@@ -630,7 +550,7 @@ fun TvRutubeVideoPlayer(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.ArrowBack, "Назад", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                         }

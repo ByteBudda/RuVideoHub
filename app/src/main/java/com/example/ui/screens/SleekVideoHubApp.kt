@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -324,7 +325,7 @@ fun SleekVideoHubApp(
             visible = currentSelectedVideo != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
-                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
             ),
             exit = slideOutVertically(
                 targetOffsetY = { it },
@@ -577,7 +578,7 @@ fun SleekTvNavigationRail(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.ExitToApp,
+                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                     contentDescription = "Выход",
                     tint = Color.Red,
                     modifier = Modifier.size(18.dp)

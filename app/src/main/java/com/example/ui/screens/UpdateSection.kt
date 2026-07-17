@@ -68,7 +68,7 @@ fun UpdateDialogs(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     if (progress >= 0f) {
                         LinearProgressIndicator(
-                            progress = progress,
+                            progress = { progress },
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
                         )
                         Spacer(modifier = Modifier.height(8.dp))

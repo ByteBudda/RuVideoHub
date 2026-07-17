@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -253,8 +254,9 @@ fun HomeTabScreen(
                             val videoRuntime = Video(
                                 id = savedVideo.id, title = savedVideo.title, channel = savedVideo.channel,
                                 views = savedVideo.views, timeAgo = savedVideo.timeAgo, duration = savedVideo.duration,
-                                isPro = savedVideo.isPro, category = savedVideo.category, description = "Продолжить просмотр",
-                                thumbnailUrl = savedVideo.thumbnailUrl, isDownloaded = savedVideo.isDownloaded, isBookmarked = savedVideo.isBookmarked
+                                isPro = savedVideo.isPro, category = savedVideo.category, description = savedVideo.description ?: "Продолжить просмотр",
+                                thumbnailUrl = savedVideo.thumbnailUrl, isDownloaded = savedVideo.isDownloaded, isBookmarked = savedVideo.isBookmarked,
+                                authorId = savedVideo.authorId, authorAvatarUrl = savedVideo.authorAvatarUrl, originType = savedVideo.originType, originId = savedVideo.originId, originTitle = savedVideo.originTitle, pageUrl = savedVideo.pageUrl
                             )
                             viewModel.selectVideo(videoRuntime)
                         },
@@ -297,7 +299,7 @@ fun HomeTabScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Назад",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
@@ -455,29 +457,14 @@ fun HomeTabScreen(
                     initialFocusRequester = initialFocusRequester,
                     viewModel = viewModel
                 )
-            } else {
-                val firstItem = currentVideos.firstOrNull()
-                if (firstItem != null) {
-                    val isCatalog = firstItem.duration == com.example.utils.VideoType.CATALOG
-                    if (isCatalog) {
-                        homeCatalogContent(
-                            groupedCatalogItems = groupedCatalogItems,
-                            catalogExpandedState = catalogExpandedState,
-                            isDarkTheme = isDarkTheme,
-                            isTvOptimized = isTvOptimized,
-                            isLargeCardsMode = isLargeCardsMode,
-                            viewModel = viewModel,
-                            tvVideoColsSetting = tvVideoColsSetting,
-                            mobileColsSetting = mobileColsSetting
-                        )
-                    } else {
-                        homeFeedContent(
-                            folderItems = folderItems,
-                            channelItems = channelItems,
-                            seriesItems = seriesItems,
-                            playlistItems = playlistItems,
-                            otherVideos = otherVideos,
-                            chunkedFolders = chunkedFolders,
+            } else if (currentVideos.isNotEmpty()) {
+                homeFeedContent(
+                    folderItems = folderItems,
+                    channelItems = channelItems,
+                    seriesItems = seriesItems,
+                    playlistItems = playlistItems,
+                    otherVideos = otherVideos,
+                    chunkedFolders = chunkedFolders,
                             chunkedSeries = chunkedSeries,
                             chunkedPlaylists = chunkedPlaylists,
                             folderCols = folderCols,
@@ -490,7 +477,6 @@ fun HomeTabScreen(
                             tvVideoColsSetting = tvVideoColsSetting,
                             mobileColsSetting = mobileColsSetting
                         )
-                    }
                 }
 
                 if (isMoreLoading) {
@@ -544,7 +530,6 @@ fun HomeTabScreen(
             }
         }
     }
-}
 }
 
 @Composable

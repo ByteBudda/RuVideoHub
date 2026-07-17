@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import kotlinx.coroutines.launch
 import com.example.viewmodel.VideoViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.testTag
+import com.example.manager.ExoPlayerHandler
 
 @Composable
 fun RutubeVideoPlayer(
@@ -96,7 +98,7 @@ fun RutubeVideoPlayer(
     LaunchedEffect(Unit) {
         if (isTvOptimized) {
             controlsVisible = false
-                                try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
+            try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
         }
     }
     val playPauseFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -155,7 +157,8 @@ fun RutubeVideoPlayer(
                 hlsUrl = resolvedUrl
                 isLoading = false
             } else {
-                useEmbedPlayer = true
+                // Never fallback to embed unless isLive
+                loadError = "Видео недоступно или не может быть воспроизведено напрямую."
                 isLoading = false
             }
         }
@@ -169,106 +172,20 @@ fun RutubeVideoPlayer(
         }
     }
 
+    val exoPlayerHandler = remember { ExoPlayerHandler(context) }
+    
     val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
-            val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-                .setBufferDurationsMs(32000, 120000, 2500, 5000)
-                .build()
-                
-            val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
-                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
-                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
-                .build()
-
-            // Strictly prioritize and configure hardware decoding by disabling software extensions and software fallback
-            val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context).apply {
-                setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-                setEnableDecoderFallback(false)
-            }
-
-            // Configure track selector to force/prefer highest available supported bitrate for ideal quality
-            val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
-                parameters = buildUponParameters()
-                    .setForceHighestSupportedBitrate(true)
-                    .build()
-            }
-
-            val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                .setDefaultRequestProperties(mapOf(
-                    "Accept" to "*/*",
-                    "Referer" to "https://rutube.ru/"
-                ))
-                .setConnectTimeoutMs(5000)
-                .setReadTimeoutMs(5000)
-                .setAllowCrossProtocolRedirects(true)
-            
-            val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
-            val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
-                .setDataSourceFactory(dataSourceFactory)
-
-            androidx.media3.exoplayer.ExoPlayer.Builder(context, renderersFactory)
-                .setMediaSourceFactory(mediaSourceFactory)
-                .setTrackSelector(trackSelector)
-                .setAudioAttributes(audioAttributes, true)
-                .setHandleAudioBecomingNoisy(true)
-                .setLoadControl(loadControl)
-                .build().apply {
-                // Ensure track selection parameters also lock into the highest supported bitrate
-                trackSelectionParameters = trackSelectionParameters.buildUpon()
-                    .setForceHighestSupportedBitrate(true)
-                    .build()
-                playWhenReady = isPlayingState
-                val uri = if (offlineFile.exists()) {
-                    android.net.Uri.fromFile(offlineFile)
-                } else {
-                    android.net.Uri.parse(hlsUrl)
-                }
-                
-                val subtitleConfigs = subtitles.map { track ->
-                    val mimeType = if (track.format.lowercase() == "vtt") androidx.media3.common.MimeTypes.TEXT_VTT else androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
-                    androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(track.url))
-                        .setMimeType(mimeType)
-                        .setLanguage(getBcp47Language(track.language))
-                        .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
-                        .build()
-                }
-
-                val mediaItemBuilder = androidx.media3.common.MediaItem.Builder()
-                    .setUri(uri)
-                    .setSubtitleConfigurations(subtitleConfigs)
-
-                if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
-                    mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
-                }
-                
-                setMediaItem(mediaItemBuilder.build())
-                prepare()
-                val savedPos = viewModel.getVideoPosition(videoId)
-                if (savedPos > 0L) {
-                    seekTo(savedPos)
-                    currentPos = savedPos
-                }
-            }
+            exoPlayerHandler.initialize(hlsUrl, offlineFile, subtitles, isPlayingState, viewModel.getVideoPosition(videoId))
         }
     }
 
     LaunchedEffect(activeSubtitleLanguage, exoPlayer) {
-        exoPlayer?.let { player ->
-            if (activeSubtitleLanguage == null) {
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
-                    .build()
-            } else {
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
-                    .setPreferredTextLanguage(getBcp47Language(activeSubtitleLanguage!!))
-                    .build()
-            }
-        }
+        val track = subtitles.find { it.language == activeSubtitleLanguage }
+        exoPlayerHandler.setSubtitleTrack(track)
     }
 
-    DisposableEffect(exoPlayer, videoId) {
+    DisposableEffect(videoId) {
         onDispose {
             exoPlayer?.let { player ->
                 val pos = player.currentPosition
@@ -277,7 +194,7 @@ fun RutubeVideoPlayer(
                     viewModel.saveVideoPosition(videoId, pos, dur)
                 }
             }
-            exoPlayer?.release()
+            exoPlayerHandler.release()
         }
     }
 
@@ -305,8 +222,8 @@ fun RutubeVideoPlayer(
                 }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                android.util.Log.e("VideoPlayer", "ExoPlayer error, falling back to embed", error)
-                useEmbedPlayer = true
+                android.util.Log.e("VideoPlayer", "ExoPlayer error", error)
+                loadError = "Ошибка воспроизведения: ${error.message}"
             }
         })
     }
@@ -317,8 +234,7 @@ fun RutubeVideoPlayer(
             kotlinx.coroutines.delay(4000)
             if (System.currentTimeMillis() - lastInteractionTime >= 4000) {
                 controlsVisible = false
-                controlsVisible = false
-                                try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
+                try { playerFocusRequester.requestFocus() } catch (e: Exception) {}
             }
         }
     }
@@ -414,74 +330,10 @@ fun RutubeVideoPlayer(
                     }
                 } else false
             }
-            .background(Color.Black)
-            .pointerInput(Unit) {
-                val pWidth = size.width.toFloat()
-                detectTapGestures(
-                    onTap = {
-                        lastInteractionTime = System.currentTimeMillis()
-                        controlsVisible = !controlsVisible
-                    },
-                    onDoubleTap = { offset ->
-                        lastInteractionTime = System.currentTimeMillis()
-                        if (offset.x < pWidth / 3) {
-                            exoPlayer?.let { player ->
-                                val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
-                                player.seekTo(newPos)
-                                currentPos = newPos
-                                hudMessage = "-10 сек"
-                            }
-                        } else if (offset.x > pWidth * 2 / 3) {
-                            exoPlayer?.let { player ->
-                                val newPos = (player.currentPosition + 10000).coerceAtMost(player.duration ?: 0)
-                                player.seekTo(newPos)
-                                currentPos = newPos
-                                hudMessage = "+10 сек"
-                            }
-                        }
-                    }
-                )
-            }
-            .pointerInput(isFullscreen) {
-                val pWidth = size.width.toFloat()
-                val pHeight = size.height.toFloat()
-                if (isFullscreen) {
-                    detectVerticalDragGestures(
-                        onDragStart = { _ ->
-                            lastInteractionTime = System.currentTimeMillis()
-                        },
-                        onDragEnd = { },
-                        onVerticalDrag = { change, dragAmount ->
-                            lastInteractionTime = System.currentTimeMillis()
-                            val isRightSide = change.position.x > pWidth / 2f
-                            
-                            val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-                            val activity = context.findActivity()
-                            
-                            if (isRightSide) {
-                                val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
-                                val currentVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
-                                val diff = -(dragAmount / pHeight) * maxVol * 1.5f
-                                val newVol = (currentVol + diff).coerceIn(0f, maxVol)
-                                audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, newVol.toInt(), 0)
-                                hudMessage = "Громкость: ${((newVol / maxVol) * 100).toInt()}%"
-                            } else {
-                                activity?.window?.let { window ->
-                                    val attrs = window.attributes
-                                    val currentBrightness = if (attrs.screenBrightness < 0) 0.5f else attrs.screenBrightness
-                                    val diff = -(dragAmount / pHeight) * 1.5f
-                                    val newBrightness = (currentBrightness + diff).coerceIn(0f, 1f)
-                                    attrs.screenBrightness = newBrightness
-                                    window.attributes = attrs
-                                    hudMessage = "Яркость: ${(newBrightness * 100).toInt()}%"
-                                }
-                            }
-                        }
-                    )
-                }
-            },
+            .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
+
         if (isLoading) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -515,7 +367,6 @@ fun RutubeVideoPlayer(
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
                                 mediaPlaybackRequiresUserGesture = false
-                                databaseEnabled = true
                             }
                             webViewClient = object : WebViewClient() {
                                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -660,6 +511,37 @@ fun RutubeVideoPlayer(
                     modifier = Modifier.fillMaxSize()
                 )
 
+                PlayerGestureOverlay(
+                    onDoubleTapLeft = {
+                        exoPlayer?.let { player ->
+                            val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
+                            player.seekTo(newPos)
+                            currentPos = newPos
+                            hudMessage = "-10 сек"
+                        }
+                    },
+                    onDoubleTapRight = {
+                        exoPlayer?.let { player ->
+                            val newPos = (player.currentPosition + 10000).coerceAtMost(player.duration ?: 0)
+                            player.seekTo(newPos)
+                            currentPos = newPos
+                            hudMessage = "+10 сек"
+                        }
+                    },
+                    currentPositionProvider = { exoPlayer?.currentPosition ?: 0L },
+                    durationProvider = { exoPlayer?.duration ?: 0L },
+                    onSeekCompleted = { targetPos ->
+                        exoPlayer?.let { player ->
+                            player.seekTo(targetPos)
+                            currentPos = targetPos
+                        }
+                    },
+                    onTap = {
+                        lastInteractionTime = System.currentTimeMillis()
+                        controlsVisible = !controlsVisible
+                    }
+                )
+
                 // Overlay Controls inside embed player web layout
                 Row(
                     modifier = Modifier
@@ -741,17 +623,7 @@ fun RutubeVideoPlayer(
                         Text("Повторить", fontSize = 11.sp)
                     }
 
-                    Button(
-                        onClick = {
-                            useEmbedPlayer = true
-                            loadError = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Embed-плеер", fontSize = 11.sp, color = Color.White)
-                    }
+
                 }
             }
         } else if (hlsUrl != null) {
@@ -825,6 +697,37 @@ fun RutubeVideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
+            PlayerGestureOverlay(
+                onDoubleTapLeft = {
+                    exoPlayer?.let { player ->
+                        val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
+                        player.seekTo(newPos)
+                        currentPos = newPos
+                        hudMessage = "-10 сек"
+                    }
+                },
+                onDoubleTapRight = {
+                    exoPlayer?.let { player ->
+                        val newPos = (player.currentPosition + 10000).coerceAtMost(player.duration ?: 0)
+                        player.seekTo(newPos)
+                        currentPos = newPos
+                        hudMessage = "+10 сек"
+                    }
+                },
+                currentPositionProvider = { exoPlayer?.currentPosition ?: 0L },
+                durationProvider = { exoPlayer?.duration ?: 0L },
+                onSeekCompleted = { targetPos ->
+                    exoPlayer?.let { player ->
+                        player.seekTo(targetPos)
+                        currentPos = targetPos
+                    }
+                },
+                onTap = {
+                    lastInteractionTime = System.currentTimeMillis()
+                    controlsVisible = !controlsVisible
+                }
+            )
+
             // Buffering progress indicator
             if (isBufferingState) {
                 Box(
@@ -894,7 +797,7 @@ fun RutubeVideoPlayer(
                                     modifier = Modifier.sleekTvFocus(CircleShape)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ArrowBack,
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Выйти из полного экрана",
                                         tint = Color.White
                                     )
@@ -1070,27 +973,22 @@ fun RutubeVideoPlayer(
                                 }
                             }
 
-                            // Cycle Aspect Ratio option like VLC
-                            Button(
+                            // Cycle Aspect Ratio option like VLC (Icon only, keeping Fit, Fill, Stretch)
+                            IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
                                     val nextMode = aspectMode.next()
                                     hudMessage = "Соотношение: ${nextMode.displayName}"
                                     onChangeAspectRatio(nextMode)
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                                modifier = Modifier.size(32.dp).sleekTvFocus(CircleShape)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = null,
+                                    imageVector = Icons.Default.AspectRatio,
+                                    contentDescription = "Соотношение сторон",
                                     tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(aspectMode.displayName, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
 
                             // Share video link
@@ -1361,7 +1259,7 @@ fun RutubeVideoPlayer(
                             IconButton(
                                 onClick = {
                                     lastInteractionTime = System.currentTimeMillis()
-                                        if (currentPos > 0) {
+                                    if (currentPos > 0) {
                                         viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
                                     }
                                     onToggleFullscreen()
