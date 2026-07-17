@@ -24,7 +24,11 @@ data class NavigationSnapshot(
     val currentQuery: String? = null,
     val currentCategory: String? = null,
     val currentActiveApiEndpoint: String? = null,
-    val currentSubfolderVideo: Video? = null
+    val currentSubfolderVideo: Video? = null,
+    val channelVideosPage: Int = 1,
+    val channelVideosEndReached: Boolean = false,
+    val channelPlaylistsPage: Int = 1,
+    val channelPlaylistsEndReached: Boolean = false
 )
 
 class NavigationManager {
