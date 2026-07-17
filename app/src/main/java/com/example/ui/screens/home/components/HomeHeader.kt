@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -63,8 +64,10 @@ fun SleekHeader(
     onSearchConfirmed: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Отслеживаем фокус ВСЕГО виджета (поле ввода + история)
+    // Отслеживаем фокус ВСЕГО виджета (поле ввода + история), чтобы история не пропадала при скролле вниз
     var widgetHasFocus by remember { mutableStateOf(false) }
+    // Отслеживаем фокус именно самого текстового поля для визуальной подсветки
+    var isSearchFocused by remember { mutableStateOf(false) }
     
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -81,15 +84,14 @@ fun SleekHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .onFocusChanged { widgetHasFocus = it.hasFocus },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 500.dp)
-                // Если фокус на текстовом поле ИЛИ на элементах истории, показываем список
-                .onFocusChanged { widgetHasFocus = it.hasFocus }
         ) {
             // Строка поиска
             Row(
@@ -97,6 +99,12 @@ fun SleekHeader(
                     .fillMaxWidth()
                     .height(44.dp)
                     .liquidGlass(RoundedCornerShape(22.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
+                    // Добавляем красивую рамку, когда текстовое поле в фокусе (т.к. мы убрали sleekTvFocus)
+                    .border(
+                        width = if (isSearchFocused && isTvOptimized) 2.dp else 0.dp,
+                        color = if (isSearchFocused && isTvOptimized) Primary else Color.Transparent,
+                        shape = RoundedCornerShape(22.dp)
+                    )
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -116,15 +124,16 @@ fun SleekHeader(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     ),
+                    cursorBrush = SolidColor(Primary), // ФИКС: Делаем курсор видимым!
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(inputFocusRequester)
-                        .sleekTvFocus(
-                            shape = RoundedCornerShape(8.dp),
-                            enabled = isTvOptimized,
-                            onEnter = { keyboardController?.show() }
-                        )
+                        // ФИКС: Убрали sleekTvFocus, чтобы пульт давал фокус НАПРЯМУЮ полю ввода
+                        .onFocusChanged { 
+                            isSearchFocused = it.isFocused 
+                        }
                         .onKeyEvent { event ->
+                            // Если нажали ОК на пульте - открываем клавиатуру
                             if (event.type == KeyEventType.KeyUp && (event.key == Key.DirectionCenter || event.key == Key.Enter)) {
                                 keyboardController?.show()
                                 true
@@ -153,11 +162,8 @@ fun SleekHeader(
                 )
 
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(
-                        onClick = { 
-                            onSearchQueryChanged("")
-                            inputFocusRequester.requestFocus() 
-                        },
+                    // ФИКС: Используем Box вместо IconButton для избежания "матрешки" фокусов на ТВ
+                    Box(
                         modifier = Modifier
                             .size(36.dp)
                             .sleekTvFocus(
@@ -168,6 +174,12 @@ fun SleekHeader(
                                     inputFocusRequester.requestFocus() 
                                 }
                             )
+                            .clip(CircleShape)
+                            .clickable {
+                                onSearchQueryChanged("")
+                                inputFocusRequester.requestFocus() 
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -177,11 +189,13 @@ fun SleekHeader(
                         )
                     }
                 } else {
-                    IconButton(
-                        onClick = onMicClick,
+                    Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .sleekTvFocus(CircleShape, enabled = isTvOptimized, onEnter = onMicClick)
+                            .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized, onEnter = onMicClick)
+                            .clip(CircleShape)
+                            .clickable { onMicClick() },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Mic,
@@ -193,7 +207,7 @@ fun SleekHeader(
                 }
             }
 
-            // История поиска (теперь не Popup, а выдвигающийся блок в интерфейсе!)
+            // История поиска (Выдвигается плавно, находится в одном окне со строкой)
             AnimatedVisibility(
                 visible = widgetHasFocus && filteredHistory.isNotEmpty(),
                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -202,7 +216,7 @@ fun SleekHeader(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp), // Отступ от поля ввода
+                        .padding(top = 8.dp), 
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant
@@ -239,12 +253,8 @@ fun SleekHeader(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            TextButton(
-                                onClick = { 
-                                    onClearAll()
-                                    inputFocusRequester.requestFocus() 
-                                },
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                            // ФИКС: Используем Box вместо TextButton
+                            Box(
                                 modifier = Modifier
                                     .height(28.dp)
                                     .sleekTvFocus(
@@ -255,7 +265,13 @@ fun SleekHeader(
                                             inputFocusRequester.requestFocus() 
                                         }
                                     )
-                                    .testTag("clear_history_button")
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onClearAll()
+                                        inputFocusRequester.requestFocus() 
+                                    }
+                                    .padding(horizontal = 12.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Очистить всё",
@@ -283,6 +299,7 @@ fun SleekHeader(
                                                 focusManager.clearFocus()
                                             }
                                         )
+                                        .clip(RoundedCornerShape(8.dp))
                                         .clickable {
                                             onSearchQueryChanged(item.query)
                                             onSearchConfirmed(item.query)
@@ -302,11 +319,8 @@ fun SleekHeader(
                                         modifier = Modifier.weight(1f)
                                     )
                                     
-                                    IconButton(
-                                        onClick = { 
-                                            onDeleteQuery(item.query)
-                                            inputFocusRequester.requestFocus() 
-                                        },
+                                    // ФИКС крестика удаления внутри истории
+                                    Box(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .sleekTvFocus(
@@ -317,7 +331,12 @@ fun SleekHeader(
                                                     inputFocusRequester.requestFocus() 
                                                 }
                                             )
-                                            .testTag("delete_history_item_${item.query}")
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                onDeleteQuery(item.query)
+                                                inputFocusRequester.requestFocus() 
+                                            },
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
@@ -336,6 +355,7 @@ fun SleekHeader(
     }
 }
 
+// CategoryRow и FeedTabRow остаются без изменений (как в оригинале)
 @Composable
 fun CategoryRow(
     categories: List<String>,
