@@ -33,6 +33,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
@@ -60,6 +66,7 @@ fun SleekHeader(
     var isFocused by remember { mutableStateOf(false) }
     var parentWidth by remember { mutableStateOf(0) }
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val filteredHistory = remember(searchQuery, searchHistory) {
         if (searchQuery.isBlank()) {
@@ -107,7 +114,20 @@ fun SleekHeader(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .sleekTvFocus(shape = RoundedCornerShape(8.dp), enabled = isTvOptimized)
+                        .sleekTvFocus(
+                            shape = RoundedCornerShape(8.dp),
+                            enabled = isTvOptimized,
+                            onEnter = { keyboardController?.show() }
+                        )
+                        .onKeyEvent { event ->
+                            // Принудительно открываем клавиатуру по кнопке ОК на пульте
+                            if (event.type == KeyEventType.KeyUp && (event.key == Key.DirectionCenter || event.key == Key.Enter)) {
+                                keyboardController?.show()
+                                true
+                            } else {
+                                false
+                            }
+                        }
                         .onFocusChanged { isFocused = it.isFocused }
                         .testTag("search_input"),
                     singleLine = true,
@@ -117,6 +137,7 @@ fun SleekHeader(
                             if (searchQuery.isNotBlank()) {
                                 onSearchConfirmed(searchQuery)
                             }
+                            keyboardController?.hide()
                             focusManager.clearFocus()
                         }
                     ),
@@ -135,7 +156,9 @@ fun SleekHeader(
                 if (searchQuery.isNotEmpty()) {
                     IconButton(
                         onClick = { onSearchQueryChanged("") },
-                        modifier = Modifier.size(36.dp).sleekTvFocus(CircleShape, onEnter = { onSearchQueryChanged("") }, enabled = isTvOptimized)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .sleekTvFocus(CircleShape, onEnter = { onSearchQueryChanged("") }, enabled = isTvOptimized)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -147,7 +170,9 @@ fun SleekHeader(
                 } else {
                     IconButton(
                         onClick = onMicClick,
-                        modifier = Modifier.size(36.dp).sleekTvFocus(CircleShape, onEnter = onMicClick, enabled = isTvOptimized)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .sleekTvFocus(CircleShape, onEnter = onMicClick, enabled = isTvOptimized)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Mic,
@@ -159,7 +184,7 @@ fun SleekHeader(
                 }
             }
 
-            // Dropdown Overlay for Search History (Browser-like behavior!)
+            // Dropdown Overlay for Search History (Адаптировано для пульта)
             if (isFocused && filteredHistory.isNotEmpty()) {
                 val density = LocalDensity.current
                 val widthDp = remember(parentWidth) { with(density) { parentWidth.toDp() } }
@@ -169,7 +194,7 @@ fun SleekHeader(
                     offset = IntOffset(0, with(density) { 46.dp.roundToPx() }),
                     onDismissRequest = { isFocused = false },
                     properties = PopupProperties(
-                        focusable = false,
+                        focusable = true, // Включаем фокус для пульта!
                         dismissOnBackPress = true,
                         dismissOnClickOutside = true
                     )
@@ -219,6 +244,7 @@ fun SleekHeader(
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
                                     modifier = Modifier
                                         .height(28.dp)
+                                        .sleekTvFocus(shape = RoundedCornerShape(8.dp), enabled = isTvOptimized, onEnter = onClearAll)
                                         .testTag("clear_history_button")
                                 ) {
                                     Text(
@@ -237,9 +263,20 @@ fun SleekHeader(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .sleekTvFocus(
+                                                shape = RoundedCornerShape(8.dp),
+                                                enabled = isTvOptimized,
+                                                onEnter = {
+                                                    onSearchQueryChanged(item.query)
+                                                    onSearchConfirmed(item.query)
+                                                    keyboardController?.hide()
+                                                    focusManager.clearFocus()
+                                                }
+                                            )
                                             .clickable {
                                                 onSearchQueryChanged(item.query)
                                                 onSearchConfirmed(item.query)
+                                                keyboardController?.hide()
                                                 focusManager.clearFocus()
                                             }
                                             .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -259,6 +296,11 @@ fun SleekHeader(
                                             onClick = { onDeleteQuery(item.query) },
                                             modifier = Modifier
                                                 .size(24.dp)
+                                                .sleekTvFocus(
+                                                    shape = CircleShape,
+                                                    enabled = isTvOptimized,
+                                                    onEnter = { onDeleteQuery(item.query) }
+                                                )
                                                 .testTag("delete_history_item_${item.query}")
                                         ) {
                                             Icon(
