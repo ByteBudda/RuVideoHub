@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -66,9 +67,9 @@ fun VolumeBrightnessHud(
     ) {
         Icon(
             imageVector = if (type == "volume") {
-                if (value == 0f) Icons.Default.VolumeOff
-                else if (value < 0.5f) Icons.Default.VolumeDown
-                else Icons.Default.VolumeUp
+                if (value == 0f) Icons.AutoMirrored.Filled.VolumeOff
+                else if (value < 0.5f) Icons.AutoMirrored.Filled.VolumeDown
+                else Icons.AutoMirrored.Filled.VolumeUp
             } else {
                 Icons.Default.LightMode
             },
