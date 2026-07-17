@@ -1,5 +1,10 @@
 package com.example.ui.screens.home.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,17 +37,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.unit.IntOffset
 import com.example.data.SearchHistory
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
@@ -63,14 +63,12 @@ fun SleekHeader(
     onSearchConfirmed: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-    var parentWidth by remember { mutableStateOf(0) }
+    // Отслеживаем фокус ВСЕГО виджета (поле ввода + история)
+    var widgetHasFocus by remember { mutableStateOf(false) }
     
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    
-    // Создаем реквестер специально для текстового поля, чтобы возвращать на него фокус из истории
-    val searchInputFocusRequester = remember { FocusRequester() }
+    val inputFocusRequester = remember { FocusRequester() }
 
     val filteredHistory = remember(searchQuery, searchHistory) {
         if (searchQuery.isBlank()) {
@@ -86,12 +84,14 @@ fun SleekHeader(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 500.dp)
-                .onSizeChanged { parentWidth = it.width }
+                // Если фокус на текстовом поле ИЛИ на элементах истории, показываем список
+                .onFocusChanged { widgetHasFocus = it.hasFocus }
         ) {
+            // Строка поиска
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -118,7 +118,7 @@ fun SleekHeader(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .focusRequester(searchInputFocusRequester) // Привязываем реквестер
+                        .focusRequester(inputFocusRequester)
                         .sleekTvFocus(
                             shape = RoundedCornerShape(8.dp),
                             enabled = isTvOptimized,
@@ -128,14 +128,10 @@ fun SleekHeader(
                             if (event.type == KeyEventType.KeyUp && (event.key == Key.DirectionCenter || event.key == Key.Enter)) {
                                 keyboardController?.show()
                                 true
-                            } else if (event.type == KeyEventType.KeyUp && event.key == Key.DirectionDown && filteredHistory.isNotEmpty()) {
-                                // Если нажали вниз, фокус сам уйдет в Popup, нам тут ничего делать не надо, система разберется
-                                false
                             } else {
                                 false
                             }
                         }
-                        .onFocusChanged { isFocused = it.isFocused }
                         .testTag("search_input"),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -150,11 +146,7 @@ fun SleekHeader(
                     ),
                     decorationBox = { innerTextField ->
                         if (searchQuery.isEmpty()) {
-                            Text(
-                                text = "Поиск видео...",
-                                color = GreyText,
-                                fontSize = 14.sp
-                            )
+                            Text(text = "Поиск видео...", color = GreyText, fontSize = 14.sp)
                         }
                         innerTextField()
                     }
@@ -162,11 +154,20 @@ fun SleekHeader(
 
                 if (searchQuery.isNotEmpty()) {
                     IconButton(
-                        onClick = { onSearchQueryChanged("") },
+                        onClick = { 
+                            onSearchQueryChanged("")
+                            inputFocusRequester.requestFocus() 
+                        },
                         modifier = Modifier
                             .size(36.dp)
-                            // Важно: onEnter должен очищать строку.
-                            .sleekTvFocus(CircleShape, enabled = isTvOptimized, onEnter = { onSearchQueryChanged("") })
+                            .sleekTvFocus(
+                                shape = CircleShape, 
+                                enabled = isTvOptimized, 
+                                onEnter = { 
+                                    onSearchQueryChanged("")
+                                    inputFocusRequester.requestFocus() 
+                                }
+                            )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -192,158 +193,138 @@ fun SleekHeader(
                 }
             }
 
-            // Dropdown Overlay for Search History
-            if (isFocused && filteredHistory.isNotEmpty()) {
-                val density = LocalDensity.current
-                val widthDp = remember(parentWidth) { with(density) { parentWidth.toDp() } }
-                
-                Popup(
-                    alignment = Alignment.TopStart,
-                    offset = IntOffset(0, with(density) { 46.dp.roundToPx() }),
-                    onDismissRequest = { isFocused = false },
-                    properties = PopupProperties(
-                        focusable = true,
-                        dismissOnBackPress = true,
-                        dismissOnClickOutside = true
-                    )
+            // История поиска (теперь не Popup, а выдвигающийся блок в интерфейсе!)
+            AnimatedVisibility(
+                visible = widgetHasFocus && filteredHistory.isNotEmpty(),
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp), // Отступ от поля ввода
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant
+                                         else MaterialTheme.colorScheme.background
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
-                    Card(
+                    Column(
                         modifier = Modifier
-                            .width(widthDp)
-                            .padding(horizontal = 4.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant
-                                             else MaterialTheme.colorScheme.background
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .padding(horizontal = 14.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.History,
-                                        contentDescription = "История поиска",
-                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "История поиска",
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                                TextButton(
-                                    onClick = onClearAll,
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                                    modifier = Modifier
-                                        .height(28.dp)
-                                        .sleekTvFocus(shape = RoundedCornerShape(8.dp), enabled = isTvOptimized, onEnter = onClearAll)
-                                        // Обработка кнопки Вверх для выхода из Popup
-                                        .onKeyEvent { event ->
-                                            if (event.type == KeyEventType.KeyUp && event.key == Key.DirectionUp) {
-                                                searchInputFocusRequester.requestFocus()
-                                                true
-                                            } else {
-                                                false
-                                            }
-                                        }
-                                        .testTag("clear_history_button")
-                                ) {
-                                    Text(
-                                        text = "Очистить всё",
-                                        color = Primary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = "История поиска",
+                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "История поиска",
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                            
-                            Spacer(modifier = Modifier.height(4.dp))
-                            
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                filteredHistory.take(6).forEachIndexed { index, item ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .sleekTvFocus(
-                                                shape = RoundedCornerShape(8.dp),
-                                                enabled = isTvOptimized,
-                                                onEnter = {
-                                                    onSearchQueryChanged(item.query)
-                                                    onSearchConfirmed(item.query)
-                                                    keyboardController?.hide()
-                                                    focusManager.clearFocus()
-                                                }
-                                            )
-                                            // Если это первый элемент в списке, перехватываем Вверх, чтобы вернуть фокус на строку поиска
-                                            .onKeyEvent { event ->
-                                                if (index == 0 && event.type == KeyEventType.KeyUp && event.key == Key.DirectionUp) {
-                                                    searchInputFocusRequester.requestFocus()
-                                                    true
-                                                } else {
-                                                    false
-                                                }
-                                            }
-                                            .clickable {
+                            TextButton(
+                                onClick = { 
+                                    onClearAll()
+                                    inputFocusRequester.requestFocus() 
+                                },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .sleekTvFocus(
+                                        shape = RoundedCornerShape(8.dp), 
+                                        enabled = isTvOptimized, 
+                                        onEnter = { 
+                                            onClearAll()
+                                            inputFocusRequester.requestFocus() 
+                                        }
+                                    )
+                                    .testTag("clear_history_button")
+                            ) {
+                                Text(
+                                    text = "Очистить всё",
+                                    color = Primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            filteredHistory.take(6).forEach { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .sleekTvFocus(
+                                            shape = RoundedCornerShape(8.dp),
+                                            enabled = isTvOptimized,
+                                            onEnter = {
                                                 onSearchQueryChanged(item.query)
                                                 onSearchConfirmed(item.query)
                                                 keyboardController?.hide()
                                                 focusManager.clearFocus()
                                             }
-                                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                                            .testTag("history_item_${item.query}"),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = item.query,
-                                            color = MaterialTheme.colorScheme.onBackground,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier.weight(1f)
                                         )
-                                        
-                                        IconButton(
-                                            onClick = { onDeleteQuery(item.query) },
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .sleekTvFocus(
-                                                    shape = CircleShape,
-                                                    enabled = isTvOptimized,
-                                                    onEnter = { onDeleteQuery(item.query) }
-                                                )
-                                                .onKeyEvent { event ->
-                                                    if (index == 0 && event.type == KeyEventType.KeyUp && event.key == Key.DirectionUp) {
-                                                        searchInputFocusRequester.requestFocus()
-                                                        true
-                                                    } else {
-                                                        false
-                                                    }
-                                                }
-                                                .testTag("delete_history_item_${item.query}")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Удалить ${item.query} из истории",
-                                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                                modifier = Modifier.size(14.dp)
-                                            )
+                                        .clickable {
+                                            onSearchQueryChanged(item.query)
+                                            onSearchConfirmed(item.query)
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
                                         }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                        .testTag("history_item_${item.query}"),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = item.query,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = { 
+                                            onDeleteQuery(item.query)
+                                            inputFocusRequester.requestFocus() 
+                                        },
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .sleekTvFocus(
+                                                shape = CircleShape,
+                                                enabled = isTvOptimized,
+                                                onEnter = { 
+                                                    onDeleteQuery(item.query)
+                                                    inputFocusRequester.requestFocus() 
+                                                }
+                                            )
+                                            .testTag("delete_history_item_${item.query}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Удалить",
+                                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
                                     }
                                 }
                             }
@@ -355,7 +336,6 @@ fun SleekHeader(
     }
 }
 
-// CategoryRow и FeedTabRow остаются без изменений (как в оригинале)
 @Composable
 fun CategoryRow(
     categories: List<String>,
