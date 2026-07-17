@@ -43,6 +43,7 @@ import com.example.ui.theme.Primary
 import com.example.viewmodel.VideoViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 @Composable
 fun TvRutubeVideoPlayer(
@@ -70,6 +71,7 @@ fun TvRutubeVideoPlayer(
     var hlsUrl by remember(videoId) { mutableStateOf<String?>(null) }
     var subtitles by remember(videoId) { mutableStateOf<List<com.example.data.SubtitleTrack>>(emptyList()) }
     var activeSubtitleLanguage by remember(videoId) { mutableStateOf<String?>(null) }
+    var subtitleDelayMs by remember(videoId) { mutableStateOf(0L) }
 
     var isLoading by remember(videoId) { mutableStateOf(true) }
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
@@ -110,33 +112,36 @@ fun TvRutubeVideoPlayer(
     }
 
     LaunchedEffect(videoId, selectedQuality) {
-        // Fetch subtitles in parallel
-        launch {
-            subtitles = viewModel.fetchSubtitles(videoId)
-        }
-
         if (isLive) {
             isLoading = false
             return@LaunchedEffect
         }
-        if (offlineFile.exists()) {
-            hlsUrl = offlineFile.absolutePath
+        isLoading = true
+        loadError = null
+        useEmbedPlayer = false
+
+        // Fetch subtitles and stream URL in parallel
+        val subsDeferred = async {
+            viewModel.fetchSubtitles(videoId)
+        }
+        val urlDeferred = async {
+            if (offlineFile.exists()) {
+                offlineFile.absolutePath
+            } else {
+                viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+            }
+        }
+
+        val loadedSubs = try { subsDeferred.await() } catch (e: Exception) { emptyList() }
+        val resolvedUrl = try { urlDeferred.await() } catch (e: Exception) { null }
+
+        subtitles = loadedSubs
+        if (resolvedUrl != null) {
+            hlsUrl = resolvedUrl
             isLoading = false
         } else {
-            if (hlsUrl == null) {
-                isLoading = true
-            }
-            loadError = null
-            useEmbedPlayer = false
-            
-            val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-            if (resolvedUrl != null) {
-                hlsUrl = resolvedUrl
-                isLoading = false
-            } else {
-                loadError = "Видео недоступно"
-                isLoading = false
-            }
+            loadError = "Видео недоступно"
+            isLoading = false
         }
     }
 
@@ -159,6 +164,16 @@ fun TvRutubeVideoPlayer(
     LaunchedEffect(activeSubtitleLanguage, exoPlayer) {
         val track = subtitles.find { it.language == activeSubtitleLanguage }
         exoPlayerHandler.setSubtitleTrack(track)
+    }
+
+    LaunchedEffect(subtitleDelayMs, exoPlayer) {
+        exoPlayerHandler.setSubtitleDelayMs(subtitleDelayMs)
+    }
+
+    LaunchedEffect(activeSubtitleLanguage) {
+        if (activeSubtitleLanguage == null) {
+            subtitleDelayMs = 0L
+        }
     }
 
     DisposableEffect(videoId) {
@@ -472,7 +487,6 @@ fun TvRutubeVideoPlayer(
                         VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                         VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                        else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
                     if (isMiniPlayer) {
                         playerView.isFocusable = false
@@ -616,6 +630,65 @@ fun TvRutubeVideoPlayer(
                                 }
                             }
                             Spacer(modifier = Modifier.width(16.dp))
+
+                            if (activeSubtitleLanguage != null) {
+                                val onDelayDecrease = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    subtitleDelayMs -= 500L
+                                }
+                                val onDelayIncrease = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    subtitleDelayMs += 500L
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .sleekTvFocus(RoundedCornerShape(4.dp), onEnter = onDelayDecrease)
+                                            .clickable(
+                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                indication = ripple(bounded = true),
+                                                onClick = onDelayDecrease
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("-0.5с", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Text(
+                                        text = "${if (subtitleDelayMs > 0L) "+" else ""}${String.format(java.util.Locale.US, "%.1f", subtitleDelayMs / 1000f)}с",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .sleekTvFocus(RoundedCornerShape(4.dp), onEnter = onDelayIncrease)
+                                            .clickable(
+                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                indication = ripple(bounded = true),
+                                                onClick = onDelayIncrease
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("+0.5с", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
                         }
 
                         val onAspectClick = {

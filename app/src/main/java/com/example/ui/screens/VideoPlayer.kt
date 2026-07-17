@@ -45,6 +45,7 @@ import com.example.data.Video
 import com.example.ui.theme.GreyText
 import com.example.ui.theme.Primary
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import com.example.viewmodel.VideoViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.testTag
@@ -128,39 +129,44 @@ fun RutubeVideoPlayer(
     var retryTrigger by remember { mutableIntStateOf(0) }
     var subtitles by remember(videoId) { mutableStateOf<List<com.example.data.SubtitleTrack>>(emptyList()) }
     var activeSubtitleLanguage by remember(videoId) { mutableStateOf<String?>(null) }
+    var subtitleDelayMs by remember(videoId) { mutableStateOf(0L) }
     var subtitleMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(videoId, selectedQuality, retryTrigger) {
-        // Fetch subtitles in parallel
-        launch {
-            subtitles = viewModel.fetchSubtitles(videoId)
-        }
-        
         if (isLive) {
             useEmbedPlayer = true
             isLoading = false
             return@LaunchedEffect
         }
-        if (offlineFile.exists()) {
-            hlsUrl = offlineFile.absolutePath
+        isLoading = true
+        loadError = null
+        useEmbedPlayer = false
+
+        // Fetch subtitles and stream URL in parallel
+        val subsDeferred = async {
+            viewModel.fetchSubtitles(videoId)
+        }
+        val urlDeferred = async {
+            if (offlineFile.exists()) {
+                offlineFile.absolutePath
+            } else {
+                if (retryTrigger > 0) {
+                    viewModel.clearHlsCache(videoId)
+                }
+                viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+            }
+        }
+
+        val loadedSubs = try { subsDeferred.await() } catch (e: Exception) { emptyList() }
+        val resolvedUrl = try { urlDeferred.await() } catch (e: Exception) { null }
+
+        subtitles = loadedSubs
+        if (resolvedUrl != null) {
+            hlsUrl = resolvedUrl
             isLoading = false
         } else {
-            isLoading = true
-            loadError = null
-            useEmbedPlayer = false
-            // Evict cache on retry
-            if (retryTrigger > 0) {
-                viewModel.clearHlsCache(videoId)
-            }
-            val resolvedUrl = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-            if (resolvedUrl != null) {
-                hlsUrl = resolvedUrl
-                isLoading = false
-            } else {
-                // Never fallback to embed unless isLive
-                loadError = "Видео недоступно или не может быть воспроизведено напрямую."
-                isLoading = false
-            }
+            loadError = "Видео недоступно или не может быть воспроизведено напрямую."
+            isLoading = false
         }
     }
 
@@ -183,6 +189,16 @@ fun RutubeVideoPlayer(
     LaunchedEffect(activeSubtitleLanguage, exoPlayer) {
         val track = subtitles.find { it.language == activeSubtitleLanguage }
         exoPlayerHandler.setSubtitleTrack(track)
+    }
+
+    LaunchedEffect(subtitleDelayMs, exoPlayer) {
+        exoPlayerHandler.setSubtitleDelayMs(subtitleDelayMs)
+    }
+
+    LaunchedEffect(activeSubtitleLanguage) {
+        if (activeSubtitleLanguage == null) {
+            subtitleDelayMs = 0L
+        }
     }
 
     DisposableEffect(videoId) {
@@ -642,7 +658,6 @@ fun RutubeVideoPlayer(
                             VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                             VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                             VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                            else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         }
 
                         addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
@@ -676,7 +691,6 @@ fun RutubeVideoPlayer(
                         VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                         VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                        else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
 
                     forceFullResize(playerView)
@@ -917,6 +931,68 @@ fun RutubeVideoPlayer(
                                                 },
                                                 modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
                                             )
+                                        }
+
+                                        if (activeSubtitleLanguage != null) {
+                                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f))
+                                            Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(
+                                                        text = "Синхронизация: ${if (subtitleDelayMs > 0L) "+" else ""}${String.format(java.util.Locale.US, "%.1f", subtitleDelayMs / 1000f)} сек",
+                                                        color = MaterialTheme.colorScheme.onBackground,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                subtitleDelayMs -= 500L
+                                                                lastInteractionTime = System.currentTimeMillis()
+                                                            },
+                                                            modifier = Modifier.size(24.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Remove,
+                                                                contentDescription = "Быстрее",
+                                                                tint = MaterialTheme.colorScheme.onBackground,
+                                                                modifier = Modifier.size(14.dp)
+                                                            )
+                                                        }
+                                                        
+                                                        Button(
+                                                            onClick = {
+                                                                subtitleDelayMs = 0L
+                                                                lastInteractionTime = System.currentTimeMillis()
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f)),
+                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            modifier = Modifier.height(20.dp)
+                                                        ) {
+                                                            Text("Сброс", color = MaterialTheme.colorScheme.onBackground, fontSize = 9.sp)
+                                                        }
+                                                        
+                                                        IconButton(
+                                                            onClick = {
+                                                                subtitleDelayMs += 500L
+                                                                lastInteractionTime = System.currentTimeMillis()
+                                                            },
+                                                            modifier = Modifier.size(24.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Add,
+                                                                contentDescription = "Медленнее",
+                                                                tint = MaterialTheme.colorScheme.onBackground,
+                                                                modifier = Modifier.size(14.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
