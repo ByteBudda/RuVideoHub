@@ -22,5 +22,10 @@ data class SavedVideo(
     val lastDuration: Long = 0L,
     val originType: String? = null,
     val originId: String? = null,
-    val originTitle: String? = null
+    val originTitle: String? = null,
+    val description: String? = null,
+    val pageUrl: String? = null,
+    val page: Int = 1,
+    val authorId: String? = null,
+    val authorAvatarUrl: String? = null
 )
