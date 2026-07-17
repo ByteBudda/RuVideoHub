@@ -118,7 +118,7 @@ fun HomeTabScreen(
             }
         }
 
-        LaunchedEffect(shouldLoadMore) {
+        LaunchedEffect(shouldLoadMore, channelActiveTab, selectedFeedTab, selectedSubfolderName) {
             if (shouldLoadMore) {
                 viewModel.loadNextPage()
             }
