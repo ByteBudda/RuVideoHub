@@ -259,14 +259,31 @@ fun VideoViewModel.fetchRealVideos(query: String? = null, category: String? = nu
 }
 
 fun VideoViewModel.loadNextPage() {
-    if (_isMoreLoading.value || isEndReached || _isLoading.value) return
+    val snapshotChannelView = navigationManager.isChannelView.value
+    val snapshotChannelActiveTab = navigationManager.channelActiveTab.value
+
+    if (snapshotChannelView) {
+        if (snapshotChannelActiveTab == "Видео") {
+            if (_isMoreLoading.value || channelVideosEndReached || _isLoading.value) return
+        } else {
+            if (_isMoreLoading.value || channelPlaylistsEndReached || _isLoadingPlaylists.value) return
+        }
+    } else {
+        if (_isMoreLoading.value || isEndReached || _isLoading.value) return
+    }
     
     val snapshotEndpoint = currentActiveApiEndpoint
     val snapshotCategory = currentCategory
     val snapshotQuery = currentQuery
-    val snapshotPage = currentPage + 1
-    val snapshotChannelView = navigationManager.isChannelView.value
-    val snapshotChannelActiveTab = navigationManager.channelActiveTab.value
+    val snapshotPage = if (snapshotChannelView) {
+        if (snapshotChannelActiveTab == "Видео") {
+            channelVideosPage + 1
+        } else {
+            channelPlaylistsPage + 1
+        }
+    } else {
+        currentPage + 1
+    }
     
     if (snapshotQuery != null && snapshotQuery.isNotEmpty() && _searchSource.value != "Rutube") {
         return
@@ -309,26 +326,51 @@ fun VideoViewModel.loadNextPage() {
             }
 
             if (newVideos.isEmpty()) {
-                isEndReached = true
-            } else {
-                currentPage = snapshotPage
                 if (snapshotChannelView) {
                     if (snapshotChannelActiveTab == "Видео") {
+                        channelVideosEndReached = true
+                    } else {
+                        channelPlaylistsEndReached = true
+                    }
+                } else {
+                    isEndReached = true
+                }
+            } else {
+                if (snapshotChannelView) {
+                    if (snapshotChannelActiveTab == "Видео") {
+                        channelVideosPage = snapshotPage
                         _channelVideos.value = (_channelVideos.value + newVideos).distinctBy { it.id }
                     } else {
+                        channelPlaylistsPage = snapshotPage
                         _channelPlaylists.value = (_channelPlaylists.value + newVideos).distinctBy { it.id }
                     }
                 } else {
+                    currentPage = snapshotPage
                     _dynamicVideos.value = (_dynamicVideos.value + newVideos).distinctBy { it.id }
                 }
             }
         } catch (e: Exception) {
             if (e is retrofit2.HttpException) {
                 if (e.code() == 404) {
-                    isEndReached = true
+                    if (snapshotChannelView) {
+                        if (snapshotChannelActiveTab == "Видео") {
+                            channelVideosEndReached = true
+                        } else {
+                            channelPlaylistsEndReached = true
+                        }
+                    } else {
+                        isEndReached = true
+                    }
                 } else if (e.code() == 403 || e.code() == 429) {
-                    // Rate limit or forbidden - stop paginating aggressively
-                    isEndReached = true
+                    if (snapshotChannelView) {
+                        if (snapshotChannelActiveTab == "Видео") {
+                            channelVideosEndReached = true
+                        } else {
+                            channelPlaylistsEndReached = true
+                        }
+                    } else {
+                        isEndReached = true
+                    }
                     android.util.Log.e("VideoViewModel", "API Error ${e.code()} in loadNextPage", e)
                 }
             } else {
@@ -576,9 +618,9 @@ fun VideoViewModel.selectVideo(video: Video?) {
                             val name = jsonObject.optString("name", video.channel) ?: ""
                             val description = jsonObject.optString("description", video.description)
                             val subCount = jsonObject.optInt("subscribers_count", 0)
-                            val avatarUrl = jsonObject.optString("avatar_url", video.authorAvatarUrl) ?: "" ?: ""
+                            val avatarUrl = jsonObject.optString("avatar_url", video.authorAvatarUrl ?: "")
                             val appearance = jsonObject.optJSONObject("appearance")
-                            val coverImage = appearance?.optString("cover_image", video.thumbnailUrl) ?: video.thumbnailUrl ?: "" ?: ""
+                            val coverImage = appearance?.optString("cover_image", video.thumbnailUrl ?: "") ?: video.thumbnailUrl ?: ""
 
                             val updatedVideo = video.copy(
                                 id = "channel_${channelIdResolved}__",
@@ -601,19 +643,21 @@ fun VideoViewModel.selectVideo(video: Video?) {
                         val vidBody = vidResponse.string()
                         _channelVideos.value = repository.parseVideoListJson(vidBody, video.category)
                         currentActiveApiEndpoint = vidUrl
-                        currentPage = 1
-                        isEndReached = false
+                        channelVideosPage = 1
+                        channelVideosEndReached = false
 
                         val plResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(plUrl)
                         val plBody = plResponse.string()
                         _channelPlaylists.value = repository.parseVideoListJson(plBody, video.category)
+                        channelPlaylistsPage = 1
+                        channelPlaylistsEndReached = false
                     } catch (e: Exception) {
                         android.util.Log.e("VideoViewModel", "Channel fetch error", e)
                     } finally {
                         _isLoading.value = false
                         _isLoadingPlaylists.value = false
                         // Eagerly prefetch page 2 in advance right after completing the channel load
-                        if (_channelVideos.value.isNotEmpty() && currentPage == 1 && !isEndReached) {
+                        if (_channelVideos.value.isNotEmpty() && channelVideosPage == 1 && !channelVideosEndReached) {
                             viewModelScope.launch {
                                 delay(200)
                                 loadNextPage()
@@ -767,8 +811,7 @@ fun VideoViewModel.selectVideo(video: Video?) {
     }
 
     // Regular video selection: play it!
-    if (video != null) {
-        viewModelScope.launch {
+    viewModelScope.launch {
             val dbVideo = repository.getVideoById(video.id)
             if (dbVideo != null && dbVideo.lastProgress > 0) {
                 playerManager.saveVideoPosition(video.id, dbVideo.lastProgress)
@@ -977,9 +1020,6 @@ fun VideoViewModel.selectVideo(video: Video?) {
                 }
             }
         }
-    } else {
-        playerManager.selectVideo(null)
-    }
 }
 
 fun VideoViewModel.loadVideoByUrlOrId(urlOrId: String) {

@@ -400,13 +400,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             currentQuery = currentQuery,
             currentCategory = currentCategory,
             currentActiveApiEndpoint = currentActiveApiEndpoint,
-            currentSubfolderVideo = _currentSubfolderVideo.value
+            currentSubfolderVideo = _currentSubfolderVideo.value,
+            channelVideosPage = channelVideosPage,
+            channelVideosEndReached = channelVideosEndReached,
+            channelPlaylistsPage = channelPlaylistsPage,
+            channelPlaylistsEndReached = channelPlaylistsEndReached
         )
         navigationManager.pushToHistory(currentSnapshot)
     }
 
     fun canNavigateBack(): Boolean {
         if (playerManager.currentSelectedVideo.value != null) return true
+        val isDeepView = navigationManager.isChannelView.value || navigationManager.selectedSubfolderName.value != null
+        if (isDeepView) {
+            if (navigationManager.canNavigateBack()) return true
+        }
         if (navigationManager.searchQuery.value.isNotEmpty()) return true
         return navigationManager.canNavigateBack()
     }
@@ -417,27 +425,61 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             return true
         }
 
+        val isDeepView = navigationManager.isChannelView.value || navigationManager.selectedSubfolderName.value != null
+
+        if (isDeepView) {
+            val last = navigationManager.navigateBack()
+            if (last != null) {
+                navigationManager.restoreFromSnapshot(last)
+                _currentChannelVideo.value = last.currentChannelVideo
+                _currentSubfolderVideo.value = last.currentSubfolderVideo
+                _channelVideos.value = last.channelVideos
+                _channelPlaylists.value = last.channelPlaylists
+                _dynamicVideos.value = last.dynamicVideos
+                
+                currentPage = last.currentPage
+                isEndReached = last.isEndReached
+                currentQuery = last.currentQuery
+                currentCategory = last.currentCategory
+                currentActiveApiEndpoint = last.currentActiveApiEndpoint
+
+                channelVideosPage = last.channelVideosPage
+                channelVideosEndReached = last.channelVideosEndReached
+                channelPlaylistsPage = last.channelPlaylistsPage
+                channelPlaylistsEndReached = last.channelPlaylistsEndReached
+
+                return true
+            }
+        }
+
         if (navigationManager.searchQuery.value.isNotEmpty()) {
             setSearchQuery("")
             return true
         }
 
-        val last = navigationManager.navigateBack()
-        if (last != null) {
-            navigationManager.restoreFromSnapshot(last)
-            _currentChannelVideo.value = last.currentChannelVideo
-            _currentSubfolderVideo.value = last.currentSubfolderVideo
-            _channelVideos.value = last.channelVideos
-            _channelPlaylists.value = last.channelPlaylists
-            _dynamicVideos.value = last.dynamicVideos
-            
-            currentPage = last.currentPage
-            isEndReached = last.isEndReached
-            currentQuery = last.currentQuery
-            currentCategory = last.currentCategory
-            currentActiveApiEndpoint = last.currentActiveApiEndpoint
+        if (!isDeepView) {
+            val last = navigationManager.navigateBack()
+            if (last != null) {
+                navigationManager.restoreFromSnapshot(last)
+                _currentChannelVideo.value = last.currentChannelVideo
+                _currentSubfolderVideo.value = last.currentSubfolderVideo
+                _channelVideos.value = last.channelVideos
+                _channelPlaylists.value = last.channelPlaylists
+                _dynamicVideos.value = last.dynamicVideos
+                
+                currentPage = last.currentPage
+                isEndReached = last.isEndReached
+                currentQuery = last.currentQuery
+                currentCategory = last.currentCategory
+                currentActiveApiEndpoint = last.currentActiveApiEndpoint
 
-            return true
+                channelVideosPage = last.channelVideosPage
+                channelVideosEndReached = last.channelVideosEndReached
+                channelPlaylistsPage = last.channelPlaylistsPage
+                channelPlaylistsEndReached = last.channelPlaylistsEndReached
+
+                return true
+            }
         }
 
         if (navigationManager.currentTab.value != "home") {
@@ -461,6 +503,10 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     internal var currentPage = 1
     internal var isEndReached = false
     val isEndReachedPublic: Boolean get() = isEndReached
+    internal var channelVideosPage = 1
+    internal var channelVideosEndReached = false
+    internal var channelPlaylistsPage = 1
+    internal var channelPlaylistsEndReached = false
     internal var currentQuery: String? = null
     internal var currentCategory: String? = "Фильмы"
     internal var currentActiveApiEndpoint: String? = null
