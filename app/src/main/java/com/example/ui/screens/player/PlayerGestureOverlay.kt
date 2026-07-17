@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioManager
+import android.view.Window
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,10 +33,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
-// Helper function to find Activity from Context
-fun Context.findActivity(): Activity? = when (this) {
+// Уникальное имя функции, чтобы избежать конфликтов с другими файлами (Overload resolution ambiguity)
+fun Context.getActivityOrNull(): Activity? = when (this) {
     is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
+    is ContextWrapper -> baseContext.getActivityOrNull()
     else -> null
 }
 
@@ -157,6 +159,7 @@ fun PlayerGestureOverlay(
                                     change.consume()
                                     lastInteractionTime = System.currentTimeMillis()
                                     
+                                    // Используем классический when, все ветки строго возвращают Unit
                                     when (dragType) {
                                         1 -> { // SEEK
                                             if (videoDuration > 0) {
@@ -169,13 +172,14 @@ fun PlayerGestureOverlay(
                                             }
                                         }
                                         2 -> { // BRIGHTNESS
-                                            context.findActivity()?.window?.let { window ->
-                                                val attrs = window.attributes
+                                            val activityWindow = context.getActivityOrNull()?.window
+                                            if (activityWindow != null) {
+                                                val attrs = activityWindow.attributes
                                                 val currentBrightness = if (attrs.screenBrightness < 0) 0.5f else attrs.screenBrightness
                                                 val diff = -(posChange.y / size.height) * 1.5f
                                                 val newBrightness = (currentBrightness + diff).coerceIn(0f, 1f)
                                                 attrs.screenBrightness = newBrightness
-                                                window.attributes = attrs
+                                                activityWindow.attributes = attrs
                                                 hudBrightness = newBrightness
                                                 hudVolume = null
                                             }
