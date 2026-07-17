@@ -37,22 +37,13 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 /**
- * Find Activity from Context (helper)
- */
-fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
-/**
  * Вертикальная полупрозрачная полоска для громкости (справа)
  * или яркости (слева)
  */
 @Composable
 fun VerticalIndicatorBar(
-    value: Float,           // 0f..1f
-    type: String,           // "volume" или "brightness"
+    value: Float,
+    type: String,
     modifier: Modifier = Modifier
 ) {
     val isVolume = type == "volume"
@@ -63,11 +54,10 @@ fun VerticalIndicatorBar(
         Icons.Default.LightMode
     }
     
-    // Цвета для градиента
     val gradientColors = if (isVolume) {
-        listOf(Color(0xFF4FC3F7), Color(0xFF00E5FF))  // Голубой для громкости
+        listOf(Color(0xFF4FC3F7), Color(0xFF00E5FF))
     } else {
-        listOf(Color(0xFFFFD54F), Color(0xFFFFAB00))  // Желтый для яркости
+        listOf(Color(0xFFFFD54F), Color(0xFFFFAB00))
     }
     
     Column(
@@ -88,7 +78,6 @@ fun VerticalIndicatorBar(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Вертикальная полоска прогресса
         Box(
             modifier = Modifier
                 .width(6.dp)
@@ -124,7 +113,7 @@ fun VerticalIndicatorBar(
 }
 
 /**
- * Горизонтальная полоска перемотки снизу (заменяет SeekProgressHud)
+ * Горизонтальная полоска перемотки снизу
  */
 @Composable
 fun SeekProgressBar(
@@ -160,7 +149,6 @@ fun SeekProgressBar(
             modifier = Modifier.width(50.dp)
         )
         
-        // Горизонтальная полоска прогресса
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -216,7 +204,6 @@ fun PlayerGestureOverlay(
     
     var lastInteractionTime by remember { mutableStateOf(0L) }
     
-    // Автоматическое скрытие HUD через 1.5 секунды
     LaunchedEffect(lastInteractionTime) {
         if (lastInteractionTime > 0L) {
             delay(1500)
@@ -228,7 +215,6 @@ fun PlayerGestureOverlay(
     }
     
     Box(modifier = modifier.fillMaxSize()) {
-        // Прозрачный оверлей для обработки жестов
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -250,13 +236,12 @@ fun PlayerGestureOverlay(
                             val down = awaitPointerEvent().changes.firstOrNull() ?: continue
                             if (down.pressed) {
                                 val downPos = down.position
-                                // Нижние 25% экрана - перемотка
                                 val isSeekDrag = downPos.y > size.height * 0.75f
                                 
                                 var dragStarted = false
                                 var accumulatedDragX = 0f
                                 var accumulatedDragY = 0f
-                                var dragType = 0 // 0: не определено, 1: seek, 2: brightness, 3: volume
+                                var dragType = 0
                                 val touchSlop = viewConfiguration.touchSlop
                                 
                                 var startPlaybackPos = 0L
@@ -278,12 +263,11 @@ fun PlayerGestureOverlay(
                                         if (abs(accumulatedDragX) > touchSlop || abs(accumulatedDragY) > touchSlop) {
                                             dragStarted = true
                                             if (isSeekDrag) {
-                                                dragType = 1  // Перемотка
+                                                dragType = 1
                                                 startPlaybackPos = currentPositionProvider()
                                                 videoDuration = durationProvider()
                                                 lastInteractionTime = System.currentTimeMillis()
                                             } else {
-                                                // Вертикальный свайп
                                                 if (abs(accumulatedDragY) > abs(accumulatedDragX)) {
                                                     dragType = if (downPos.x < size.width / 2f) 2 else 3
                                                     lastInteractionTime = System.currentTimeMillis()
@@ -299,7 +283,7 @@ fun PlayerGestureOverlay(
                                         lastInteractionTime = System.currentTimeMillis()
                                         
                                         when (dragType) {
-                                            1 -> { // SEEK - горизонтальная перемотка снизу
+                                            1 -> {
                                                 if (videoDuration > 0) {
                                                     val maxSeekSpan = if (videoDuration < 300000L) videoDuration else 300000L
                                                     val deltaMs = ((accumulatedDragX / size.width) * maxSeekSpan).toLong()
@@ -309,8 +293,9 @@ fun PlayerGestureOverlay(
                                                     hudSeekDuration = videoDuration
                                                 }
                                             }
-                                            2 -> { // BRIGHTNESS - левая половина
-                                                context.findActivity()?.window?.let { window ->
+                                            2 -> {
+                                                val activity = context.findActivity()
+                                                activity?.window?.let { window ->
                                                     val attrs = window.attributes
                                                     val currentBrightness = if (attrs.screenBrightness < 0f) 0.5f else attrs.screenBrightness
                                                     val diff = -(posChange.y / size.height) * 1.2f
@@ -321,7 +306,7 @@ fun PlayerGestureOverlay(
                                                     hudVolume = null
                                                 }
                                             }
-                                            3 -> { // VOLUME - правая половина
+                                            3 -> {
                                                 val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
                                                 val diff = -(posChange.y / size.height) * maxVol * 1.2f
                                                 val newVol = (currentVol + diff).coerceIn(0f, maxVol)
@@ -344,9 +329,6 @@ fun PlayerGestureOverlay(
                 }
         )
         
-        // === HUD Overlays ===
-        
-        // 1. Яркость - слева, вертикально
         AnimatedVisibility(
             visible = hudBrightness != null,
             enter = fadeIn(),
@@ -363,7 +345,6 @@ fun PlayerGestureOverlay(
             }
         }
         
-        // 2. Громкость - справа, вертикально
         AnimatedVisibility(
             visible = hudVolume != null,
             enter = fadeIn(),
@@ -380,7 +361,6 @@ fun PlayerGestureOverlay(
             }
         }
         
-        // 3. Перемотка - снизу, горизонтально (используем SeekProgressBar вместо SeekProgressHud)
         AnimatedVisibility(
             visible = hudSeekPosition != null && hudSeekDuration != null,
             enter = fadeIn(),
@@ -400,7 +380,6 @@ fun PlayerGestureOverlay(
     }
 }
 
-// Форматирование времени
 private fun formatDuration(timeMs: Long): String {
     val totalSeconds = (timeMs / 1000).toInt()
     val seconds = totalSeconds % 60
@@ -411,4 +390,10 @@ private fun formatDuration(timeMs: Long): String {
     } else {
         String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
     }
+}
+
+private fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
