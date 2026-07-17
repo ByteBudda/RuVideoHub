@@ -2,7 +2,6 @@ package com.example.ui.screens.player
 
 import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.media.AudioManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -27,13 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.math.abs
-
-// Helper function to find Activity from Context
-fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
 
 /**
  * Stateful Gesture catcher overlay supporting tap, double taps,
