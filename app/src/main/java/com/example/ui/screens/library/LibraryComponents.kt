@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -109,10 +110,14 @@ fun BookmarkItemRow(
             duration = saved.duration,
             isPro = saved.isPro,
             category = saved.category,
-            description = "Сохраненный элемент.",
+            description = saved.description ?: "Сохраненный элемент.",
             thumbnailUrl = saved.thumbnailUrl,
             isDownloaded = saved.isDownloaded,
-            isBookmarked = true
+            isBookmarked = true,
+            pageUrl = saved.pageUrl,
+            originType = saved.originType,
+            originId = saved.originId,
+            originTitle = saved.originTitle
         )
     }
 
@@ -183,7 +188,7 @@ fun BookmarkItemRow(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.PlaylistPlay,
+                            imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
@@ -288,6 +293,37 @@ fun BookmarkItemRow(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
+                
+                if (!saved.originTitle.isNullOrBlank()) {
+                    Text(
+                        text = "Плейлист: ${saved.originTitle}",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                if (!saved.description.isNullOrBlank()) {
+                    Text(
+                        text = saved.description,
+                        fontSize = 9.sp,
+                        color = GreyText.copy(alpha = 0.8f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                if (!saved.pageUrl.isNullOrBlank()) {
+                    Text(
+                        text = "Стр: ${saved.page} • ${saved.pageUrl}",
+                        fontSize = 8.sp,
+                        color = GreyText.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
             }
 

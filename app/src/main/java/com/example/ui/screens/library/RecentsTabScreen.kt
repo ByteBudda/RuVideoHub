@@ -79,8 +79,8 @@ fun RecentsTabScreen(
                             viewModel.deleteRecentItem(Video(
                                 id = it.id, title = it.title, channel = it.channel,
                                 views = it.views, timeAgo = it.timeAgo, duration = it.duration,
-                                isPro = it.isPro, category = it.category, description = "", thumbnailUrl = it.thumbnailUrl,
-                                isDownloaded = it.isDownloaded, isBookmarked = it.isBookmarked
+                                isPro = it.isPro, category = it.category, description = it.description ?: "", thumbnailUrl = it.thumbnailUrl,
+                                isDownloaded = it.isDownloaded, isBookmarked = it.isBookmarked, authorId = it.authorId, authorAvatarUrl = it.authorAvatarUrl, originType = it.originType, originId = it.originId, originTitle = it.originTitle, pageUrl = it.pageUrl
                             ))
                         }
                     },
@@ -141,10 +141,9 @@ fun RecentsTabScreen(
                     duration = saved.duration,
                     isPro = saved.isPro,
                     category = saved.category,
-                    description = "Просмотрено недавно.",
-                    thumbnailUrl = saved.thumbnailUrl,
+                    description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl,
                     isDownloaded = saved.isDownloaded,
-                    isBookmarked = saved.isBookmarked
+                    isBookmarked = saved.isBookmarked, authorId = saved.authorId, authorAvatarUrl = saved.authorAvatarUrl, originType = saved.originType, originId = saved.originId, originTitle = saved.originTitle, pageUrl = saved.pageUrl
                 )
             }
 
@@ -192,15 +191,13 @@ fun RecentsTabScreen(
                                 onVideoClick = { viewModel.selectVideo(videoRuntime) },
                                 onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
                                 onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                onDeleteClick = {
+                                    viewModel.deleteRecentItem(videoRuntime)
+                                    android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
+                                },
                                 isDark = isDarkTheme,
                                 isTvOptimized = isTvOptimized,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).combinedClickable(
-                                    onClick = { viewModel.selectVideo(videoRuntime) },
-                                    onLongClick = {
-                                        viewModel.deleteRecentItem(videoRuntime)
-                                        android.widget.Toast.makeText(context, "Удалено из истории", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                )
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
                             )
                         }
                     } else {

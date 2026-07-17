@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -220,7 +221,7 @@ fun LibraryTabScreen(
                         .testTag("bookmark_sort_button")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Sort,
+                        imageVector = Icons.AutoMirrored.Filled.Sort,
                         contentDescription = "Сортировка",
                         tint = Primary,
                         modifier = Modifier.size(18.dp)
@@ -343,8 +344,7 @@ fun LibraryTabScreen(
                                     val videoRuntime = Video(
                                         id = saved.id, title = saved.title, channel = saved.channel,
                                         views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
                                     )
                                     viewModel.toggleBookmark(videoRuntime)
                                 }
@@ -375,8 +375,7 @@ fun LibraryTabScreen(
                                     val videoRuntime = Video(
                                         id = saved.id, title = saved.title, channel = saved.channel,
                                         views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
                                     )
                                     viewModel.toggleBookmark(videoRuntime)
                                 }
@@ -407,8 +406,7 @@ fun LibraryTabScreen(
                                     val videoRuntime = Video(
                                         id = saved.id, title = saved.title, channel = saved.channel,
                                         views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
                                     )
                                     viewModel.toggleBookmark(videoRuntime)
                                 }
@@ -439,8 +437,7 @@ fun LibraryTabScreen(
                                     val videoRuntime = Video(
                                         id = saved.id, title = saved.title, channel = saved.channel,
                                         views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
                                     )
                                     viewModel.toggleBookmark(videoRuntime)
                                 }
@@ -455,7 +452,7 @@ fun LibraryTabScreen(
                         BookmarkSectionHeader(
                             title = "Плейлисты",
                             count = playlists.size,
-                            icon = Icons.Default.PlaylistPlay,
+                            icon = Icons.AutoMirrored.Filled.PlaylistPlay,
                             isExpanded = playlistsExpanded,
                             onClick = { playlistsExpanded = !playlistsExpanded }
                         )
@@ -471,8 +468,7 @@ fun LibraryTabScreen(
                                     val videoRuntime = Video(
                                         id = saved.id, title = saved.title, channel = saved.channel,
                                         views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = "Сохраненный элемент.",
-                                        thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
                                     )
                                     viewModel.toggleBookmark(videoRuntime)
                                 }

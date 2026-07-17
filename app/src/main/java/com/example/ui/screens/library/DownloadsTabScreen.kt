@@ -117,10 +117,9 @@ fun DownloadsTabScreen(
                     duration = saved.duration,
                     isPro = saved.isPro,
                     category = saved.category,
-                    description = "Скачанное видео.",
-                    thumbnailUrl = saved.thumbnailUrl,
+                    description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl,
                     isDownloaded = true,
-                    isBookmarked = saved.isBookmarked
+                    isBookmarked = saved.isBookmarked, authorId = saved.authorId, authorAvatarUrl = saved.authorAvatarUrl, originType = saved.originType, originId = saved.originId, originTitle = saved.originTitle, pageUrl = saved.pageUrl
                 )
             }
 
