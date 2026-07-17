@@ -63,20 +63,26 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
                 <data android:scheme="http" />
                 <data android:scheme="https" />
                 <data android:host="rutube.ru" />
                 <data android:host="www.rutube.ru" />
-
-                <data android:pathPattern=".*" />
+                <data android:pathPrefix="/video/" />
+                <data android:pathPrefix="/channel/" />
+                <data android:pathPrefix="/plst/" />
+                <data android:pathPrefix="/playlist/" />
+                <data android:pathPrefix="/api/video/playlist/" />
+                <data android:pathPrefix="/api/playlist/custom/" />
+                <data android:pathPrefix="/tv/" />
+                <data android:pathPrefix="/metainfo/tv/" />
+                <data android:pathPrefix="/series/" />
+                <data android:pathPrefix="/feeds/" />
+                <data android:pathPrefix="/api/feeds/" />
             </intent-filter>
-
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
                 <data android:scheme="http" />
                 <data android:scheme="https" />
                 <data android:host="vk.com" />
@@ -85,23 +91,19 @@
                 <data android:host="www.vkvideo.ru" />
                 <data android:host="m.vk.com" />
                 <data android:host="m.vkvideo.ru" />
-
-                <data android:pathPattern=".*" />
+                <data android:pathPrefix="/video" />
             </intent-filter>
-
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
                 <data android:scheme="http" />
                 <data android:scheme="https" />
                 <data android:host="dzen.ru" />
                 <data android:host="www.dzen.ru" />
                 <data android:host="zen.yandex.ru" />
                 <data android:host="www.zen.yandex.ru" />
-
-                <data android:pathPattern=".*" />
+                <data android:pathPrefix="/video" />
             </intent-filter>
         </activity>
 
