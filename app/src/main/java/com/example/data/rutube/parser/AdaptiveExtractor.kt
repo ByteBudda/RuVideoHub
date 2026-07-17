@@ -87,11 +87,11 @@ object AdaptiveExtractor {
             is String -> if (value.isNotBlank() && value != "null") value else default
             is Number -> value.toString()
             is JSONObject -> {
-                value.optString("value", null as String?)
-                    ?: value.optString("name", null as String?)
-                    ?: value.optString("title", null as String?)
-                    ?: value.optString("code", null as String?)
-                    ?: value.optString("id", null as String?)
+                value.optString("value", "").takeIf { it.isNotBlank() }
+                    ?: value.optString("name", "").takeIf { it.isNotBlank() }
+                    ?: value.optString("title", "").takeIf { it.isNotBlank() }
+                    ?: value.optString("code", "").takeIf { it.isNotBlank() }
+                    ?: value.optString("id", "").takeIf { it.isNotBlank() }
                     ?: default
             }
             else -> value.toString().takeIf { it.isNotBlank() && it != "null" } ?: default

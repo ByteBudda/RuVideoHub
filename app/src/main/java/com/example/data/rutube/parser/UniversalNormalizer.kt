@@ -213,7 +213,7 @@ object UniversalNormalizer {
             ?: data.optString("object_id", null)?.takeIf { it.isNotBlank() }
             ?: AdaptiveExtractor.getString(data, "id", endpointHint).takeIf { it.isNotBlank() }
             ?: AdaptiveExtractor.getString(target, "id", endpointHint).takeIf { it.isNotBlank() }
-            ?: makeId("playlist", data, endpointHint)
+            ?: makeId("playlist", data, endpointHint) ?: ""
 
         val vCount = target.optInt("video_count", 0)
             .takeIf { it > 0 }
@@ -228,17 +228,17 @@ object UniversalNormalizer {
         val contentUrl = target.optString("absolute_url", null)?.takeIf { it.isNotBlank() }
             ?: target.optString("content", null)?.takeIf { it.isNotBlank() }
             ?: data.optString("url", null)?.takeIf { it.isNotBlank() }
-            ?: "https://rutube.ru/api/playlist/custom/$id/videos/"
+            ?: "https://rutube.ru/api/playlist/custom/$id/videos/" ?: ""
 
         val title = target.optString("name", null)?.takeIf { it.isNotBlank() }
-            ?: target.optString("title", null)?.takeIf { it.isNotBlank() }
-            ?: AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled")
+            ?: target.optString("title", null)?.takeIf { it.isNotBlank() } ?: ""
+            ?: AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled") ?: ""
 
         val thumbnail = target.optString("picture", null)?.takeIf { it.isNotBlank() }
             ?: target.optString("thumbnail", null)?.takeIf { it.isNotBlank() }
-            ?: AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
-            ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() }
-            ?: AdaptiveExtractor.getString(data, "image", endpointHint).takeIf { it.isNotBlank() }
+            ?: AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() } ?: ""
+            ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() } ?: ""
+            ?: AdaptiveExtractor.getString(data, "image", endpointHint) ?: "".takeIf { it.isNotBlank() } ?: ""
 
         return NormalizedCard.PlaylistCard(
             id = id,
@@ -271,7 +271,7 @@ object UniversalNormalizer {
             id = id,
             title = title,
             thumbnail = AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() }
-                ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() },
+                ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() } ?: "",
             description = description.takeIf { it.isNotBlank() },
             actionUrl = actionUrl
         )
