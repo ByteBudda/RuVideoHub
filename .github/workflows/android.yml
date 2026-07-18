@@ -27,10 +27,6 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Decode Keystore to Root
-        run: |
-          base64 --decode bytebudda.keystore.base64 > bytebudda.keystore
-
       - name: Build with Gradle (Release)
         run: |
           gradle assembleRelease -Pfdroid=true \
