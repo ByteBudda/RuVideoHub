@@ -7,17 +7,33 @@ plugins {
 }
 
 android {
+    lint {
+        disable += setOf("GestureBackNavigation", "UnsafeOptInUsageError")
+    }
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.bytebudda"
+    applicationId = "com.aistudio.ruvideohub.zmpqyq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 9
-    versionName = "3.5.73"
+    versionCode = 5
+    versionName = "3.6"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    val isFdroid = project.hasProperty("fdroid") || 
+                   project.hasProperty("no_updater") || 
+                   System.getenv("FDROID") == "true" || 
+                   System.getenv("NO_UPDATER") == "true"
+
+    if (isFdroid) {
+        logger.lifecycle("BUILD CONFIGURATION: F-Droid mode (Updater disabled)")
+    } else {
+        logger.lifecycle("BUILD CONFIGURATION: Standard mode (Updater enabled)")
+    }
+
+    buildConfigField("boolean", "UPDATER_ENABLED", (!isFdroid).toString())
   }
 
   signingConfigs {
@@ -39,7 +55,7 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = true
+      isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
