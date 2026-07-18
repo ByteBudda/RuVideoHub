@@ -14,11 +14,11 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.bytebudda.ruvideohub"
+    applicationId = "com.ruvideohub.app"
     minSdk = 24
     targetSdk = 36
     versionCode = 10
-    versionName = "1.0 Release"
+    versionName = "3.5.74"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
