@@ -258,17 +258,25 @@ fun SleekHeader(
                                 )
                             }
                             
-                            // ФИКС БОЛЬШОЙ КОРЗИНЫ: Нативный IconButton для четкого фокуса пульта
-                            IconButton(
-                                onClick = { 
-                                    onClearAll()
-                                    inputFocusRequester.requestFocus() 
-                                },
+                            // Глобальная корзина: используем Box вместо IconButton для стабильного TV-фокуса
+                            Box(
                                 modifier = Modifier
                                     .size(36.dp)
-                                    .focusable()
-                                    .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized)
-                                    .testTag("btn_clear_all_history")
+                                    .sleekTvFocus(
+                                        shape = CircleShape, 
+                                        enabled = isTvOptimized,
+                                        onEnter = {
+                                            onClearAll()
+                                            inputFocusRequester.requestFocus()
+                                        }
+                                    )
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        onClearAll()
+                                        inputFocusRequester.requestFocus()
+                                    }
+                                    .testTag("btn_clear_all_history"),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete, 
@@ -283,49 +291,66 @@ fun SleekHeader(
                         
                         Column(modifier = Modifier.fillMaxWidth()) {
                             filteredHistory.take(6).forEach { item ->
+                                // Обрати внимание: с Row убраны ВСЕ фокусы и клики. Это просто контейнер.
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .sleekTvFocus(
-                                            shape = RoundedCornerShape(8.dp),
-                                            enabled = isTvOptimized,
-                                            onEnter = {
+                                        .padding(horizontal = 14.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // 1. Отдельный кликабельный элемент для самого текста запроса
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .sleekTvFocus(
+                                                shape = RoundedCornerShape(8.dp),
+                                                enabled = isTvOptimized,
+                                                onEnter = {
+                                                    onSearchQueryChanged(item.query)
+                                                    onSearchConfirmed(item.query)
+                                                    keyboardController?.hide()
+                                                    focusManager.clearFocus()
+                                                }
+                                            )
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
                                                 onSearchQueryChanged(item.query)
                                                 onSearchConfirmed(item.query)
                                                 keyboardController?.hide()
                                                 focusManager.clearFocus()
                                             }
+                                            .padding(vertical = 10.dp, horizontal = 8.dp) // Внутренние отступы для комфортного нажатия
+                                    ) {
+                                        Text(
+                                            text = item.query,
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
                                         )
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            onSearchQueryChanged(item.query)
-                                            onSearchConfirmed(item.query)
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus()
-                                        }
-                                        .padding(horizontal = 14.dp, vertical = 4.dp), // Чуть уменьшили вертикальный паддинг Row, чтобы компенсировать паддинг кнопки
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = item.query,
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    }
                                     
-                                    // ФИКС МАЛЕНЬКОЙ КОРЗИНЫ: Заменили крестик на корзину и обернули в полноценный focusable IconButton
-                                    IconButton(
-                                        onClick = { 
-                                            onDeleteQuery(item.query)
-                                            inputFocusRequester.requestFocus() 
-                                        },
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    
+                                    // 2. Отдельный кликабельный элемент для маленькой корзины
+                                    Box(
                                         modifier = Modifier
                                             .size(36.dp)
-                                            .focusable()
-                                            .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized)
-                                            .testTag("delete_history_item_${item.query}")
+                                            .sleekTvFocus(
+                                                shape = CircleShape, 
+                                                enabled = isTvOptimized,
+                                                onEnter = {
+                                                    onDeleteQuery(item.query)
+                                                    inputFocusRequester.requestFocus()
+                                                }
+                                            )
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                onDeleteQuery(item.query)
+                                                inputFocusRequester.requestFocus() 
+                                            }
+                                            .testTag("delete_history_item_${item.query}"),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
