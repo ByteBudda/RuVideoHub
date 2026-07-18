@@ -192,7 +192,11 @@ fun SleekHeader(
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized, onEnter = onMicClick)
+                            .sleekTvFocus(
+                                shape = CircleShape, 
+                                enabled = isTvOptimized, 
+                                onEnter = onMicClick
+                            )
                             .clip(CircleShape)
                             .clickable { onMicClick() },
                         contentAlignment = Alignment.Center
@@ -262,7 +266,7 @@ fun SleekHeader(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .focusable()
-                                    .sleekTvFocus(CircleShape, isTvOptimized)
+                                    .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete, 
@@ -366,7 +370,12 @@ fun CategoryRow(
 
             Box(
                 modifier = Modifier
-                    .sleekTvFocus(shape = RoundedCornerShape(12.dp), scaleAmount = 1.05f, onEnter = { onCategorySelected(cat) })
+                    .sleekTvFocus(
+                        shape = RoundedCornerShape(12.dp), 
+                        enabled = true, 
+                        scaleAmount = 1.05f, 
+                        onEnter = { onCategorySelected(cat) }
+                    )
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isSelected) Primary else SurfaceVariant)
                     .clickable { onCategorySelected(cat) }
@@ -408,7 +417,12 @@ fun FeedTabRow(
             
             Box(
                 modifier = Modifier
-                    .sleekTvFocus(shape = RoundedCornerShape(100.dp), scaleAmount = 1.05f, onEnter = { onTabSelected(tab) })
+                    .sleekTvFocus(
+                        shape = RoundedCornerShape(100.dp), 
+                        enabled = isTvOptimized, 
+                        scaleAmount = 1.05f, 
+                        onEnter = { onTabSelected(tab) }
+                    )
                     .then(
                         if (isSelected && focusRequester != null) {
                             Modifier.focusRequester(focusRequester)
