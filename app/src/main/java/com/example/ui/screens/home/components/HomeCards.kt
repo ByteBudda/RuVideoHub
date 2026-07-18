@@ -169,7 +169,8 @@ fun HeroVideoCard(
     }
     
     if (showMenu) {
-        var hasSeenKeyDown by remember { mutableStateOf(false) }
+        // Флаг, который блокирует нажатия, пока мы не увидим отпускание кнопки от долгого тапа
+        var ignoreInitialRelease by remember { mutableStateOf(true) }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
             Card(
@@ -178,25 +179,17 @@ fun HeroVideoCard(
                 modifier = Modifier
                     .widthIn(min = 280.dp, max = 320.dp)
                     .onPreviewKeyEvent { event ->
-                        // Ловим "ОК" на пульте
                         if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
-                            when (event.type) {
-                                KeyEventType.KeyDown -> {
-                                    hasSeenKeyDown = true
-                                    false // Не поглощаем, отдаем дальше
+                            if (ignoreInitialRelease) {
+                                // Если поймали отпускание кнопки - снимаем блокировку
+                                if (event.type == KeyEventType.KeyUp) {
+                                    ignoreInitialRelease = false
                                 }
-                                KeyEventType.KeyUp -> {
-                                    if (!hasSeenKeyDown) {
-                                        true // Поглощаем фантомный отпуск, если перед ним не было нажатия
-                                    } else {
-                                        false // Нажатие было внутри меню, отдаем кнопке для клика
-                                    }
-                                }
-                                else -> false
+                                // Поглощаем всё (и спам KeyDown, и финальный KeyUp от долгого нажатия)
+                                return@onPreviewKeyEvent true 
                             }
-                        } else {
-                            false
                         }
+                        false // Пропускаем остальные кнопки (например, стрелки) и нормальные клики
                     }
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -396,7 +389,7 @@ fun SleekVideoGridItem(
     }
 
     if (showMenu) {
-        var hasSeenKeyDown by remember { mutableStateOf(false) }
+        var ignoreInitialRelease by remember { mutableStateOf(true) }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
             Card(
@@ -406,23 +399,14 @@ fun SleekVideoGridItem(
                     .widthIn(min = 280.dp, max = 320.dp)
                     .onPreviewKeyEvent { event ->
                         if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
-                            when (event.type) {
-                                KeyEventType.KeyDown -> {
-                                    hasSeenKeyDown = true
-                                    false
+                            if (ignoreInitialRelease) {
+                                if (event.type == KeyEventType.KeyUp) {
+                                    ignoreInitialRelease = false
                                 }
-                                KeyEventType.KeyUp -> {
-                                    if (!hasSeenKeyDown) {
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                                else -> false
+                                return@onPreviewKeyEvent true 
                             }
-                        } else {
-                            false
                         }
+                        false
                     }
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
