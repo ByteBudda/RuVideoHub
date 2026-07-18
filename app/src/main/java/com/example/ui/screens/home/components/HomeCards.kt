@@ -16,6 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -164,17 +169,35 @@ fun HeroVideoCard(
     }
     
     if (showMenu) {
-        var isMenuClickable by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(300)
-            isMenuClickable = true
-        }
+        var hasSeenKeyDown by remember { mutableStateOf(false) }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.widthIn(min = 280.dp, max = 320.dp)
+                modifier = Modifier
+                    .widthIn(min = 280.dp, max = 320.dp)
+                    .onPreviewKeyEvent { event ->
+                        // Ловим "ОК" на пульте
+                        if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                            when (event.type) {
+                                KeyEventType.KeyDown -> {
+                                    hasSeenKeyDown = true
+                                    false // Не поглощаем, отдаем дальше
+                                }
+                                KeyEventType.KeyUp -> {
+                                    if (!hasSeenKeyDown) {
+                                        true // Поглощаем фантомный отпуск, если перед ним не было нажатия
+                                    } else {
+                                        false // Нажатие было внутри меню, отдаем кнопке для клика
+                                    }
+                                }
+                                else -> false
+                            }
+                        } else {
+                            false
+                        }
+                    }
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Опции", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
@@ -184,7 +207,6 @@ fun HeroVideoCard(
                     if (onChannelClick != null) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onChannelClick()
                             },
@@ -197,7 +219,6 @@ fun HeroVideoCard(
                     
                     Button(
                         onClick = { 
-                            if (!isMenuClickable) return@Button
                             showMenu = false
                             onBookmarkToggle()
                         },
@@ -210,7 +231,6 @@ fun HeroVideoCard(
                     if (!isContainer) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDownloadToggle()
                             },
@@ -224,7 +244,6 @@ fun HeroVideoCard(
                     if (video.isDownloaded && onSaveToDeviceClick != null) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onSaveToDeviceClick()
                             },
@@ -238,7 +257,6 @@ fun HeroVideoCard(
                     if (onDeleteClick != null) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDeleteClick()
                             },
@@ -378,17 +396,34 @@ fun SleekVideoGridItem(
     }
 
     if (showMenu) {
-        var isMenuClickable by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(300)
-            isMenuClickable = true
-        }
+        var hasSeenKeyDown by remember { mutableStateOf(false) }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.widthIn(min = 280.dp, max = 320.dp)
+                modifier = Modifier
+                    .widthIn(min = 280.dp, max = 320.dp)
+                    .onPreviewKeyEvent { event ->
+                        if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                            when (event.type) {
+                                KeyEventType.KeyDown -> {
+                                    hasSeenKeyDown = true
+                                    false
+                                }
+                                KeyEventType.KeyUp -> {
+                                    if (!hasSeenKeyDown) {
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                else -> false
+                            }
+                        } else {
+                            false
+                        }
+                    }
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Опции", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
@@ -398,7 +433,6 @@ fun SleekVideoGridItem(
                     if (onChannelClick != null) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onChannelClick()
                             },
@@ -411,7 +445,6 @@ fun SleekVideoGridItem(
                     
                     Button(
                         onClick = { 
-                            if (!isMenuClickable) return@Button
                             showMenu = false
                             onBookmarkToggle()
                         },
@@ -424,7 +457,6 @@ fun SleekVideoGridItem(
                     if (!isContainer) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDownloadToggle()
                             },
@@ -438,7 +470,6 @@ fun SleekVideoGridItem(
                     if (video.isDownloaded && onSaveToDeviceClick != null) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onSaveToDeviceClick()
                             },
@@ -452,7 +483,6 @@ fun SleekVideoGridItem(
                     if (onDeleteClick != null) {
                         Button(
                             onClick = { 
-                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDeleteClick()
                             },
