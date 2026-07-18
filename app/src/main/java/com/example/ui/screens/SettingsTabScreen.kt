@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.theme.GreyText
 import com.example.viewmodel.VideoViewModel
+import com.example.BuildConfig
 
 @Composable
 fun SettingsTabScreen(
@@ -79,14 +80,16 @@ fun SettingsTabScreen(
         )
 
         // Section: Updates
-        Text(
-            text = "Обновление",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp, top = 16.dp)
-        )
-        UpdateSection(isDarkTheme, isTvOptimized)
+        if (BuildConfig.UPDATER_ENABLED) {
+            Text(
+                text = "Обновление",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp, top = 16.dp)
+            )
+            UpdateSection(isDarkTheme, isTvOptimized)
+        }
 
         // Section: Backup & Restore
         BackupSettingsSection(
