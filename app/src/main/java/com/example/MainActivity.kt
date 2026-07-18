@@ -96,16 +96,43 @@ class MainActivity : ComponentActivity() {
       }
     }
 
-    // Handle deep link intent on fresh startup
-    intent?.data?.toString()?.let { url ->
-        viewModel.loadVideoByUrlOrId(url)
-    }
-    intent?.getStringExtra("restore_video_id")?.let { id ->
-        viewModel.loadVideoByUrlOrId(id)
-    }
+    // Handle incoming intent (deep link or shared content)
+    handleIntent(intent)
 
     // Automatically resume any interrupted/pending downloads in the background
     com.example.manager.DownloadManager.resumeAll(this)
+  }
+
+  private fun handleIntent(intent: android.content.Intent?) {
+    if (intent == null) return
+    val action = intent.action
+    val type = intent.type
+
+    if (android.content.Intent.ACTION_SEND == action && type != null) {
+      if ("text/plain" == type) {
+        intent.getStringExtra(android.content.Intent.EXTRA_TEXT)?.let { sharedText ->
+          extractUrl(sharedText)?.let { url ->
+            viewModel.loadVideoByUrlOrId(url)
+            return
+          }
+        }
+      }
+    }
+
+    intent.data?.toString()?.let { url ->
+      viewModel.loadVideoByUrlOrId(url)
+      return
+    }
+
+    intent.getStringExtra("restore_video_id")?.let { id ->
+      viewModel.loadVideoByUrlOrId(id)
+      return
+    }
+  }
+
+  private fun extractUrl(text: String): String? {
+    val regex = """https?://[^\s]+""".toRegex()
+    return regex.find(text)?.value
   }
 
   override fun onUserLeaveHint() {
@@ -133,12 +160,7 @@ class MainActivity : ComponentActivity() {
   override fun onNewIntent(intent: android.content.Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    intent.data?.toString()?.let { url ->
-        viewModel.loadVideoByUrlOrId(url)
-    }
-    intent.getStringExtra("restore_video_id")?.let { id ->
-        viewModel.loadVideoByUrlOrId(id)
-    }
+    handleIntent(intent)
   }
 }
 
