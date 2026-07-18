@@ -17,7 +17,7 @@ android {
     applicationId = "com.aistudio.ruvideohub.zmpqyq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 5
+    versionCode = 10
     versionName = "3.6"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
