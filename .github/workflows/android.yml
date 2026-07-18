@@ -37,7 +37,7 @@ jobs:
             --no-daemon --no-configuration-cache
         working-directory: ./app
 
-      name: Upload APK to Release
+      - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
