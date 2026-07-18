@@ -8,6 +8,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -99,7 +101,7 @@ fun SleekHeader(
                     .fillMaxWidth()
                     .height(44.dp)
                     .liquidGlass(RoundedCornerShape(22.dp), borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
-                    // Добавляем красивую рамку, когда текстовое поле в фокусе (т.к. мы убрали sleekTvFocus)
+                    // Добавляем красивую рамку, когда текстовое поле в фокусе
                     .border(
                         width = if (isSearchFocused && isTvOptimized) 2.dp else 0.dp,
                         color = if (isSearchFocused && isTvOptimized) Primary else Color.Transparent,
@@ -124,11 +126,10 @@ fun SleekHeader(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     ),
-                    cursorBrush = SolidColor(Primary), // ФИКС: Делаем курсор видимым!
+                    cursorBrush = SolidColor(Primary), 
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(inputFocusRequester)
-                        // ФИКС: Убрали sleekTvFocus, чтобы пульт давал фокус НАПРЯМУЮ полю ввода
                         .onFocusChanged { 
                             isSearchFocused = it.isFocused 
                         }
@@ -162,7 +163,6 @@ fun SleekHeader(
                 )
 
                 if (searchQuery.isNotEmpty()) {
-                    // ФИКС: Используем Box вместо IconButton для избежания "матрешки" фокусов на ТВ
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -207,7 +207,7 @@ fun SleekHeader(
                 }
             }
 
-            // История поиска (Выдвигается плавно, находится в одном окне со строкой)
+            // История поиска
             AnimatedVisibility(
                 visible = widgetHasFocus && filteredHistory.isNotEmpty(),
                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -253,31 +253,22 @@ fun SleekHeader(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            // ФИКС: Используем Box вместо TextButton
-                            Box(
+                            // Кнопка корзины с поддержкой фокуса
+                            IconButton(
+                                onClick = { 
+                                    onClearAll()
+                                    inputFocusRequester.requestFocus() 
+                                },
                                 modifier = Modifier
-                                    .height(28.dp)
-                                    .sleekTvFocus(
-                                        shape = RoundedCornerShape(8.dp), 
-                                        enabled = isTvOptimized, 
-                                        onEnter = { 
-                                            onClearAll()
-                                            inputFocusRequester.requestFocus() 
-                                        }
-                                    )
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        onClearAll()
-                                        inputFocusRequester.requestFocus() 
-                                    }
-                                    .padding(horizontal = 12.dp),
-                                contentAlignment = Alignment.Center
+                                    .size(32.dp)
+                                    .focusable()
+                                    .sleekTvFocus(CircleShape, isTvOptimized)
                             ) {
-                                Text(
-                                    text = "Очистить всё",
-                                    color = Primary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                Icon(
+                                    imageVector = Icons.Default.Delete, 
+                                    contentDescription = "Очистить всё", 
+                                    tint = Primary, 
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
@@ -319,10 +310,11 @@ fun SleekHeader(
                                         modifier = Modifier.weight(1f)
                                     )
                                     
-                                    // ФИКС крестика удаления внутри истории
+                                    // Иконка удаления одного элемента с фокусом
                                     Box(
                                         modifier = Modifier
-                                            .size(24.dp)
+                                            .size(32.dp)
+                                            .focusable()
                                             .sleekTvFocus(
                                                 shape = CircleShape,
                                                 enabled = isTvOptimized,
@@ -342,7 +334,7 @@ fun SleekHeader(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Удалить",
                                             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(14.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
@@ -355,7 +347,6 @@ fun SleekHeader(
     }
 }
 
-// CategoryRow и FeedTabRow остаются без изменений (как в оригинале)
 @Composable
 fun CategoryRow(
     categories: List<String>,
