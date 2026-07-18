@@ -27,26 +27,22 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > bytebudda.keystore
-
       - name: Build with Gradle (Release)
         run: |
-          gradle assembleRelease -Pfdroid=true \
+          gradle assembleRelease \
             -Pandroid.injected.signing.store.file="../bytebudda.keystore" \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
+            -Pandroid.injected.signing.store.password="9z9r1h41n0r1" \
+            -Pandroid.injected.signing.key.alias="bytebudda" \
+            -Pandroid.injected.signing.key.password="9z9r1h41n0r1" \
             --no-daemon --no-configuration-cache
         working-directory: ./app
 
-      - name: Upload APK to Release
+      name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
-          tag_name: nightly-${{ github.run_number }}
-          name: Nightly Build #${{ github.run_number }}
+          tag_name: release-${{ github.run_number }}
+          name: release Build #${{ github.run_number }}
           draft: true
           prerelease: true
           generate_release_notes: true
