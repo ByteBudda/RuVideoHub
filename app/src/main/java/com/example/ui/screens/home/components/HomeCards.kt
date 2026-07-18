@@ -164,6 +164,12 @@ fun HeroVideoCard(
     }
     
     if (showMenu) {
+        var isMenuClickable by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(300)
+            isMenuClickable = true
+        }
+
         androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -178,6 +184,7 @@ fun HeroVideoCard(
                     if (onChannelClick != null) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onChannelClick()
                             },
@@ -190,6 +197,7 @@ fun HeroVideoCard(
                     
                     Button(
                         onClick = { 
+                            if (!isMenuClickable) return@Button
                             showMenu = false
                             onBookmarkToggle()
                         },
@@ -202,6 +210,7 @@ fun HeroVideoCard(
                     if (!isContainer) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDownloadToggle()
                             },
@@ -215,6 +224,7 @@ fun HeroVideoCard(
                     if (video.isDownloaded && onSaveToDeviceClick != null) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onSaveToDeviceClick()
                             },
@@ -228,6 +238,7 @@ fun HeroVideoCard(
                     if (onDeleteClick != null) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDeleteClick()
                             },
@@ -367,6 +378,12 @@ fun SleekVideoGridItem(
     }
 
     if (showMenu) {
+        var isMenuClickable by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(300)
+            isMenuClickable = true
+        }
+
         androidx.compose.ui.window.Dialog(onDismissRequest = { showMenu = false }) {
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -381,6 +398,7 @@ fun SleekVideoGridItem(
                     if (onChannelClick != null) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onChannelClick()
                             },
@@ -393,6 +411,7 @@ fun SleekVideoGridItem(
                     
                     Button(
                         onClick = { 
+                            if (!isMenuClickable) return@Button
                             showMenu = false
                             onBookmarkToggle()
                         },
@@ -405,6 +424,7 @@ fun SleekVideoGridItem(
                     if (!isContainer) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDownloadToggle()
                             },
@@ -418,6 +438,7 @@ fun SleekVideoGridItem(
                     if (video.isDownloaded && onSaveToDeviceClick != null) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onSaveToDeviceClick()
                             },
@@ -431,6 +452,7 @@ fun SleekVideoGridItem(
                     if (onDeleteClick != null) {
                         Button(
                             onClick = { 
+                                if (!isMenuClickable) return@Button
                                 showMenu = false
                                 onDeleteClick()
                             },
