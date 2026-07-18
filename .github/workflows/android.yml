@@ -13,6 +13,9 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,29 +27,28 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # 1. Распаковываем твой оригинальный ключ из репозитория
       - name: Decode Keystore to Root
         run: |
-          base64 --decode debug.keystore.base64 > my-upload-key.jks
+          base64 --decode bytebudda.keystore.base64 > bytebudda.keystore
 
-      # 2. Собираем релиз и принудительно переопределяем свойства подписи прямо в команде!
-      # Флаги -Pandroid.injected.signing... заставят Gradle забить на строку "upload" в gradle.kts
-      # и использовать правильные параметры твоего дебаг-ключа.
       - name: Build with Gradle (Release)
         run: |
-          gradle assembleRelease \
-            -Pandroid.injected.signing.store.file="../my-upload-key.jks" \
-            -Pandroid.injected.signing.store.password="android" \
-            -Pandroid.injected.signing.key.alias="androiddebugkey" \
-            -Pandroid.injected.signing.key.password="android" \
+          gradle assembleRelease -Pfdroid=true \
+            -Pandroid.injected.signing.store.file="../bytebudda.keystore" \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
             --no-daemon --no-configuration-cache
         working-directory: ./app
 
-      # 3. Вытаскиваем уже полностью собранный и валидно подписанный APK в артефакты
-      - name: Upload Signed APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: RutubeApp-Release-Signed
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-          retention-days: 7
+          files: app/build/outputs/apk/release/app-release.apk
+          tag_name: nightly-${{ github.run_number }}
+          name: Nightly Build #${{ github.run_number }}
+          draft: true
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
