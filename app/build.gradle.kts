@@ -55,7 +55,8 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true // удаляет неиспользуемые ресурсы для уменьшения веса
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -140,11 +141,11 @@ dependencies {
 }
 
 val copyApk by tasks.registering(Copy::class) {
-    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    from(layout.buildDirectory.dir("outputs/apk/release"))
     into(rootProject.layout.projectDirectory.dir("apk"))
     include("*.apk")
 }
 
-tasks.matching { it.name == "assembleDebug" }.configureEach {
+tasks.matching { it.name == "assembleRelease" }.configureEach {
     finalizedBy(copyApk)
 }
