@@ -257,16 +257,18 @@ fun SleekHeader(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            // Кнопка корзины с поддержкой фокуса
+                            
+                            // ФИКС БОЛЬШОЙ КОРЗИНЫ: Нативный IconButton для четкого фокуса пульта
                             IconButton(
                                 onClick = { 
                                     onClearAll()
                                     inputFocusRequester.requestFocus() 
                                 },
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(36.dp)
                                     .focusable()
                                     .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized)
+                                    .testTag("btn_clear_all_history")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete, 
@@ -301,8 +303,7 @@ fun SleekHeader(
                                             keyboardController?.hide()
                                             focusManager.clearFocus()
                                         }
-                                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                                        .testTag("history_item_${item.query}"),
+                                        .padding(horizontal = 14.dp, vertical = 4.dp), // Чуть уменьшили вертикальный паддинг Row, чтобы компенсировать паддинг кнопки
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -314,29 +315,21 @@ fun SleekHeader(
                                         modifier = Modifier.weight(1f)
                                     )
                                     
-                                    // Иконка удаления одного элемента с фокусом
-                                    Box(
+                                    // ФИКС МАЛЕНЬКОЙ КОРЗИНЫ: Заменили крестик на корзину и обернули в полноценный focusable IconButton
+                                    IconButton(
+                                        onClick = { 
+                                            onDeleteQuery(item.query)
+                                            inputFocusRequester.requestFocus() 
+                                        },
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(36.dp)
                                             .focusable()
-                                            .sleekTvFocus(
-                                                shape = CircleShape,
-                                                enabled = isTvOptimized,
-                                                onEnter = { 
-                                                    onDeleteQuery(item.query)
-                                                    inputFocusRequester.requestFocus() 
-                                                }
-                                            )
-                                            .clip(CircleShape)
-                                            .clickable {
-                                                onDeleteQuery(item.query)
-                                                inputFocusRequester.requestFocus() 
-                                            },
-                                        contentAlignment = Alignment.Center
+                                            .sleekTvFocus(shape = CircleShape, enabled = isTvOptimized)
+                                            .testTag("delete_history_item_${item.query}")
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Удалить",
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Удалить элемент",
                                             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                                             modifier = Modifier.size(16.dp)
                                         )
