@@ -31,6 +31,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun GlobalUpdateChecker() {
+    if (!BuildConfig.UPDATER_ENABLED) return
+
     val context = LocalContext.current
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showDialog by remember { mutableStateOf(false) }
@@ -125,6 +127,8 @@ fun UpdateDialogs(
 
 @Composable
 fun UpdateSection(isDarkTheme: Boolean, isTvOptimized: Boolean) {
+    if (!BuildConfig.UPDATER_ENABLED) return
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isChecking by remember { mutableStateOf(false) }
