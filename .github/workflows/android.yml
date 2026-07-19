@@ -40,21 +40,7 @@ jobs:
           if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then echo "⚠️ BASE64 KEYSTORE IS EMPTY!"; else echo "✅ Base64 Keystore is set"; fi
 
   
-      # Этап 1: Собираем стандартную версию (с апдейтером)
-      - name: Build Standard Release
-        run: |
-          gradle assembleRelease \
-            -Pandroid.injected.signing.store.file="../bytebudda.keystore" \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
-            --no-daemon --no-configuration-cache
-        working-directory: ./app
-
-      # Переименовываем стандартный APK, чтобы его не стёрло следующей сборкой
-      - name: Rename Standard APK
-        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/RuVideoHub-Standard.apk
-
+      
       # Этап 2: Собираем F-Droid версию (без апдейтера)
       - name: Build F-Droid Release
         run: |
@@ -75,7 +61,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/build/outputs/apk/release/RuVideoHub-Standard.apk
             app/build/outputs/apk/release/RuVideoHub-FDroid.apk
           tag_name: nightly-${{ github.run_number }}
           name: Nightly Build #${{ github.run_number }}
