@@ -39,10 +39,7 @@ jobs:
           if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then echo "⚠️ KEY PASSWORD IS EMPTY!"; else echo "✅ Key password is set"; fi
           if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then echo "⚠️ BASE64 KEYSTORE IS EMPTY!"; else echo "✅ Base64 Keystore is set"; fi
 
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > bytebudda.keystore
-
+  
       # Этап 1: Собираем стандартную версию (с апдейтером)
       - name: Build Standard Release
         run: |
