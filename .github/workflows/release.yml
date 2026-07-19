@@ -1,4 +1,4 @@
-name: Android debug Release Sign with debug Key
+name: Android Release Sign with Repo Key
 
 on:
   push:
@@ -9,6 +9,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # Если секреты добавлены во вкладку Environment, раскомментируй строку ниже 
+    # и укажи точное название твоего окружения на GitHub (например, release):
+    # environment: release
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -27,24 +31,37 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Decode Keystore to Root
+      # Тест на проверку секретов, чтобы исключить пустые строки
+      - name: Check Secrets Presence
         run: |
-          base64 --decode debug.keystore.base64 > my-upload-key.jks
+          if [ -z "${{ secrets.KEY_ALIAS }}" ]; then echo "⚠️ ALIAS IS EMPTY!"; else echo "✅ Alias is set"; fi
+          if [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]; then echo "⚠️ STORE PASSWORD IS EMPTY!"; else echo "✅ Store password is set"; fi
+          if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then echo "⚠️ KEY PASSWORD IS EMPTY!"; else echo "✅ Key password is set"; fi
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then echo "⚠️ BASE64 KEYSTORE IS EMPTY!"; else echo "✅ Base64 Keystore is set"; fi
 
-      - name: Build with Gradle (Release)
+  
+      
+      # Этап 2: Собираем
+      - name: Build  Release
         run: |
           gradle assembleRelease \
-            -Pandroid.injected.signing.store.file="../my-upload-key.jks" \
-            -Pandroid.injected.signing.store.password="android" \
-            -Pandroid.injected.signing.key.alias="androiddebugkey" \
-            -Pandroid.injected.signing.key.password="android" \
+            -Pandroid.injected.signing.store.file="../bytebudda.keystore" \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
             --no-daemon --no-configuration-cache
         working-directory: ./app
 
-      - name: Upload APK to Release
+      # Переименовываем APK
+      - name: Rename  APK
+        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/RuVideoHub-github.apk
+
+      # Выгружаем оба файла в релизы GitHub
+      - name: Upload APKs to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release.apk
+          files: |
+            app/build/outputs/apk/release/RuVideoHub-github.apk
           tag_name: nightly-${{ github.run_number }}
           name: Nightly Build #${{ github.run_number }}
           draft: true
