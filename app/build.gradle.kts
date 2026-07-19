@@ -17,8 +17,8 @@ android {
     applicationId = "com.ruvideohub.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 5
-    versionName = "3.6"
+    versionCode = 10
+    versionName = "3.5.74 release"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -56,8 +56,8 @@ android {
     release {
       isCrunchPngs = false
       isMinifyEnabled = true
-      isShrinkResources = true
- proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      isShrinkResources = true // удаляет неиспользуемые ресурсы для уменьшения веса
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
@@ -118,7 +118,6 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  implementation(libs.conscrypt.android)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
@@ -142,11 +141,11 @@ dependencies {
 }
 
 val copyApk by tasks.registering(Copy::class) {
-    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    from(layout.buildDirectory.dir("outputs/apk/release"))
     into(rootProject.layout.projectDirectory.dir("apk"))
     include("*.apk")
 }
 
-tasks.matching { it.name == "assembleDebug" }.configureEach {
+tasks.matching { it.name == "assembleRelease" }.configureEach {
     finalizedBy(copyApk)
 }
