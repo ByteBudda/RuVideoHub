@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- 1. Rich Deep Purple Cosmic Gradient Background -->
+    <path
+        android:pathData="M0,0h320v180h-320z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="160"
+                android:startY="0"
+                android:endX="160"
+                android:endY="180"
+                android:type="linear">
+                <item android:offset="0" android:color="#210F42" />
+                <item android:offset="0.5" android:color="#140727" />
+                <item android:offset="1" android:color="#0B0316" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 2. Ambient Background Glows / Bokeh Effects -->
+    <!-- Soft Purple Glow Left -->
+    <path
+        android:pathData="M70,50m-35,0a35,35 0,1 1,70 0a35,35 0,1 1,-70 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="70"
+                android:startY="15"
+                android:endX="70"
+                android:endY="85"
+                android:type="radial"
+                android:gradientRadius="35">
+                <item android:offset="0" android:color="#268A2BE2" />
+                <item android:offset="1" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Soft Pink Glow Right -->
+    <path
+        android:pathData="M250,120m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="250"
+                android:startY="75"
+                android:endX="250"
+                android:endY="165"
+                android:type="radial"
+                android:gradientRadius="45">
+                <item android:offset="0" android:color="#20FF007F" />
+                <item android:offset="1" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Dynamic Tech Grid Lines (Low Opacity) -->
+    <path
+        android:pathData="M0,90 H320"
+        android:strokeColor="#0DFFFFFF"
+        android:strokeWidth="0.8" />
+    <path
+        android:pathData="M160,0 V180"
+        android:strokeColor="#0DFFFFFF"
+        android:strokeWidth="0.8" />
+
+    <!-- 3. Outer Neon Glow Ring (Magenta/Pink Accent) -->
+    <path
+        android:pathData="M160,46 a44,44 0,1,1 0,88 a44,44 0,1,1 0,-88 Z"
+        android:strokeColor="#4DFF007F"
+        android:strokeWidth="3" />
+    <path
+        android:pathData="M160,47 a43,43 0,1,1 0,86 a43,43 0,1,1 0,-86 Z"
+        android:strokeColor="#B3E040FB"
+        android:strokeWidth="1" />
+
+    <!-- 4. The Glass Sphere Base (Translucent Gradient) -->
+    <path
+        android:pathData="M160,50 a40,40 0,1,1 0,80 a40,40 0,1,1 0,-80 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="130"
+                android:startY="55"
+                android:endX="190"
+                android:endY="125"
+                android:type="linear">
+                <item android:offset="0" android:color="#4DFFFFFF" />
+                <item android:offset="0.3" android:color="#1AFFFFFF" />
+                <item android:offset="0.7" android:color="#0AFFFFFF" />
+                <item android:offset="1" android:color="#33D500F9" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 5. Glass Inner Reflection Shadow (3D depth) -->
+    <path
+        android:pathData="M160,51 a39,39 0,1,1 0,78 a39,39 0,1,1 0,-78 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="160"
+                android:startY="130"
+                android:endX="160"
+                android:endY="70"
+                android:type="linear">
+                <item android:offset="0" android:color="#20000000" />
+                <item android:offset="1" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 6. Play Icon inside the Glass Sphere (Centered perfectly) -->
+    <path
+        android:pathData="M152.5,76.5 L173.5,90 L152.5,103.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="152"
+                android:startY="76"
+                android:endX="174"
+                android:endY="104"
+                android:type="linear">
+                <item android:offset="0" android:color="#FF26B2" />
+                <item android:offset="1" android:color="#D500F9" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Play Icon High-Contrast Border -->
+    <path
+        android:pathData="M152.5,76.5 L173.5,90 L152.5,103.5 Z"
+        android:strokeColor="#E0FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round" />
+
+    <!-- 7. Specular Glass Highlight / Shine (Glossy Curved Cap at top-left) -->
+    <path
+        android:pathData="M135,60 C145,52 165,51 175,56 C165,54 145,56 137,64 C136,63 135,61 135,60 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="155"
+                android:startY="52"
+                android:endX="155"
+                android:endY="64"
+                android:type="linear">
+                <item android:offset="0" android:color="#B3FFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Additional tiny pin-point reflection -->
+    <path
+        android:pathData="M134,68 A 2,2 0,1,1 130,68 A 2,2 0,1,1 134,68 Z"
+        android:fillColor="#80FFFFFF" />
+
+</vector>
