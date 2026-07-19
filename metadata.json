@@ -1,6 +1,0 @@
-{
-  "name": "RuVideoHub",
-  "description": "RuVideoHub client search under a sleek interface theme.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
