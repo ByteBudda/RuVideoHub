@@ -17,8 +17,8 @@ android {
     applicationId = "com.ruvideohub.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 10
-    versionName = "3.5.74 release"
+    versionCode = 74
+    versionName = "3.5.74"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -55,8 +55,7 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = true
-      isShrinkResources = true // удаляет неиспользуемые ресурсы для уменьшения веса
+      isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -86,7 +85,7 @@ secrets {
 // This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
-  implementation(platform(libs.firebase.bom))
+  // implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // implementation(libs.androidx.camera.camera2)
@@ -141,11 +140,11 @@ dependencies {
 }
 
 val copyApk by tasks.registering(Copy::class) {
-    from(layout.buildDirectory.dir("outputs/apk/release"))
+    from(layout.buildDirectory.dir("outputs/apk/debug"))
     into(rootProject.layout.projectDirectory.dir("apk"))
     include("*.apk")
 }
 
-tasks.matching { it.name == "assembleRelease" }.configureEach {
+tasks.matching { it.name == "assembleDebug" }.configureEach {
     finalizedBy(copyApk)
 }
