@@ -566,6 +566,7 @@ fun TvMiniPlayerScreen(
             val currentVid = currentVideo
             val isLiveStream = currentVid != null && (currentVid.duration == "ЭФИР" || 
                               currentVid.duration == "00:00" || 
+                              currentVid.duration == "0" ||
                               currentVid.duration.isBlank() || 
                               currentVid.duration.contains(":") == false ||
                               currentVid.duration.equals("трансляция", ignoreCase = true) || 

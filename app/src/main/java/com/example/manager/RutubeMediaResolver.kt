@@ -28,6 +28,68 @@ class RutubeMediaResolver(
         masterUrlCache.remove(videoId)
     }
 
+    /**
+     * Извлекает прямую ссылку на HLS-поток из JSON-ответа /api/play/options/
+     * Поддерживает обычные видео, стримы (live_streams) и видео с video_balancer
+     */
+    fun extractStreamUrlFromPlayOptions(json: JSONObject): String? {
+        // 1. Проверяем live_streams (для прямых эфиров)
+        json.optJSONObject("live_streams")?.let { liveStreams ->
+            // Пробуем hls массив
+            liveStreams.optJSONArray("hls")?.let { hlsArray ->
+                if (hlsArray.length() > 0) {
+                    val firstHls = hlsArray.getJSONObject(0)
+                    firstHls.optString("url").takeIf { it.isNotBlank() }?.let { return it }
+                }
+            }
+            // Пробуем прямые поля
+            listOf("hls", "m3u8", "url", "default").forEach { key ->
+                liveStreams.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 2. Проверяем live_balancer (альтернативный формат)
+        json.optJSONObject("live_balancer")?.let { liveBalancer ->
+            listOf("hls", "m3u8", "url", "default").forEach { key ->
+                liveBalancer.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 3. Проверяем video_balancer (для обычных видео)
+        json.optJSONObject("video_balancer")?.let { vb ->
+            listOf("m3u8", "hls", "default", "url").forEach { key ->
+                vb.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 4. Проверяем корневые поля
+        listOf("hls_url", "stream_url", "m3u8", "url", "video_url").forEach { key ->
+            json.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+        }
+
+        // 5. Рекурсивный поиск по всем полям JSON (запасной вариант)
+        fun searchInJson(obj: JSONObject, depth: Int = 0): String? {
+            if (depth > 3) return null
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = obj.opt(key)
+                when (value) {
+                    is String -> {
+                        if (value.contains(".m3u8") && value.startsWith("http")) {
+                            return value
+                        }
+                    }
+                    is JSONObject -> {
+                        searchInJson(value, depth + 1)?.let { return it }
+                    }
+                }
+            }
+            return null
+        }
+        return searchInJson(json)
+    }
+
     suspend fun fetchSubtitles(videoId: String): List<SubtitleTrack> {
         return withContext(Dispatchers.IO) {
             try {
@@ -59,6 +121,7 @@ class RutubeMediaResolver(
     }
 
     suspend fun fetchHlsStreamUrl(videoId: String, quality: String = "Авто"): String? {
+        // Plugin video
         if (videoId.startsWith("plugin_")) {
             val cachedMaster = masterUrlCache[videoId]
             if (cachedMaster != null) {
@@ -79,6 +142,8 @@ class RutubeMediaResolver(
                 }
             }
         }
+
+        // VK video
         if (videoId.startsWith("vk_")) {
             val cachedMaster = masterUrlCache[videoId]
             if (cachedMaster != null) {
@@ -100,6 +165,8 @@ class RutubeMediaResolver(
                 }
             }
         }
+
+        // Rutube video
         val masterUrl = withContext(Dispatchers.IO) {
             val cachedMaster = masterUrlCache[videoId]
             if (cachedMaster != null) {
@@ -136,49 +203,20 @@ class RutubeMediaResolver(
                         val bodyString = resp.body?.string() ?: return@withContext null
                         val jsonObject = JSONObject(bodyString)
 
-                        var extractedStreamUrl: String? = null
-                        val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
-                        if (videoBalancerObj != null) {
-                            extractedStreamUrl = videoBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
-                                ?: videoBalancerObj.optString("default").takeIf { it.isNotBlank() }
-                        }
+                        // Используем улучшенную функцию извлечения
+                        var extractedStreamUrl = extractStreamUrlFromPlayOptions(jsonObject)
 
                         if (extractedStreamUrl.isNullOrBlank()) {
-                            val liveBalancerObj = jsonObject.optJSONObject("live_balancer") ?: jsonObject.optJSONObject("live_streams")
-                            if (liveBalancerObj != null) {
-                                extractedStreamUrl = liveBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
-                                    ?: liveBalancerObj.optString("default").takeIf { it.isNotBlank() }
-                            }
+                            android.util.Log.w("RutubeMediaResolver", "No stream URL found in play options for $videoId")
                         }
 
-                        if (extractedStreamUrl.isNullOrBlank()) {
-                            val keys = jsonObject.keys()
-                            while (keys.hasNext()) {
-                                val key = keys.next()
-                                val value = jsonObject.opt(key)
-                                if (value is String && value.contains(".m3u8")) {
-                                    extractedStreamUrl = value
-                                    break
-                                } else if (value is JSONObject) {
-                                    val subKeys = value.keys()
-                                    while (subKeys.hasNext()) {
-                                        val sk = subKeys.next()
-                                        val sv = value.opt(sk)
-                                        if (sv is String && sv.contains(".m3u8")) {
-                                            extractedStreamUrl = sv
-                                            break
-                                        }
-                                    }
-                                }
-                            }
-                        }
                         if (extractedStreamUrl != null) {
                             masterUrlCache.put(videoId, extractedStreamUrl)
                         }
                         extractedStreamUrl
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("RutubeMediaResolver", "Error fetching direct stream URL", e)
+                    android.util.Log.e("RutubeMediaResolver", "Error fetching direct stream URL for $videoId", e)
                     null
                 }
             }
