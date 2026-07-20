@@ -1043,11 +1043,9 @@ fun TvRutubeVideoPlayer(
                             webViewClient = object : WebViewClient() {
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     super.onPageFinished(view, url)
-                                    // Принудительно растягиваем контент на весь экран
                                     view?.evaluateJavascript(
                                         """
                                         (function() {
-                                            // Стили для полного заполнения экрана
                                             var style = document.getElementById('tv-player-style');
                                             if (!style) {
                                                 style = document.createElement('style');
@@ -1084,7 +1082,6 @@ fun TvRutubeVideoPlayer(
                                             `;
                                             window.dispatchEvent(new Event('resize'));
                                             
-                                            // Автозапуск
                                             var playAttempts = 0;
                                             function tryPlay() {
                                                 var video = document.querySelector('video');
@@ -1136,7 +1133,6 @@ fun TvRutubeVideoPlayer(
                         }
                     },
                     update = { webView ->
-                        // Принудительно обновляем размеры при каждом обновлении
                         webView.layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -1147,7 +1143,6 @@ fun TvRutubeVideoPlayer(
                         webView.post {
                             webView.requestLayout()
                             webView.invalidate()
-                            // Перезапускаем скрипт растяжения
                             webView.evaluateJavascript(
                                 """
                                 (function() {
@@ -1207,10 +1202,20 @@ fun TvRutubeVideoPlayer(
                             useEmbedPlayer = false
                             hlsUrl = null
                             isLoading = true
-                            // Повторная попытка получить HLS
-                            viewModel.clearHlsCache(videoId)
-                            viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-                            isLoading = false
+                            viewModel.viewModelScope.launch {
+                                try {
+                                    val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+                                    if (url != null && url.isNotBlank() && url.contains(".m3u8")) {
+                                        hlsUrl = url
+                                        if (isLive) isLiveStreamReady = true
+                                    } else {
+                                        useEmbedPlayer = true
+                                    }
+                                } catch (e: Exception) {
+                                    useEmbedPlayer = true
+                                }
+                                isLoading = false
+                            }
                         },
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.7f), CircleShape)
