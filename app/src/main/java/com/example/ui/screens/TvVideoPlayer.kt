@@ -76,6 +76,7 @@ fun TvRutubeVideoPlayer(
     var isLoading by remember(videoId) { mutableStateOf(true) }
     var loadError by remember(videoId) { mutableStateOf<String?>(null) }
     var useEmbedPlayer by remember(videoId) { mutableStateOf(false) }
+    var isLiveStreamReady by remember { mutableStateOf(false) }
     
     val isPlayingFromViewModel by viewModel.isPlaying.collectAsStateWithLifecycle()
     var isPlayingState by remember { mutableStateOf(viewModel.isPlaying.value) }
@@ -112,10 +113,29 @@ fun TvRutubeVideoPlayer(
     }
 
     LaunchedEffect(videoId, selectedQuality) {
+        isLoading = true
+        loadError = null
+        useEmbedPlayer = false
+        isLiveStreamReady = false
+
         if (isLive) {
-            isLoading = false
+            try {
+                val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+                if (url != null && url.contains(".m3u8")) {
+                    hlsUrl = url
+                    isLiveStreamReady = true
+                    isLoading = false
+                } else {
+                    useEmbedPlayer = true
+                    isLoading = false
+                }
+            } catch (e: Exception) {
+                useEmbedPlayer = true
+                isLoading = false
+            }
             return@LaunchedEffect
         }
+
         isLoading = true
         loadError = null
         useEmbedPlayer = false
@@ -157,7 +177,14 @@ fun TvRutubeVideoPlayer(
     
     val exoPlayer = remember(videoId, hlsUrl, subtitles) {
         if (hlsUrl == null) null else {
-            exoPlayerHandler.initialize(hlsUrl, offlineFile, subtitles, isPlayingState, viewModel.getVideoPosition(videoId))
+            exoPlayerHandler.initialize(
+                hlsUrl = hlsUrl,
+                offlineFile = offlineFile,
+                subtitles = subtitles,
+                isPlayingState = isPlayingState,
+                initialPosition = viewModel.getVideoPosition(videoId),
+                isLive = isLive
+            )
         }
     }
 
@@ -202,7 +229,7 @@ fun TvRutubeVideoPlayer(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     isBufferingState = playbackState == androidx.media3.common.Player.STATE_BUFFERING ||
                                        playbackState == androidx.media3.common.Player.STATE_IDLE
-                    if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                    if (playbackState == androidx.media3.common.Player.STATE_ENDED && !isLive) {
                         val currentVideo = viewModel.playerManager.currentSelectedVideo.value
                         if (currentVideo != null) {
                             viewModel.markAsWatched(currentVideo, exoPlayer.duration)
@@ -359,20 +386,646 @@ fun TvRutubeVideoPlayer(
                 } else Modifier
             )
     ) {
-        if (isLive) {
-            SimulatedPlaybackBars(modifier = Modifier.fillMaxSize())
+        // Если это стрим и мы ещё не получили HLS — показываем индикатор загрузки
+        if (isLive && !isLiveStreamReady && !useEmbedPlayer && isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(color = Primary, modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Подключение к прямому эфиру...",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = videoTitle,
+                        color = GreyText,
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+            }
+        } else if (isLive && isLiveStreamReady && hlsUrl != null) {
+            // Стрим воспроизводится через ExoPlayer как обычное видео
+            // Код для воспроизведения hlsUrl (такой же как для обычных видео)
+            AndroidView(
+                factory = { ctx ->
+                    androidx.media3.ui.PlayerView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        useController = false
+                        player = exoPlayer
+                        keepScreenOn = true
+                        if (isMiniPlayer) {
+                            isFocusable = false
+                            isFocusableInTouchMode = false
+                        }
+                    }
+                },
+                update = { playerView ->
+                    playerView.player = exoPlayer
+                    playerView.keepScreenOn = true
+                    playerView.resizeMode = when (aspectMode) {
+                        VlcAspectRatio.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        VlcAspectRatio.BEST_FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        VlcAspectRatio.FILL -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    }
+                    if (isMiniPlayer) {
+                        playerView.isFocusable = false
+                        playerView.isFocusableInTouchMode = false
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
+            )
+            
+            // LIVE badge overlay
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Red.copy(alpha = 0.85f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                    Text(
+                        text = "LIVE",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+            
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                if (latestIsMiniPlayer) {
+                                    latestOnToggleFullscreen()
+                                } else {
+                                    controlsVisible = !controlsVisible
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            },
+                            onDoubleTap = {
+                                if (latestIsMiniPlayer) {
+                                    latestOnToggleFullscreen()
+                                } else {
+                                    controlsVisible = !controlsVisible
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            }
+                        )
+                    }
+            )
+            
+            if (isBufferingState) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Primary, modifier = Modifier.size(64.dp))
+                }
+            }
+
+            AnimatedVisibility(
+                visible = controlsVisible && !isMiniPlayer,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.fillMaxSize()
             ) {
-                Text(
-                    text = "Прямой эфир: $videoTitle",
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                ) {
+                    // Top Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isFullscreen) {
+                            val onBackClick = { 
+                                if (currentPos > 0 && !isLive) {
+                                    viewModel.saveVideoPosition(videoId, currentPos, totalDuration)
+                                }
+                                onToggleFullscreen() 
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                    .sleekTvFocus(CircleShape, onEnter = onBackClick)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onBackClick
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+                        
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = if (offlineFile.exists()) "$videoTitle (Офлайн)" else videoTitle,
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isLive) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.Red)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "LIVE",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        
+                        val isVkOrDzen = videoId.startsWith("vk_") || videoId.startsWith("plugin_Дзен_")
+                        if (!offlineFile.exists() && !isVkOrDzen) {
+                            val onQualityClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                val qualities = listOf("Авто", "1080p", "720p", "480p")
+                                val nextIdx = (qualities.indexOf(selectedQuality) + 1) % qualities.size
+                                selectedQuality = qualities[nextIdx]
+                                viewModel.setPlayerQuality(selectedQuality)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onQualityClick)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onQualityClick
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(selectedQuality, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+
+                        if (subtitles.isNotEmpty() && !isLive) {
+                            val onSubtitleClick = {
+                                lastInteractionTime = System.currentTimeMillis()
+                                val options = listOf(null) + subtitles.map { it.language }
+                                val nextIdx = (options.indexOf(activeSubtitleLanguage) + 1) % options.size
+                                activeSubtitleLanguage = options[nextIdx]
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(if (activeSubtitleLanguage != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .sleekTvFocus(RoundedCornerShape(8.dp), onEnter = onSubtitleClick)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onSubtitleClick
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Subtitles, "Субтитры", tint = if (activeSubtitleLanguage != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(activeSubtitleLanguage ?: "Выкл", color = if (activeSubtitleLanguage != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            if (activeSubtitleLanguage != null) {
+                                val onDelayDecrease = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    subtitleDelayMs -= 500L
+                                }
+                                val onDelayIncrease = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    subtitleDelayMs += 500L
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .sleekTvFocus(RoundedCornerShape(4.dp), onEnter = onDelayDecrease)
+                                            .clickable(
+                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                indication = ripple(bounded = true),
+                                                onClick = onDelayDecrease
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("-0.5с", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Text(
+                                        text = "${if (subtitleDelayMs > 0L) "+" else ""}${String.format(java.util.Locale.US, "%.1f", subtitleDelayMs / 1000f)}с",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .sleekTvFocus(RoundedCornerShape(4.dp), onEnter = onDelayIncrease)
+                                            .clickable(
+                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                indication = ripple(bounded = true),
+                                                onClick = onDelayIncrease
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("+0.5с", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+                        }
+
+                        val onAspectClick = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            val modes = VlcAspectRatio.values()
+                            val next = modes[(aspectMode.ordinal + 1) % modes.size]
+                            onChangeAspectRatio(next)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onAspectClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onAspectClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AspectRatio, "Формат", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                        }
+                        
+                        if (!isFullscreen) {
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                    .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = onToggleFullscreen
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Fullscreen, "Полный экран", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+
+                    // Center Controls
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalArrangement = Arrangement.spacedBy(28.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val onPrevClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            viewModel.playerManager.playPrevious()
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onPrevClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onPrevClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SkipPrevious, "Предыдущее видео", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                        }
+
+                        val onRewindClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            exoPlayer?.let {
+                                val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
+                                it.seekTo(newPos)
+                                currentPos = newPos
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onRewindClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onRewindClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.FastRewind, "Назад", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                        }
+
+                        val onPlayPauseClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            exoPlayer?.let {
+                                if (it.isPlaying) {
+                                    it.pause()
+                                    isPlayingState = false
+                                } else {
+                                    it.play()
+                                    isPlayingState = true
+                                }
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .focusRequester(playPauseFocusRequester)
+                                .sleekTvFocus(CircleShape, onEnter = onPlayPauseClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onPlayPauseClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isPlayingState) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = "Play/Pause",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(56.dp)
+                                    .align(Alignment.Center)
+                            )
+                        }
+
+                        val onForwardClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            exoPlayer?.let {
+                                val newPos = (it.currentPosition + 10000).coerceAtMost(it.duration)
+                                it.seekTo(newPos)
+                                currentPos = newPos
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onForwardClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onForwardClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.FastForward, "Вперед", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                        }
+
+                        val onNextClick: () -> Unit = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            viewModel.playerManager.playNext()
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), CircleShape)
+                                .sleekTvFocus(CircleShape, onEnter = onNextClick)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    onClick = onNextClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SkipNext, "Следующее видео", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                        }
+                    }
+
+                    // Bottom Bar (Timeline) — для LIVE скрываем или показываем упрощённый вариант
+                    var isTimelineFocused by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(start = 32.dp, end = 32.dp, bottom = 48.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (!isLive) {
+                            Text(
+                                text = formatMillis(currentPos),
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.width(0.dp))
+                            
+                            BoxWithConstraints(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(32.dp)
+                                    .onFocusChanged { isTimelineFocused = it.isFocused }
+                                    .focusable()
+                                    .onKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown) {
+                                            when (event.key) {
+                                                Key.DirectionLeft -> {
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    exoPlayer?.let { player ->
+                                                        val seekStep = if (player.duration > 0) (player.duration / 100).coerceIn(5000L, 30000L) else 10000L
+                                                        val newPos = (player.currentPosition - seekStep).coerceAtLeast(0L)
+                                                        player.seekTo(newPos)
+                                                        currentPos = newPos
+                                                    }
+                                                    true
+                                                }
+                                                Key.DirectionRight -> {
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    exoPlayer?.let { player ->
+                                                        val seekStep = if (player.duration > 0) (player.duration / 100).coerceIn(5000L, 30000L) else 10000L
+                                                        val newPos = (player.currentPosition + seekStep).coerceAtMost(player.duration)
+                                                        player.seekTo(newPos)
+                                                        currentPos = newPos
+                                                    }
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    .pointerInput(totalDuration) {
+                                        detectTapGestures(
+                                            onTap = { offset ->
+                                                if (totalDuration > 0) {
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    exoPlayer?.let { player ->
+                                                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                        val newPos = (totalDuration * fraction).toLong()
+                                                        player.seekTo(newPos)
+                                                        currentPos = newPos
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                    .pointerInput(totalDuration) {
+                                        detectDragGestures(
+                                            onDragStart = { _ ->
+                                                lastInteractionTime = System.currentTimeMillis()
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                if (totalDuration > 0) {
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                    val newPos = (totalDuration * fraction).toLong()
+                                                    currentPos = newPos
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                exoPlayer?.let { player ->
+                                                    player.seekTo(currentPos)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    .padding(horizontal = 4.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                val progress = if (totalDuration > 0) currentPos.toFloat() / totalDuration else 0f
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(if (isTimelineFocused) 8.dp else 4.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.Gray.copy(alpha = 0.5f))
+                                )
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(progress)
+                                        .height(if (isTimelineFocused) 8.dp else 4.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Primary)
+                                )
+                                
+                                if (isTimelineFocused) {
+                                    val thumbOffset = maxWidth * progress - 8.dp
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterStart)
+                                            .offset(x = thumbOffset.coerceAtLeast(0.dp))
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                            .border(2.dp, Primary, CircleShape)
+                                    )
+                                }
+                            }
+                            
+                            Text(
+                                text = formatMillis(totalDuration),
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        } else {
+                            // Для LIVE показываем только время и статус
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Red)
+                                    )
+                                    Text(
+                                        text = "LIVE",
+                                        color = Color.Red,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = formatMillis(currentPos),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
             }
         } else if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -463,7 +1116,8 @@ fun TvRutubeVideoPlayer(
                     }
                 }
             }
-        } else if (hlsUrl != null) {
+        } else if (hlsUrl != null && !isLive) {
+            // Обычное видео (не стрим)
             AndroidView(
                 factory = { ctx ->
                     androidx.media3.ui.PlayerView(ctx).apply {
@@ -949,7 +1603,6 @@ fun TvRutubeVideoPlayer(
                         ) {
                             val progress = if (totalDuration > 0) currentPos.toFloat() / totalDuration else 0f
                             
-                            // Background track
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -958,7 +1611,6 @@ fun TvRutubeVideoPlayer(
                                     .background(Color.Gray.copy(alpha = 0.5f))
                             )
                             
-                            // Active progress track
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth(progress)
@@ -967,7 +1619,6 @@ fun TvRutubeVideoPlayer(
                                     .background(Primary)
                             )
                             
-                            // Glowing circle thumb when focused
                             if (isTimelineFocused) {
                                 val thumbOffset = maxWidth * progress - 8.dp
                                 Box(
@@ -995,5 +1646,3 @@ fun TvRutubeVideoPlayer(
         }
     }
 }
-
-
