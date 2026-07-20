@@ -55,13 +55,13 @@ class ExoPlayerHandler(private val context: Context) {
         this.currentSubtitleDelayMs = 0L
         this.isLiveStream = isLive
 
-        // Для стримов увеличиваем буферы
+        // Для стримов увеличиваем буферы (используем позиционные аргументы)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                minBufferMs = if (isLive) 64000 else 32000,
-                maxBufferMs = if (isLive) 180000 else 120000,
-                bufferForPlaybackMs = if (isLive) 5000 else 2500,
-                bufferForPlaybackAfterRebufferMs = if (isLive) 10000 else 5000
+                if (isLive) 64000 else 32000,   // minBufferMs
+                if (isLive) 180000 else 120000, // maxBufferMs
+                if (isLive) 5000 else 2500,     // bufferForPlaybackMs
+                if (isLive) 10000 else 5000     // bufferForPlaybackAfterRebufferMs
             )
             .build()
 
@@ -131,13 +131,11 @@ class ExoPlayerHandler(private val context: Context) {
                     .setUri(uri)
                     .setSubtitleConfigurations(subtitleConfigs)
 
-                if (!offlineFile.exists() && hlsUrl!!.contains(".m3u8")) {
+                if (!offlineFile.exists() && hlsUrl != null && hlsUrl!!.contains(".m3u8")) {
                     mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
                 }
 
-                // Для стримов отключаем поиск
                 if (isLive) {
-                    // Устанавливаем параметры для live-стрима
                     trackSelectionParameters = trackSelectionParameters.buildUpon()
                         .build()
                 }
@@ -153,7 +151,7 @@ class ExoPlayerHandler(private val context: Context) {
     }
 
     fun setSubtitleTrack(track: SubtitleTrack?) {
-        if (isLiveStream) return // Стримы не поддерживают субтитры через этот механизм
+        if (isLiveStream) return
         exoPlayer?.let { player ->
             if (track == null) {
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -169,7 +167,7 @@ class ExoPlayerHandler(private val context: Context) {
     }
 
     fun setSubtitleDelayMs(delayMs: Long) {
-        if (isLiveStream) return // Стримы не поддерживают задержку субтитров
+        if (isLiveStream) return
         currentSubtitleDelayMs = delayMs
         shiftingJob?.cancel()
         shiftingJob = scope.launch {
@@ -220,7 +218,7 @@ class ExoPlayerHandler(private val context: Context) {
                 .setUri(uri)
                 .setSubtitleConfigurations(newSubtitleConfigs)
             
-            if (originalOfflineFile?.exists() != true && originalHlsUrl?.contains(".m3u8") == true) {
+            if (originalOfflineFile?.exists() != true && originalHlsUrl != null && originalHlsUrl!!.contains(".m3u8")) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
             }
             
