@@ -8,7 +8,6 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
-import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -33,6 +32,7 @@ class ExoPlayerHandler(private val context: Context) {
     private var originalOfflineFile: File? = null
     private var originalSubtitles: List<SubtitleTrack> = emptyList()
     private var currentSubtitleDelayMs: Long = 0L
+    private var isLiveStream: Boolean = false
 
     private val scope = CoroutineScope(Dispatchers.Main)
     private val okHttpClient = OkHttpClient()
@@ -43,18 +43,26 @@ class ExoPlayerHandler(private val context: Context) {
         offlineFile: File,
         subtitles: List<SubtitleTrack>,
         isPlayingState: Boolean,
-        initialPosition: Long
+        initialPosition: Long,
+        isLive: Boolean = false
     ): ExoPlayer {
-        Log.d("ExoPlayerHandler", "Initializing player: hlsUrl=$hlsUrl, offlineFile=${offlineFile.exists()}, isPlaying=$isPlayingState")
-        release() // Always release any existing player before creating a new one
+        Log.d("ExoPlayerHandler", "Initializing player: hlsUrl=$hlsUrl, offlineFile=${offlineFile.exists()}, isPlaying=$isPlayingState, isLive=$isLive")
+        release()
 
         this.originalHlsUrl = hlsUrl
         this.originalOfflineFile = offlineFile
         this.originalSubtitles = subtitles
         this.currentSubtitleDelayMs = 0L
+        this.isLiveStream = isLive
 
+        // Для стримов увеличиваем буферы
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(32000, 120000, 2500, 5000)
+            .setBufferDurationsMs(
+                minBufferMs = if (isLive) 64000 else 32000,
+                maxBufferMs = if (isLive) 180000 else 120000,
+                bufferForPlaybackMs = if (isLive) 5000 else 2500,
+                bufferForPlaybackAfterRebufferMs = if (isLive) 10000 else 5000
+            )
             .build()
 
         val audioAttributes = AudioAttributes.Builder()
@@ -98,20 +106,25 @@ class ExoPlayerHandler(private val context: Context) {
                     .setForceHighestSupportedBitrate(true)
                     .build()
                 playWhenReady = isPlayingState
+                
                 val uri = if (offlineFile.exists()) {
                     Uri.fromFile(offlineFile)
                 } else {
                     Uri.parse(hlsUrl)
                 }
 
-                val subtitleConfigs = subtitles.map { track ->
-                    val isVtt = track.format.lowercase().contains("vtt") || track.url.lowercase().contains(".vtt")
-                    val mimeType = if (isVtt) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
-                    MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.url))
-                        .setMimeType(mimeType)
-                        .setLanguage(getBcp47Language(track.language))
-                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                        .build()
+                val subtitleConfigs = if (!isLive) {
+                    subtitles.map { track ->
+                        val isVtt = track.format.lowercase().contains("vtt") || track.url.lowercase().contains(".vtt")
+                        val mimeType = if (isVtt) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
+                        MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.url))
+                            .setMimeType(mimeType)
+                            .setLanguage(getBcp47Language(track.language))
+                            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                            .build()
+                    }
+                } else {
+                    emptyList()
                 }
 
                 val mediaItemBuilder = MediaItem.Builder()
@@ -122,10 +135,17 @@ class ExoPlayerHandler(private val context: Context) {
                     mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
                 }
 
+                // Для стримов отключаем поиск
+                if (isLive) {
+                    // Устанавливаем параметры для live-стрима
+                    trackSelectionParameters = trackSelectionParameters.buildUpon()
+                        .build()
+                }
+
                 setMediaItem(mediaItemBuilder.build())
                 prepare()
                 play()
-                if (initialPosition > 0L) {
+                if (initialPosition > 0L && !isLive) {
                     seekTo(initialPosition)
                 }
             }
@@ -133,6 +153,7 @@ class ExoPlayerHandler(private val context: Context) {
     }
 
     fun setSubtitleTrack(track: SubtitleTrack?) {
+        if (isLiveStream) return // Стримы не поддерживают субтитры через этот механизм
         exoPlayer?.let { player ->
             if (track == null) {
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -148,6 +169,7 @@ class ExoPlayerHandler(private val context: Context) {
     }
 
     fun setSubtitleDelayMs(delayMs: Long) {
+        if (isLiveStream) return // Стримы не поддерживают задержку субтитров
         currentSubtitleDelayMs = delayMs
         shiftingJob?.cancel()
         shiftingJob = scope.launch {
