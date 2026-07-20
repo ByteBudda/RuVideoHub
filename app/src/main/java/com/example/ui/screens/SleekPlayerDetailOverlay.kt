@@ -141,8 +141,12 @@ fun SleekPlayerDetailOverlay(
 
     val playerContent = remember(video.id) {
         androidx.compose.runtime.movableContentOf<Boolean, Boolean, VlcAspectRatio> { isMini, isFull, aspect ->
+            // ============================================================
+            // ИСПРАВЛЕНО: добавлена проверка duration == "0"
+            // ============================================================
             val isLiveStream = video.duration == "ЭФИР" || 
                               video.duration == "00:00" || 
+                              video.duration == "0" ||  // ← ДОБАВЛЕНО
                               video.duration.isBlank() || 
                               video.duration.contains(":") == false ||
                               video.duration.equals("трансляция", ignoreCase = true) || 
