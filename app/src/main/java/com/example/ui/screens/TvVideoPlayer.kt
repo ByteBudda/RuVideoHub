@@ -1018,6 +1018,7 @@ fun TvRutubeVideoPlayer(
             // ============================================================
             // EMBED ПЛЕЕР — ИСПРАВЛЕННАЯ ВЕРСИЯ
             // ============================================================
+            val coroutineScope = rememberCoroutineScope()
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1202,7 +1203,7 @@ fun TvRutubeVideoPlayer(
                             useEmbedPlayer = false
                             hlsUrl = null
                             isLoading = true
-                            viewModel.viewModelScope.launch {
+                            coroutineScope.launch {
                                 try {
                                     val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
                                     if (url != null && url.isNotBlank() && url.contains(".m3u8")) {
