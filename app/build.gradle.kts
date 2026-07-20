@@ -17,8 +17,8 @@ android {
     applicationId = "com.ruvideohub.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 10
-    versionName = "3.5.74 release"
+    versionCode = 11
+    versionName = "3.5.75 release"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
