@@ -132,9 +132,6 @@ fun RutubeVideoPlayer(
     var subtitleDelayMs by remember(videoId) { mutableStateOf(0L) }
     var subtitleMenuExpanded by remember { mutableStateOf(false) }
 
-    // ============================================================
-    // УНИВЕРСАЛЬНАЯ ЗАГРУЗКА: HLS для всех, embed как fallback
-    // ============================================================
     LaunchedEffect(videoId, selectedQuality, retryTrigger) {
         isLoading = true
         loadError = null
@@ -142,19 +139,16 @@ fun RutubeVideoPlayer(
         isLiveStreamReady = false
 
         try {
-            // 1. Проверяем офлайн-файл
             if (offlineFile.exists()) {
                 hlsUrl = offlineFile.absolutePath
                 isLoading = false
                 return@LaunchedEffect
             }
 
-            // 2. Очищаем кэш при повторной попытке
             if (retryTrigger > 0) {
                 viewModel.clearHlsCache(videoId)
             }
 
-            // 3. Пробуем получить HLS поток (работает и для LIVE, и для обычных видео)
             val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
 
             if (url != null && url.isNotBlank() && url.contains(".m3u8")) {
@@ -162,12 +156,10 @@ fun RutubeVideoPlayer(
                 if (isLive) isLiveStreamReady = true
                 isLoading = false
             } else {
-                // 4. HLS не получен — пробуем embed-плеер
                 useEmbedPlayer = true
                 isLoading = false
             }
         } catch (e: Exception) {
-            // 5. Ошибка — пробуем embed-плеер
             android.util.Log.e("VideoPlayer", "HLS fetch error", e)
             useEmbedPlayer = true
             isLoading = false
@@ -325,7 +317,7 @@ fun RutubeVideoPlayer(
                                 }
                                 true
                             } else {
-                                false // let it pass to focused button if any
+                                false
                             }
                         }
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
@@ -739,35 +731,16 @@ fun RutubeVideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // LIVE badge overlay
+            // LIVE indicator — маленький красный кружок
             if (isLive) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(16.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Red.copy(alpha = 0.85f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Color.White)
-                        )
-                        Text(
-                            text = "LIVE",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
+                        .padding(12.dp)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color.Red)
+                )
             }
 
             PlayerGestureOverlay(
@@ -884,21 +857,6 @@ fun RutubeVideoPlayer(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            if (isLive) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color.Red)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "LIVE",
-                                        color = Color.White,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
                         }
 
                         // Right actions (Aspect ratio, Quality & Share)
@@ -1168,7 +1126,7 @@ fun RutubeVideoPlayer(
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
-                            ) {}, // consume clicks to avoid hiding controls
+                            ) {},
                         horizontalArrangement = Arrangement.spacedBy(20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1294,7 +1252,7 @@ fun RutubeVideoPlayer(
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
-                            ) {} // Consume touch events
+                            ) {}
                     ) {
                         // Progress Slider Row (скрываем для LIVE)
                         if (!isLive) {
@@ -1430,7 +1388,7 @@ fun RutubeVideoPlayer(
                                 }
                             }
                         } else {
-                            // Для LIVE показываем просто время в эфире
+                            // Для LIVE — только время в эфире
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1438,12 +1396,6 @@ fun RutubeVideoPlayer(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "● LIVE",
-                                    color = Color.Red,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
                                 Text(
                                     text = formatMillis(currentPos),
                                     color = Color.White.copy(alpha = 0.7f),
