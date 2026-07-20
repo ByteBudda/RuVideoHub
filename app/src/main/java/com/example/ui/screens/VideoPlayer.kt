@@ -132,62 +132,44 @@ fun RutubeVideoPlayer(
     var subtitleDelayMs by remember(videoId) { mutableStateOf(0L) }
     var subtitleMenuExpanded by remember { mutableStateOf(false) }
 
+    // ============================================================
+    // УНИВЕРСАЛЬНАЯ ЗАГРУЗКА: HLS для всех, embed как fallback
+    // ============================================================
     LaunchedEffect(videoId, selectedQuality, retryTrigger) {
         isLoading = true
         loadError = null
         useEmbedPlayer = false
         isLiveStreamReady = false
-        
-        // Для прямых эфиров — пробуем получить HLS поток
-        if (isLive) {
-            try {
-                val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-                if (url != null && url.contains(".m3u8")) {
-                    hlsUrl = url
-                    isLiveStreamReady = true
-                    isLoading = false
-                } else {
-                    // Fallback на embed плеер
-                    useEmbedPlayer = true
-                    isLoading = false
-                }
-            } catch (e: Exception) {
-                // Если HLS не получился — используем embed
+
+        try {
+            // 1. Проверяем офлайн-файл
+            if (offlineFile.exists()) {
+                hlsUrl = offlineFile.absolutePath
+                isLoading = false
+                return@LaunchedEffect
+            }
+
+            // 2. Очищаем кэш при повторной попытке
+            if (retryTrigger > 0) {
+                viewModel.clearHlsCache(videoId)
+            }
+
+            // 3. Пробуем получить HLS поток (работает и для LIVE, и для обычных видео)
+            val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+
+            if (url != null && url.isNotBlank() && url.contains(".m3u8")) {
+                hlsUrl = url
+                if (isLive) isLiveStreamReady = true
+                isLoading = false
+            } else {
+                // 4. HLS не получен — пробуем embed-плеер
                 useEmbedPlayer = true
                 isLoading = false
             }
-            return@LaunchedEffect
-        }
-
-        // Обычное видео
-        isLoading = true
-        loadError = null
-        useEmbedPlayer = false
-
-        // Fetch subtitles and stream URL in parallel
-        val subsDeferred = async {
-            viewModel.fetchSubtitles(videoId)
-        }
-        val urlDeferred = async {
-            if (offlineFile.exists()) {
-                offlineFile.absolutePath
-            } else {
-                if (retryTrigger > 0) {
-                    viewModel.clearHlsCache(videoId)
-                }
-                viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-            }
-        }
-
-        val loadedSubs = try { subsDeferred.await() } catch (e: Exception) { emptyList() }
-        val resolvedUrl = try { urlDeferred.await() } catch (e: Exception) { null }
-
-        subtitles = loadedSubs
-        if (resolvedUrl != null) {
-            hlsUrl = resolvedUrl
-            isLoading = false
-        } else {
-            loadError = "Видео недоступно или не может быть воспроизведено напрямую."
+        } catch (e: Exception) {
+            // 5. Ошибка — пробуем embed-плеер
+            android.util.Log.e("VideoPlayer", "HLS fetch error", e)
+            useEmbedPlayer = true
             isLoading = false
         }
     }
@@ -235,7 +217,7 @@ fun RutubeVideoPlayer(
             exoPlayer?.let { player ->
                 val pos = player.currentPosition
                 val dur = player.duration.coerceAtLeast(0L)
-                if (pos > 0L) {
+                if (pos > 0L && !isLive) {
                     viewModel.saveVideoPosition(videoId, pos, dur)
                 }
             }
@@ -297,7 +279,7 @@ fun RutubeVideoPlayer(
             exoPlayer?.let { player ->
                 val pos = player.currentPosition
                 val dur = player.duration.coerceAtLeast(0L)
-                if (pos > 0L) {
+                if (pos > 0L && !isLive) {
                     viewModel.saveVideoPosition(videoId, pos, dur)
                 }
             }
@@ -314,7 +296,7 @@ fun RutubeVideoPlayer(
                 if (pos > 0L) {
                     currentPos = pos
                     totalDuration = dur
-                    if (Math.abs(pos - lastSavedPos) >= 5000L) {
+                    if (Math.abs(pos - lastSavedPos) >= 5000L && !isLive) {
                         viewModel.saveVideoPosition(videoId, pos, dur)
                         lastSavedPos = pos
                     }
@@ -621,7 +603,8 @@ fun RutubeVideoPlayer(
                         onClick = { 
                             useEmbedPlayer = false 
                             hlsUrl = null 
-                            loadError = "Переключен назад на стандартный плеер." 
+                            retryTrigger++
+                            loadError = null
                         },
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.6f), CircleShape)
@@ -630,7 +613,7 @@ fun RutubeVideoPlayer(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Стандартный плеер",
+                            contentDescription = "Попробовать HLS",
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
@@ -674,6 +657,17 @@ fun RutubeVideoPlayer(
                         modifier = Modifier.height(32.dp)
                     ) {
                         Text("Повторить", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = {
+                            useEmbedPlayer = true
+                            loadError = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Embed-плеер", fontSize = 11.sp)
                     }
                 }
             }
@@ -966,7 +960,7 @@ fun RutubeVideoPlayer(
                                 }
                             }
 
-                            if (subtitles.isNotEmpty()) {
+                            if (subtitles.isNotEmpty() && !isLive) {
                                 Box {
                                     Button(
                                         onClick = {
@@ -1078,53 +1072,55 @@ fun RutubeVideoPlayer(
                                 }
                             }
 
-                            // Speed selection
-                            var speedMenuExpanded by remember { mutableStateOf(false) }
-                            val availableSpeeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                            // Speed selection (скрываем для LIVE)
+                            if (!isLive) {
+                                var speedMenuExpanded by remember { mutableStateOf(false) }
+                                val availableSpeeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
 
-                            Box {
-                                Button(
-                                    onClick = {
-                                        lastInteractionTime = System.currentTimeMillis()
-                                        speedMenuExpanded = true
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp)).testTag("player_speed_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Speed,
-                                        contentDescription = "Скорость воспроизведения",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (playbackSpeed == 1.0f) "1x" else "${playbackSpeed}x", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                DropdownMenu(
-                                    expanded = speedMenuExpanded,
-                                    onDismissRequest = { speedMenuExpanded = false },
-                                    modifier = Modifier.background(MaterialTheme.colorScheme.background)
-                                ) {
-                                    availableSpeeds.forEach { speed ->
-                                        DropdownMenuItem(
-                                            text = { 
-                                                Text(
-                                                    text = if (speed == 1.0f) "Обычная" else "${speed}x", 
-                                                    color = if (playbackSpeed == speed) Primary else MaterialTheme.colorScheme.onBackground,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = if (playbackSpeed == speed) FontWeight.Bold else FontWeight.Normal
-                                                ) 
-                                            },
-                                            onClick = {
-                                                playbackSpeed = speed
-                                                speedMenuExpanded = false
-                                                lastInteractionTime = System.currentTimeMillis()
-                                            },
-                                            modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                Box {
+                                    Button(
+                                        onClick = {
+                                            lastInteractionTime = System.currentTimeMillis()
+                                            speedMenuExpanded = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(28.dp).sleekTvFocus(RoundedCornerShape(8.dp)).testTag("player_speed_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = "Скорость воспроизведения",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
                                         )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(if (playbackSpeed == 1.0f) "1x" else "${playbackSpeed}x", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = speedMenuExpanded,
+                                        onDismissRequest = { speedMenuExpanded = false },
+                                        modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                                    ) {
+                                        availableSpeeds.forEach { speed ->
+                                            DropdownMenuItem(
+                                                text = { 
+                                                    Text(
+                                                        text = if (speed == 1.0f) "Обычная" else "${speed}x", 
+                                                        color = if (playbackSpeed == speed) Primary else MaterialTheme.colorScheme.onBackground,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = if (playbackSpeed == speed) FontWeight.Bold else FontWeight.Normal
+                                                    ) 
+                                                },
+                                                onClick = {
+                                                    playbackSpeed = speed
+                                                    speedMenuExpanded = false
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                },
+                                                modifier = Modifier.sleekTvFocus(RoundedCornerShape(4.dp))
+                                            )
+                                        }
                                     }
                                 }
                             }
