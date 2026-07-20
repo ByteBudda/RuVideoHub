@@ -30,6 +30,61 @@ object YtDlpDownloader {
         }
     }
 
+    /**
+     * Извлекает прямую ссылку на HLS-поток из JSON-ответа /api/play/options/
+     * Поддерживает обычные видео, стримы (live_streams) и видео с video_balancer
+     */
+    fun extractStreamUrlFromPlayOptions(json: JSONObject): String? {
+        // 1. Проверяем live_streams (для прямых эфиров)
+        json.optJSONObject("live_streams")?.let { liveStreams ->
+            // Пробуем hls массив
+            liveStreams.optJSONArray("hls")?.let { hlsArray ->
+                if (hlsArray.length() > 0) {
+                    val firstHls = hlsArray.getJSONObject(0)
+                    firstHls.optString("url").takeIf { it.isNotBlank() }?.let { return it }
+                }
+            }
+            // Пробуем прямые поля
+            listOf("hls", "m3u8", "url", "default").forEach { key ->
+                liveStreams.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 2. Проверяем video_balancer (для обычных видео)
+        json.optJSONObject("video_balancer")?.let { vb ->
+            listOf("m3u8", "hls", "default", "url").forEach { key ->
+                vb.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 3. Проверяем корневые поля
+        listOf("hls_url", "stream_url", "m3u8", "url", "video_url").forEach { key ->
+            json.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+        }
+
+        // 4. Рекурсивный поиск по всем полям JSON (запасной вариант)
+        fun searchInJson(obj: JSONObject, depth: Int = 0): String? {
+            if (depth > 3) return null
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = obj.opt(key)
+                when (value) {
+                    is String -> {
+                        if (value.contains(".m3u8") && value.startsWith("http")) {
+                            return value
+                        }
+                    }
+                    is JSONObject -> {
+                        searchInJson(value, depth + 1)?.let { return it }
+                    }
+                }
+            }
+            return null
+        }
+        return searchInJson(json)
+    }
+
     suspend fun startYtDlpDownload(
         application: Application,
         video: Video,
@@ -108,6 +163,8 @@ object YtDlpDownloader {
             delay(600)
             
             var extractedStreamUrl: String? = null
+            
+            // Проверка на manual URL (для плагинов)
             if (video.id.startsWith("manual_") && video.description.startsWith("http")) {
                 extractedStreamUrl = video.description
                 log("[download] Bypassing Rutube web options extraction. Loading direct stream: ${extractedStreamUrl.take(60)}...")
@@ -118,43 +175,35 @@ object YtDlpDownloader {
                     val playOptionsBody = playOptionsResponse.string()
                     val jsonObject = JSONObject(playOptionsBody)
                     
-                    val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
-                    if (videoBalancerObj != null) {
-                        extractedStreamUrl = videoBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
-                            ?: videoBalancerObj.optString("default").takeIf { it.isNotBlank() }
+                    // Используем улучшенную функцию извлечения
+                    extractedStreamUrl = extractStreamUrlFromPlayOptions(jsonObject)
+                    
+                    if (extractedStreamUrl.isNullOrBlank()) {
+                        log("[rutube] Warning: No stream URL found in play options, trying alternative endpoints...")
+                        
+                        // Пробуем альтернативный эндпоинт для стримов
+                        try {
+                            val liveResponse = apiService.getDynamicUrl("https://rutube.ru/api/play/live/$id/?format=json")
+                            val liveBody = liveResponse.string()
+                            val liveJson = JSONObject(liveBody)
+                            extractedStreamUrl = extractStreamUrlFromPlayOptions(liveJson)
+                        } catch (e: Exception) {
+                            // Игнорируем, это просто fallback
+                        }
                     }
                     
                     if (extractedStreamUrl.isNullOrBlank()) {
-                        val liveBalancerObj = jsonObject.optJSONObject("live_balancer") ?: jsonObject.optJSONObject("live_streams")
-                        if (liveBalancerObj != null) {
-                            extractedStreamUrl = liveBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
-                                ?: liveBalancerObj.optString("default").takeIf { it.isNotBlank() }
-                        }
-                    }
-
-                    if (extractedStreamUrl.isNullOrBlank()) {
-                        val keys = jsonObject.keys()
-                        while (keys.hasNext()) {
-                            val key = keys.next()
-                            val value = jsonObject.opt(key)
-                            if (value is String && value.contains(".m3u8")) {
-                                extractedStreamUrl = value
-                                break
-                            } else if (value is JSONObject) {
-                                val subKeys = value.keys()
-                                while (subKeys.hasNext()) {
-                                    val sk = subKeys.next()
-                                    val sv = value.opt(sk)
-                                    if (sv is String && sv.contains(".m3u8")) {
-                                        extractedStreamUrl = sv
-                                        break
-                                    }
-                                }
-                            }
+                        log("[rutube] Warning: Trying legacy video_balancer parsing...")
+                        // Старая логика для обратной совместимости
+                        val videoBalancerObj = jsonObject.optJSONObject("video_balancer")
+                        if (videoBalancerObj != null) {
+                            extractedStreamUrl = videoBalancerObj.optString("m3u8").takeIf { it.isNotBlank() }
+                                ?: videoBalancerObj.optString("default").takeIf { it.isNotBlank() }
                         }
                     }
                 } catch (ex: Exception) {
-                    log("[rutube] Warning: video balancer URL parsing fallback to default stream.")
+                    log("[rutube] Warning: Play options parsing failed: ${ex.message}")
+                    log("[rutube] Falling back to legacy stream detection...")
                 }
             }
 
