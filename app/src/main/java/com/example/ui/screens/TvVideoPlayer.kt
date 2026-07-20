@@ -112,55 +112,39 @@ fun TvRutubeVideoPlayer(
         }
     }
 
+    // ============================================================
+    // УНИВЕРСАЛЬНАЯ ЗАГРУЗКА: HLS для всех, embed как fallback
+    // ============================================================
     LaunchedEffect(videoId, selectedQuality) {
         isLoading = true
         loadError = null
         useEmbedPlayer = false
         isLiveStreamReady = false
 
-        if (isLive) {
-            try {
-                val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-                if (url != null && url.contains(".m3u8")) {
-                    hlsUrl = url
-                    isLiveStreamReady = true
-                    isLoading = false
-                } else {
-                    useEmbedPlayer = true
-                    isLoading = false
-                }
-            } catch (e: Exception) {
+        try {
+            // 1. Проверяем офлайн-файл
+            if (offlineFile.exists()) {
+                hlsUrl = offlineFile.absolutePath
+                isLoading = false
+                return@LaunchedEffect
+            }
+
+            // 2. Пробуем получить HLS поток (работает и для LIVE, и для обычных видео)
+            val url = viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+
+            if (url != null && url.isNotBlank() && url.contains(".m3u8")) {
+                hlsUrl = url
+                if (isLive) isLiveStreamReady = true
+                isLoading = false
+            } else {
+                // 3. HLS не получен — пробуем embed-плеер
                 useEmbedPlayer = true
                 isLoading = false
             }
-            return@LaunchedEffect
-        }
-
-        isLoading = true
-        loadError = null
-        useEmbedPlayer = false
-
-        // Fetch subtitles and stream URL in parallel
-        val subsDeferred = async {
-            viewModel.fetchSubtitles(videoId)
-        }
-        val urlDeferred = async {
-            if (offlineFile.exists()) {
-                offlineFile.absolutePath
-            } else {
-                viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
-            }
-        }
-
-        val loadedSubs = try { subsDeferred.await() } catch (e: Exception) { emptyList() }
-        val resolvedUrl = try { urlDeferred.await() } catch (e: Exception) { null }
-
-        subtitles = loadedSubs
-        if (resolvedUrl != null) {
-            hlsUrl = resolvedUrl
-            isLoading = false
-        } else {
-            loadError = "Видео недоступно"
+        } catch (e: Exception) {
+            // 4. Ошибка — пробуем embed-плеер
+            android.util.Log.e("TvVideoPlayer", "HLS fetch error", e)
+            useEmbedPlayer = true
             isLoading = false
         }
     }
@@ -208,7 +192,7 @@ fun TvRutubeVideoPlayer(
             exoPlayer?.let { player ->
                 val pos = player.currentPosition
                 val dur = player.duration.coerceAtLeast(0L)
-                if (pos > 0L) {
+                if (pos > 0L && !isLive) {
                     viewModel.saveVideoPosition(videoId, pos, dur)
                 }
             }
@@ -252,7 +236,7 @@ fun TvRutubeVideoPlayer(
             exoPlayer?.let { player ->
                 val pos = player.currentPosition
                 val dur = player.duration.coerceAtLeast(0L)
-                if (pos > 0L) {
+                if (pos > 0L && !isLive) {
                     viewModel.saveVideoPosition(videoId, pos, dur)
                 }
             }
@@ -267,7 +251,7 @@ fun TvRutubeVideoPlayer(
             if (pos > 0L) {
                 currentPos = pos
                 totalDuration = dur
-                if (Math.abs(pos - lastSavedPos) >= 5000L) {
+                if (Math.abs(pos - lastSavedPos) >= 5000L && !isLive) {
                     viewModel.saveVideoPosition(videoId, pos, dur)
                     lastSavedPos = pos
                 }
@@ -415,8 +399,7 @@ fun TvRutubeVideoPlayer(
                 }
             }
         } else if (isLive && isLiveStreamReady && hlsUrl != null) {
-            // Стрим воспроизводится через ExoPlayer как обычное видео
-            // Код для воспроизведения hlsUrl (такой же как для обычных видео)
+            // Стрим воспроизводится через ExoPlayer
             AndroidView(
                 factory = { ctx ->
                     androidx.media3.ui.PlayerView(ctx).apply {
@@ -1032,87 +1015,296 @@ fun TvRutubeVideoPlayer(
                 CircularProgressIndicator(color = Primary, modifier = Modifier.size(64.dp))
             }
         } else if (useEmbedPlayer) {
-            AndroidView(
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        webChromeClient = WebChromeClient()
-                        webViewClient = WebViewClient()
-                        if (isMiniPlayer) {
-                            isFocusable = false
-                            isFocusableInTouchMode = false
-                        }
-                        val url = if (videoId.startsWith("vk_")) {
-                            val parts = videoId.substringAfter("vk_").split("_")
-                            if (parts.size >= 2) {
-                                val ownerId = parts[0]
-                                val vkId = parts[1]
-                                "https://vk.com/video_ext.php?oid=$ownerId&id=$vkId&autoplay=1"
-                            } else {
-                                "https://vk.com/video_ext.php?oid=$videoId&id=$videoId&autoplay=1"
-                            }
-                        } else if (videoId.startsWith("plugin_")) {
-                            viewModel.getPluginPageUrl(videoId) ?: "about:blank"
-                        } else {
-                            "https://rutube.ru/play/embed/$videoId/?autoplay=1"
-                        }
-                        loadUrl(url)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
-            )
-            
+            // ============================================================
+            // EMBED ПЛЕЕР — ИСПРАВЛЕННАЯ ВЕРСИЯ
+            // ============================================================
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
-                                if (latestIsMiniPlayer) {
-                                    latestOnToggleFullscreen()
-                                } else {
-                                    controlsVisible = !controlsVisible
-                                    lastInteractionTime = System.currentTimeMillis()
-                                }
-                            },
-                            onDoubleTap = {
-                                if (latestIsMiniPlayer) {
-                                    latestOnToggleFullscreen()
-                                } else {
-                                    controlsVisible = !controlsVisible
-                                    lastInteractionTime = System.currentTimeMillis()
+                    .background(Color.Black)
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            settings.apply {
+                                javaScriptEnabled = true
+                                domStorageEnabled = true
+                                mediaPlaybackRequiresUserGesture = false
+                                useWideViewPort = true
+                                loadWithOverviewMode = true
+                                setSupportZoom(false)
+                                builtInZoomControls = false
+                            }
+                            webChromeClient = WebChromeClient()
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    // Принудительно растягиваем контент на весь экран
+                                    view?.evaluateJavascript(
+                                        """
+                                        (function() {
+                                            // Стили для полного заполнения экрана
+                                            var style = document.getElementById('tv-player-style');
+                                            if (!style) {
+                                                style = document.createElement('style');
+                                                style.id = 'tv-player-style';
+                                                document.head.appendChild(style);
+                                            }
+                                            style.innerHTML = `
+                                                * { margin: 0 !important; padding: 0 !important; }
+                                                html, body, iframe, video, object, embed, 
+                                                .player-container, .video-player, #player, 
+                                                [id*="player"], [class*="player"],
+                                                [id*="video"], [class*="video"],
+                                                [id*="embed"], [class*="embed"] {
+                                                    width: 100% !important;
+                                                    height: 100% !important;
+                                                    max-width: 100% !important;
+                                                    max-height: 100% !important;
+                                                    min-width: 100% !important;
+                                                    min-height: 100% !important;
+                                                    position: absolute !important;
+                                                    top: 0 !important;
+                                                    left: 0 !important;
+                                                    margin: 0 !important;
+                                                    padding: 0 !important;
+                                                    border: none !important;
+                                                    overflow: hidden !important;
+                                                }
+                                                body { 
+                                                    background: #000 !important;
+                                                    display: flex !important;
+                                                    align-items: center !important;
+                                                    justify-content: center !important;
+                                                }
+                                            `;
+                                            window.dispatchEvent(new Event('resize'));
+                                            
+                                            // Автозапуск
+                                            var playAttempts = 0;
+                                            function tryPlay() {
+                                                var video = document.querySelector('video');
+                                                if (video && !video.paused) {
+                                                    return;
+                                                }
+                                                if (video) {
+                                                    video.muted = false;
+                                                    video.play().catch(function(e) {});
+                                                }
+                                                var btns = document.querySelectorAll('[class*="play"], [id*="play"], .wdp-play-button, .video_box_prep');
+                                                for (var i = 0; i < btns.length; i++) {
+                                                    var btn = btns[i];
+                                                    var text = (btn.className + " " + btn.id).toLowerCase();
+                                                    if (text.indexOf('pause') === -1) {
+                                                        try { btn.click(); } catch(e) {}
+                                                    }
+                                                }
+                                                if (playAttempts < 10) {
+                                                    playAttempts++;
+                                                    setTimeout(tryPlay, 600);
+                                                }
+                                            }
+                                            setTimeout(tryPlay, 400);
+                                        })();
+                                        """.trimIndent(), null
+                                    )
                                 }
                             }
+                            if (isMiniPlayer) {
+                                isFocusable = false
+                                isFocusableInTouchMode = false
+                            }
+                            val embedUrl = if (videoId.startsWith("vk_")) {
+                                val parts = videoId.substringAfter("vk_").split("_")
+                                if (parts.size >= 2) {
+                                    val ownerId = parts[0]
+                                    val vkId = parts[1]
+                                    "https://vk.com/video_ext.php?oid=$ownerId&id=$vkId&autoplay=1"
+                                } else {
+                                    "https://vk.com/video_ext.php?oid=$videoId&id=$videoId&autoplay=1"
+                                }
+                            } else if (videoId.startsWith("plugin_")) {
+                                viewModel.getPluginPageUrl(videoId) ?: "about:blank"
+                            } else {
+                                "https://rutube.ru/play/embed/$videoId/?autoplay=1"
+                            }
+                            loadUrl(embedUrl)
+                        }
+                    },
+                    update = { webView ->
+                        // Принудительно обновляем размеры при каждом обновлении
+                        webView.layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                    }
-            )
-            
-            AnimatedVisibility(
-                visible = controlsVisible && !isMiniPlayer,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                        webView.requestLayout()
+                        webView.invalidate()
+                        
+                        webView.post {
+                            webView.requestLayout()
+                            webView.invalidate()
+                            // Перезапускаем скрипт растяжения
+                            webView.evaluateJavascript(
+                                """
+                                (function() {
+                                    var style = document.getElementById('tv-player-style');
+                                    if (!style) {
+                                        style = document.createElement('style');
+                                        style.id = 'tv-player-style';
+                                        document.head.appendChild(style);
+                                    }
+                                    style.innerHTML = `
+                                        * { margin: 0 !important; padding: 0 !important; }
+                                        html, body, iframe, video, object, embed, 
+                                        .player-container, .video-player, #player, 
+                                        [id*="player"], [class*="player"],
+                                        [id*="video"], [class*="video"],
+                                        [id*="embed"], [class*="embed"] {
+                                            width: 100% !important;
+                                            height: 100% !important;
+                                            max-width: 100% !important;
+                                            max-height: 100% !important;
+                                            min-width: 100% !important;
+                                            min-height: 100% !important;
+                                            position: absolute !important;
+                                            top: 0 !important;
+                                            left: 0 !important;
+                                            margin: 0 !important;
+                                            padding: 0 !important;
+                                            border: none !important;
+                                            overflow: hidden !important;
+                                        }
+                                        body { 
+                                            background: #000 !important;
+                                            display: flex !important;
+                                            align-items: center !important;
+                                            justify-content: center !important;
+                                        }
+                                    `;
+                                    window.dispatchEvent(new Event('resize'));
+                                })();
+                                """.trimIndent(), null
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
+                )
+                
+                // Кнопка переключения на HLS
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
                     IconButton(
-                        onClick = onToggleFullscreen,
+                        onClick = {
+                            useEmbedPlayer = false
+                            hlsUrl = null
+                            isLoading = true
+                            // Повторная попытка получить HLS
+                            viewModel.clearHlsCache(videoId)
+                            viewModel.fetchHlsStreamUrl(videoId, selectedQuality)
+                            isLoading = false
+                        },
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(24.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                            .size(56.dp)
-                            .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
+                            .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                            .size(48.dp)
+                            .sleekTvFocus(CircleShape)
                     ) {
                         Icon(
-                            imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                            contentDescription = "Полный экран",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(32.dp)
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Попробовать HLS",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
+                    }
+                }
+                
+                // LIVE badge если нужно
+                if (isLive) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(16.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.Red.copy(alpha = 0.85f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                            )
+                            Text(
+                                text = "LIVE",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (latestIsMiniPlayer) {
+                                        latestOnToggleFullscreen()
+                                    } else {
+                                        controlsVisible = !controlsVisible
+                                        lastInteractionTime = System.currentTimeMillis()
+                                    }
+                                },
+                                onDoubleTap = {
+                                    if (latestIsMiniPlayer) {
+                                        latestOnToggleFullscreen()
+                                    } else {
+                                        controlsVisible = !controlsVisible
+                                        lastInteractionTime = System.currentTimeMillis()
+                                    }
+                                }
+                            )
+                        }
+                )
+                
+                AnimatedVisibility(
+                    visible = controlsVisible && !isMiniPlayer,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        IconButton(
+                            onClick = onToggleFullscreen,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(24.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                                .size(56.dp)
+                                .sleekTvFocus(CircleShape, onEnter = onToggleFullscreen)
+                        ) {
+                            Icon(
+                                imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                contentDescription = "Полный экран",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             }
