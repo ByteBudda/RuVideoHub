@@ -434,33 +434,16 @@ fun TvRutubeVideoPlayer(
                     .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
             )
             
-            // LIVE badge overlay
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(16.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.Red.copy(alpha = 0.85f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                    )
-                    Text(
-                        text = "LIVE",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                }
+            // LIVE indicator — маленький красный кружок
+            if (isLive) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(Color.Red)
+                )
             }
             
             Box(
@@ -549,21 +532,7 @@ fun TvRutubeVideoPlayer(
                                 maxLines = 1,
                                 modifier = Modifier.weight(1f)
                             )
-                            if (isLive) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color.Red)
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "LIVE",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+                            // ❌ УДАЛЁН БЛОК С "LIVE" РЯДОМ С НАЗВАНИЕМ
                         }
                         
                         val isVkOrDzen = videoId.startsWith("vk_") || videoId.startsWith("plugin_Дзен_")
@@ -844,7 +813,7 @@ fun TvRutubeVideoPlayer(
                         }
                     }
 
-                    // Bottom Bar (Timeline) — для LIVE скрываем или показываем упрощённый вариант
+                    // Bottom Bar (Timeline) — для LIVE только время
                     var isTimelineFocused by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
@@ -976,29 +945,12 @@ fun TvRutubeVideoPlayer(
                                 fontWeight = FontWeight.Medium
                             )
                         } else {
-                            // Для LIVE показываем только время и статус
+                            // Для LIVE — только время, без "● LIVE"
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clip(CircleShape)
-                                            .background(Color.Red)
-                                    )
-                                    Text(
-                                        text = "LIVE",
-                                        color = Color.Red,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
                                 Text(
                                     text = formatMillis(currentPos),
                                     color = Color.White.copy(alpha = 0.7f),
@@ -1016,7 +968,7 @@ fun TvRutubeVideoPlayer(
             }
         } else if (useEmbedPlayer) {
             // ============================================================
-            // EMBED ПЛЕЕР — ИСПРАВЛЕННАЯ ВЕРСИЯ
+            // EMBED ПЛЕЕР
             // ============================================================
             val coroutineScope = rememberCoroutineScope()
             Box(
@@ -1192,6 +1144,18 @@ fun TvRutubeVideoPlayer(
                         .then(if (isMiniPlayer) Modifier.focusProperties { canFocus = false } else Modifier)
                 )
                 
+                // LIVE indicator для embed
+                if (isLive) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(16.dp)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(Color.Red)
+                    )
+                }
+                
                 // Кнопка переключения на HLS
                 Box(
                     modifier = Modifier
@@ -1229,37 +1193,6 @@ fun TvRutubeVideoPlayer(
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
-                    }
-                }
-                
-                // LIVE badge если нужно
-                if (isLive) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(16.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.Red.copy(alpha = 0.85f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
-                            Text(
-                                text = "LIVE",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
                     }
                 }
                 
