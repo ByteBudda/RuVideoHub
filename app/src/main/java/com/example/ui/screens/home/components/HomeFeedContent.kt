@@ -39,7 +39,7 @@ fun LazyListScope.homeFeedContent(
         item {
             SectionHeader(title = "Подкатегории", isDark = isDarkTheme)
         }
-        items(chunkedFolders) { rowItems ->
+        items(chunkedFolders, key = { "folder_row_" + it.hashCode() }) { rowItems ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,7 +78,7 @@ fun LazyListScope.homeFeedContent(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(channelItems) { channel ->
+                items(channelItems, key = { it.id }) { channel ->
                     CircularChannelItem(
                         video = channel,
                         onClick = { viewModel.selectVideo(channel) },
@@ -95,7 +95,7 @@ fun LazyListScope.homeFeedContent(
         item {
             SectionHeader(title = "Сериалы", isDark = isDarkTheme)
         }
-        items(chunkedSeries) { rowItems ->
+        items(chunkedSeries, key = { "series_row_" + it.hashCode() }) { rowItems ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,7 +135,7 @@ fun LazyListScope.homeFeedContent(
         item {
             SectionHeader(title = "Плейлисты", isDark = isDarkTheme)
         }
-        items(chunkedPlaylists) { rowItems ->
+        items(chunkedPlaylists, key = { "playlist_row_" + it.hashCode() }) { rowItems ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

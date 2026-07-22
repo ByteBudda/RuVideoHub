@@ -214,7 +214,7 @@ object VkVideoLoader {
                 val inputStream = body.byteStream()
                 
                 targetFile.outputStream().use { outputStream ->
-                    val buffer = ByteArray(8192)
+                    val buffer = ByteArray(8 * 1024 * 1024)
                     var bytesRead: Int
                     var downloaded = 0L
                     val startTimeMs = System.currentTimeMillis()
@@ -400,7 +400,7 @@ object VkVideoLoader {
                                     val body = response.body
                                     if (body != null) {
                                         val inputStream = body.byteStream()
-                                        val buffer = ByteArray(8192)
+                                        val buffer = ByteArray(8 * 1024 * 1024)
                                         var bytesRead: Int
                                         while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                                             outputStream.write(buffer, 0, bytesRead)

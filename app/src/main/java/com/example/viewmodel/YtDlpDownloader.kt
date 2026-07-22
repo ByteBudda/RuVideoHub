@@ -383,23 +383,27 @@ object YtDlpDownloader {
                         }
                         
                         activeDownloads.value[id]?.let { currentDl ->
-                            activeDownloads.value = activeDownloads.value.toMutableMap().apply {
-                                this[id] = currentDl.copy(
-                                    progress = progressValue,
-                                    speed = speedStr,
-                                    eta = etaStr
-                                )
+                            // Throttling: Only update if progress changed by > 1%
+                            if (Math.abs(progressValue - currentDl.progress) > 0.01f) {
+                                activeDownloads.value = activeDownloads.value.toMutableMap().apply {
+                                    this[id] = currentDl.copy(
+                                        progress = progressValue,
+                                        speed = speedStr,
+                                        eta = etaStr
+                                    )
+                                }
                             }
                         }
                     }
                     
                     log("[download] Concatenating ${segments.size} fragments into target file...")
                     FileOutputStream(targetFile).use { outputStream ->
+                        val outputChannel = outputStream.channel
                         for (index in segments.indices) {
                             val segmentFile = File(segmentsDir, "seg_$index.ts")
                             if (segmentFile.exists()) {
                                 segmentFile.inputStream().use { input ->
-                                    input.copyTo(outputStream)
+                                    input.channel.transferTo(0, segmentFile.length(), outputChannel)
                                 }
                             }
                         }
@@ -446,7 +450,7 @@ object YtDlpDownloader {
                         log("[backup] Download stream established. Size: " + String.format("%.2f MB", contentLength.toDouble() / (1024 * 1024)))
 
                         FileOutputStream(targetFile).use { outputStream ->
-                            val buffer = ByteArray(64 * 1024)
+                            val buffer = ByteArray(8 * 1024 * 1024)
                             var bytesRead: Int
                             var totalBytesRead = 0L
                             val startBackupMs = System.currentTimeMillis()
@@ -488,12 +492,15 @@ object YtDlpDownloader {
                                 }
 
                                 activeDownloads.value[id]?.let { currentDl ->
-                                    activeDownloads.value = activeDownloads.value.toMutableMap().apply {
-                                        this[id] = currentDl.copy(
-                                            progress = progressValue.coerceAtMost(1f),
-                                            speed = speedStr,
-                                            eta = etaStr
-                                        )
+                                    // Throttling: Only update if progress changed by > 1%
+                                    if (Math.abs(progressValue - currentDl.progress) > 0.01f) {
+                                        activeDownloads.value = activeDownloads.value.toMutableMap().apply {
+                                            this[id] = currentDl.copy(
+                                                progress = progressValue.coerceAtMost(1f),
+                                                speed = speedStr,
+                                                eta = etaStr
+                                            )
+                                        }
                                     }
                                 }
 

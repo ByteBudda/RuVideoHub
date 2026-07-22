@@ -313,8 +313,11 @@ fun LibraryTabScreen(
                             .background(
                                 if (isSelected) Primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             )
+                            .sleekTvFocus(
+                                shape = RoundedCornerShape(20.dp),
+                                onEnter = { selectedTab = index }
+                            )
                             .clickable { selectedTab = index }
-                            .sleekTvFocus(RoundedCornerShape(20.dp))
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(

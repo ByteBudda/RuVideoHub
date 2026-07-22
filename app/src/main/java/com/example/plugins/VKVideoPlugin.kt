@@ -311,7 +311,7 @@ class VKVideoPlugin : VideoPlugin {
     private fun read(connection: HttpURLConnection): String {
         connection.inputStream.use { input ->
             ByteArrayOutputStream(128 * 1024).use { output ->
-                val buffer = ByteArray(8192)
+                val buffer = ByteArray(8 * 1024 * 1024)
                 var count: Int
                 while (input.read(buffer).also { count = it } != -1) {
                     output.write(buffer, 0, count)

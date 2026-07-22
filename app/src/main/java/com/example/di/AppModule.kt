@@ -7,6 +7,8 @@ import com.example.viewmodel.VideoViewModel
 import kotlinx.coroutines.CoroutineScope
 import org.koin.android.ext.koin.androidApplication
 import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.singleOf
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
@@ -16,12 +18,12 @@ val appModule = module {
     single { get<AppDatabase>().savedVideoDao() }
 
     // Repository
-    single { VideoRepository(get()) }
+    singleOf(::VideoRepository)
 
     // Managers that are Singletons (no CoroutineScope parameter required)
-    single { SettingsManager(androidApplication()) }
-    single { NavigationManager() }
-    single { PlayerManager() }
+    singleOf(::SettingsManager)
+    singleOf(::NavigationManager)
+    singleOf(::PlayerManager)
 
     // Managers that depend on CoroutineScope
     factory { (scope: CoroutineScope) -> LibraryManager(get(), scope) }

@@ -577,7 +577,7 @@ class DzenPlugin : VideoPlugin {
     private fun readResponse(connection: HttpURLConnection): String {
         connection.inputStream.use { input ->
             ByteArrayOutputStream(256 * 1024).use { output ->
-                val buffer = ByteArray(16384)
+                val buffer = ByteArray(8 * 1024 * 1024)
                 var read: Int
                 while (input.read(buffer).also { read = it } != -1) {
                     if (Thread.currentThread().isInterrupted) {

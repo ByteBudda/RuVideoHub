@@ -11,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,21 +46,28 @@ fun VideoThumbnail(
     val finalShape = shape ?: RoundedCornerShape(cardCornerRadius.dp)
 
     val isFolder = duration == com.example.utils.VideoType.FOLDER
-    val gradientColors = when {
-        isFolder -> listOf(Color(0xFFFFB300), Color(0xFFE65100))
-        id == "api_review" -> listOf(Color(0xFF6750A4), Color(0xFF21005D))
-        id == "top_10" -> listOf(Color(0xFF4B3978), Color(0xFF1B033A))
-        id == "history_rutube" -> listOf(Color(0xFF8B5CF6), Color(0xFF3B0764))
-        id == "android_2026" -> listOf(Color(0xFF0284C7), Color(0xFF0369A1))
-        id == "sleek_compose" -> listOf(Color(0xFFEC4899), Color(0xFFBE185D))
-        id == "recommender_secrets" -> listOf(Color(0xFF10B981), Color(0xFF047857))
-        else -> listOf(Color(0xFF333333), Color(0xFF111111))
+    
+    val gradientColors = remember(id, isFolder) {
+        when {
+            isFolder -> listOf(Color(0xFFFFB300), Color(0xFFE65100))
+            id == "api_review" -> listOf(Color(0xFF6750A4), Color(0xFF21005D))
+            id == "top_10" -> listOf(Color(0xFF4B3978), Color(0xFF1B033A))
+            id == "history_rutube" -> listOf(Color(0xFF8B5CF6), Color(0xFF3B0764))
+            id == "android_2026" -> listOf(Color(0xFF0284C7), Color(0xFF0369A1))
+            id == "sleek_compose" -> listOf(Color(0xFFEC4899), Color(0xFFBE185D))
+            id == "recommender_secrets" -> listOf(Color(0xFF10B981), Color(0xFF047857))
+            else -> listOf(Color(0xFF333333), Color(0xFF111111))
+        }
+    }
+    
+    val brush = remember(gradientColors) {
+        Brush.linearGradient(colors = gradientColors)
     }
 
     Box(
         modifier = modifier
             .clip(finalShape)
-            .background(Brush.linearGradient(colors = gradientColors))
+            .background(brush)
     ) {
         if (isFolder) {
             Icon(

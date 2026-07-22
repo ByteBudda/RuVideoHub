@@ -1,5 +1,9 @@
 package com.example.ui.screens
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.Outline
+
 
 import com.example.ui.screens.player.*
 
@@ -62,7 +66,7 @@ val LocalMobileGridColumns = androidx.compose.runtime.compositionLocalOf { 2 }
 fun Modifier.sleekTvFocus(
     shape: Shape = RoundedCornerShape(12.dp),
     focusColor: Color = MaterialTheme.colorScheme.primary,
-    scaleAmount: Float = 1.1f,
+    scaleAmount: Float = 1.05f,
     onEnter: (() -> Unit)? = null,
     onLongEnter: (() -> Unit)? = null,
     enabled: Boolean = true
@@ -76,7 +80,10 @@ fun Modifier.sleekTvFocus(
     val focusStyle = LocalFocusStyle.current
     val scale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isFocused) {
-            if (focusStyle == "scale" || focusStyle == "scale_glow" || focusStyle == "glow") scaleAmount else 1.00f
+            when (focusStyle) {
+                "scale", "scale_glow" -> scaleAmount
+                else -> 1.0f
+            }
         } else {
             1.0f
         },
@@ -84,10 +91,10 @@ fun Modifier.sleekTvFocus(
         label = "focus_scale"
     )
 
-    val backgroundColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (isFocused) focusColor.copy(alpha = 0.3f) else Color.Transparent,
+    val tintAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused && focusStyle == "tint") 0.25f else 0.0f,
         animationSpec = androidx.compose.animation.core.tween(200),
-        label = "focus_background"
+        label = "focus_tint"
     )
 
     val focusModifier = Modifier
@@ -95,21 +102,27 @@ fun Modifier.sleekTvFocus(
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
-            if (isFocused && (focusStyle == "scale_glow" || focusStyle == "glow")) {
-                shadowElevation = 32f
-                ambientShadowColor = focusColor
-                spotShadowColor = focusColor
-            }
+            this.shape = shape
+            clip = false
         }
         .then(
             if (isFocused) {
                 when (focusStyle) {
-                    "scale" -> Modifier.background(backgroundColor, shape).border(1.5.dp, focusColor.copy(alpha = 0.3f), shape)
-                    "glow" -> Modifier.background(backgroundColor, shape).border(2.0.dp, focusColor.copy(alpha = 0.6f), shape)
-                    "scale_glow" -> Modifier.background(backgroundColor, shape).border(3.0.dp, focusColor, shape)
-                    "classic" -> Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f), shape)
-                    "tint" -> Modifier.background(focusColor.copy(alpha = 0.3f), shape).border(2.dp, focusColor, shape)
-                    else -> Modifier.background(backgroundColor, shape).border(3.0.dp, focusColor.copy(alpha = 0.85f), shape)
+                    "scale" -> Modifier
+                    "scale_glow", "glow" -> Modifier.border(2.dp, focusColor, shape).background(focusColor.copy(alpha = 0.15f), shape)
+                    "classic" -> Modifier.border(3.dp, MaterialTheme.colorScheme.onBackground, shape).background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f), shape)
+                    "tint" -> Modifier.border(2.dp, focusColor.copy(alpha = 0.8f), shape).background(focusColor.copy(alpha = 0.25f), shape)
+                    else -> Modifier.border(2.dp, focusColor, shape).background(focusColor.copy(alpha = 0.15f), shape)
+                }
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (tintAlpha > 0f) {
+                Modifier.clip(shape).drawWithContent {
+                    drawContent()
+                    drawRect(color = focusColor.copy(alpha = tintAlpha))
                 }
             } else {
                 Modifier

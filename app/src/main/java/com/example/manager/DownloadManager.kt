@@ -102,7 +102,7 @@ class DownloadManager(
                 
                 val totalBytes = sourceFile.length()
                 var bytesCopied = 0L
-                val buffer = ByteArray(8192)
+                val buffer = ByteArray(8 * 1024 * 1024)
                 
                 sourceFile.inputStream().use { input ->
                     destFile.outputStream().use { output ->

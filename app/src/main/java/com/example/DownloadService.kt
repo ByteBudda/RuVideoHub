@@ -23,12 +23,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import java.io.File
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.CopyOnWriteArrayList
 
 class DownloadService : Service() {
 
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private val downloadSemaphore = Semaphore(1)
 
     private val repository: VideoRepository by inject()
 
@@ -77,56 +80,58 @@ class DownloadService : Service() {
         startForeground(NOTIFICATION_ID, getNotification("Инициализация...", video.title, 0))
 
         val job = serviceScope.launch {
-            try {
-                if (video.id.startsWith("plugin_")) {
-                    downloadPluginVideoDirect(video) { completedId ->
-                        val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
-                        queue.removeAll { it.first.id == completedId }
-                        DownloadManager.saveQueue(this@DownloadService, queue)
-                        serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
-                        showResultNotification(video.title, true)
-                    }
-                } else if (video.id.startsWith("vk_")) {
-                    downloadVkVideoDirect(video) { completedId ->
-                        // Removed from queue upon completion
-                        val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
-                        queue.removeAll { it.first.id == completedId }
-                        DownloadManager.saveQueue(this@DownloadService, queue)
+            downloadSemaphore.withPermit {
+                try {
+                    if (video.id.startsWith("plugin_")) {
+                        downloadPluginVideoDirect(video) { completedId ->
+                            val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
+                            queue.removeAll { it.first.id == completedId }
+                            DownloadManager.saveQueue(this@DownloadService, queue)
+                            serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
+                            showResultNotification(video.title, true)
+                        }
+                    } else if (video.id.startsWith("vk_")) {
+                        downloadVkVideoDirect(video) { completedId ->
+                            // Removed from queue upon completion
+                            val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
+                            queue.removeAll { it.first.id == completedId }
+                            DownloadManager.saveQueue(this@DownloadService, queue)
 
-                        serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
-                        showResultNotification(video.title, true)
-                    }
-                } else {
-                    YtDlpDownloader.startYtDlpDownload(
-                        application,
-                        video,
-                        repository,
-                        DownloadManager._activeDownloads,
-                        quality
-                    ) { completedId ->
-                        // Removed from queue upon completion
-                        val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
-                        queue.removeAll { it.first.id == completedId }
-                        DownloadManager.saveQueue(this@DownloadService, queue)
+                            serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
+                            showResultNotification(video.title, true)
+                        }
+                    } else {
+                        YtDlpDownloader.startYtDlpDownload(
+                            application,
+                            video,
+                            repository,
+                            DownloadManager._activeDownloads,
+                            quality
+                        ) { completedId ->
+                            // Removed from queue upon completion
+                            val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
+                            queue.removeAll { it.first.id == completedId }
+                            DownloadManager.saveQueue(this@DownloadService, queue)
 
-                        serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
-                        showResultNotification(video.title, true)
+                            serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
+                            showResultNotification(video.title, true)
+                        }
                     }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Download failed for ${video.id}", e)
-                showResultNotification(video.title, false)
-            } finally {
-                DownloadManager.downloadJobs.remove(video.id)
-                DownloadManager.removeActiveDownload(video.id)
-                
-                // If there are no more active downloads, stop the foreground service
-                if (DownloadManager.downloadJobs.isEmpty()) {
-                    @Suppress("DEPRECATION")
-                stopForeground(true)
-                    stopSelf()
-                } else {
-                    updateNotification()
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Download failed for ${video.id}", e)
+                    showResultNotification(video.title, false)
+                } finally {
+                    DownloadManager.downloadJobs.remove(video.id)
+                    DownloadManager.removeActiveDownload(video.id)
+                    
+                    // If there are no more active downloads, stop the foreground service
+                    if (DownloadManager.downloadJobs.isEmpty()) {
+                        @Suppress("DEPRECATION")
+                    stopForeground(true)
+                        stopSelf()
+                    } else {
+                        updateNotification()
+                    }
                 }
             }
         }

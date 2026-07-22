@@ -223,7 +223,7 @@ object UpdateManager {
                 val input = connection.inputStream
                 val output = java.io.FileOutputStream(apkFile)
 
-                val data = ByteArray(8192)
+                val data = ByteArray(8 * 1024 * 1024)
                 var total: Long = 0
                 var count: Int
                 var lastNotifyTime = 0L

@@ -220,6 +220,23 @@ fun RutubeVideoPlayer(
     var isBufferingState by remember { mutableStateOf(false) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, exoPlayer) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE || event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                if (!viewModel.isInPipMode.value) {
+                    exoPlayer?.pause()
+                    isPlayingState = false
+                    viewModel.setPlayingState(false)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(playbackSpeed, exoPlayer) {
         exoPlayer?.setPlaybackSpeed(playbackSpeed)
     }

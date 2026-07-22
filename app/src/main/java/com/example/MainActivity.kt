@@ -19,7 +19,10 @@ class MainActivity : ComponentActivity() {
   private val viewModel: VideoViewModel by viewModel()
 
   private val handler = android.os.Handler(android.os.Looper.getMainLooper())
-  private val exitRunnable = Runnable { finishAndRemoveTask() }
+  private val exitRunnable = Runnable { 
+      finishAndRemoveTask()
+      kotlin.system.exitProcess(0)
+  }
   private val toastRunnable = Runnable {
     android.widget.Toast.makeText(this, "Удерживайте кнопку НАЗАД 3 секунды для выхода", android.widget.Toast.LENGTH_SHORT).show()
   }
