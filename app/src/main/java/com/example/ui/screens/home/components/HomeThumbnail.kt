@@ -37,7 +37,8 @@ fun VideoThumbnail(
     playbackProgress: Float = 0f,
     onPlayClick: (() -> Unit)? = null,
     viewsAndTimeAgo: String? = null,
-    shape: Shape? = null
+    shape: Shape? = null,
+    progressTimestamp: String? = null
 ) {
     val customTheme = com.example.ui.theme.LocalCustomTheme.current
     val cardCornerRadius = customTheme?.cardCornerRadius ?: 16
@@ -163,7 +164,7 @@ fun VideoThumbnail(
         }
 
         // Duration capsule
-        if (duration.isNotBlank() && duration != "СЕРИАЛ" && duration != "ПРОМО" && duration != "КАТАЛОГ") {
+        if (duration.isNotBlank() && duration != "СЕРИАЛ" && duration != "ПРОМО" && duration != "КАТАЛОГ" && progressTimestamp.isNullOrBlank()) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -222,7 +223,7 @@ fun VideoThumbnail(
                 )
             }
 
-            // Beautiful "Продолжить" badge in the top right corner
+            // Beautiful "Продолжить" badge/timestamp in the top right corner
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -231,22 +232,31 @@ fun VideoThumbnail(
                     .background(Color.Black.copy(alpha = 0.8f))
                     .padding(horizontal = 6.dp, vertical = 3.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Продолжить",
-                        tint = Color.White,
-                        modifier = Modifier.size(10.dp)
-                    )
+                if (!progressTimestamp.isNullOrBlank()) {
                     Text(
-                        text = "Продолжить",
+                        text = progressTimestamp,
                         color = Color.White,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Продолжить",
+                            tint = Color.White,
+                            modifier = Modifier.size(10.dp)
+                        )
+                        Text(
+                            text = "Продолжить",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

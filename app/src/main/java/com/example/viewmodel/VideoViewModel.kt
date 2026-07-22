@@ -1,9 +1,7 @@
 package com.example.viewmodel
 
 import com.example.ui.theme.CustomTheme
-
 import android.app.Application
-import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,76 +10,67 @@ import com.example.data.AppDatabase
 import com.example.data.SavedVideo
 import com.example.data.Video
 import com.example.data.VideoRepository
-import com.example.data.RutubeCategory
 import com.example.data.SearchHistory
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.net.URI
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
-import java.util.concurrent.TimeUnit
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.RequestBody.Companion.toRequestBody
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import com.example.manager.*
-import java.util.Stack
 
-class VideoViewModel(application: Application) : AndroidViewModel(application) {
-
-    internal val categorySlugs = mapOf(
-        "Фильмы" to "movies",
-        "Сериалы" to "serials",
-        "Телепередачи" to "tv",
-        "Мультфильмы" to "cartoons",
-        "Музыка" to "music",
-        "Спорт" to "sport",
-        "Юмор" to "umor",
-        "Видеоигры" to "games",
-        "Технологии" to "technologies",
-        "Блоги" to "blogs",
-        "Новости" to "news",
-        "Лайфхаки" to "lifehacks",
-        "Детям" to "kids",
-        "Авто-мото" to "auto",
-        "Обучение" to "education",
-        "Путешествия" to "travel",
-        "Кулинария" to "food",
-        "Аниме" to "anime"
-    )
+class VideoViewModel(
+    application: Application,
+    val repository: VideoRepository,
+    val settingsManager: SettingsManager,
+    val navigationManager: NavigationManager,
+    val playerManager: PlayerManager,
+    libraryManagerFactory: (CoroutineScope) -> LibraryManager,
+    downloadManagerFactory: (CoroutineScope) -> DownloadManager,
+    backupRestoreManagerFactory: (LibraryManager) -> BackupRestoreManager,
+    mediaResolverFactory: (CoroutineScope) -> RutubeMediaResolver,
+    feedManagerFactory: (CoroutineScope, RutubeMediaResolver) -> RutubeFeedManager
+) : AndroidViewModel(application) {
 
     internal val db = AppDatabase.getDatabase(application)
-    internal val repository = VideoRepository(db.savedVideoDao())
 
     // Managers
-    val settingsManager = SettingsManager(application)
-    val navigationManager = NavigationManager()
-    val playerManager = PlayerManager()
-    val libraryManager = LibraryManager(repository, viewModelScope)
-    val downloadManager = DownloadManager(application, repository, viewModelScope)
-    val backupRestoreManager = BackupRestoreManager(repository, settingsManager, libraryManager)
-    val mediaResolver = RutubeMediaResolver(playerManager, viewModelScope)
+    val libraryManager = libraryManagerFactory(viewModelScope)
+    val downloadManager = downloadManagerFactory(viewModelScope)
+    val backupRestoreManager = backupRestoreManagerFactory(libraryManager)
+    val mediaResolver = mediaResolverFactory(viewModelScope)
+
+    // Decoupled Feed Manager
+    val feedManager = feedManagerFactory(viewModelScope, mediaResolver)
 
     init {
-        com.example.manager.DownloadManager.onDownloadCompletedListener = { completedId ->
-            viewModelScope.launch {
+        // Load saved video progress timestamps from database on startup
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val savedList = repository.getSavedVideosOnly().first()
+                withContext(Dispatchers.Main) {
+                    savedList.forEach { savedVideo ->
+                        if (savedVideo.lastProgress > 0L) {
+                            playerManager.saveVideoPosition(savedVideo.id, savedVideo.lastProgress)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VideoViewModel", "Error restoring initial playback positions", e)
+            }
+        }
+
+        viewModelScope.launch {
+            downloadManager.downloadCompleted.collect { completedId ->
                 if (playerManager.currentSelectedVideo.value?.id == completedId) {
                     playerManager.selectVideo(playerManager.currentSelectedVideo.value?.copy(isDownloaded = true))
                 }
             }
         }
+
+        // Sync recent watched videos to Android TV "Продолжить просмотр" channel
+
     }
 
     // Proxies for backward compatibility and UI convenience
@@ -175,14 +164,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchQuery(query: String) {
         navigationManager.setSearchQuery(query)
         triggerDebouncedSearch(query, navigationManager.selectedCategory.value)
-    }
-
-    fun setSearchSource(source: String) {
-        _searchSource.value = source
-        val q = navigationManager.searchQuery.value
-        if (q.isNotEmpty()) {
-            triggerDebouncedSearch(q, navigationManager.selectedCategory.value)
-        }
     }
 
     fun togglePlayPause() = playerManager.togglePlayPause()
@@ -280,102 +261,21 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-
     internal var playbackJob: Job? = null
 
-    // Dynamic list of real matching videos from network / offline database/built-in catalog
-    internal val _dynamicVideos = MutableStateFlow<List<Video>>(emptyList())
-    val dynamicVideos = _dynamicVideos.asStateFlow()
-
-    internal val _searchSource = MutableStateFlow("Rutube")
-    val searchSource = _searchSource.asStateFlow()
-
-    internal val _isLoading = MutableStateFlow(true)
-    val isLoading = _isLoading.asStateFlow()
-
-    internal val _realCategories = MutableStateFlow<List<RutubeCategory>>(emptyList())
-    val realCategories = _realCategories.asStateFlow()
-
-    internal val _isCategoriesLoading = MutableStateFlow(true)
-    val isCategoriesLoading = _isCategoriesLoading.asStateFlow()
-
-    internal val _feedTabs = MutableStateFlow<List<com.example.data.rutube.parser.TabInfo>>(emptyList())
-    val feedTabs = _feedTabs.asStateFlow()
-
-    internal val _currentChannelVideo = MutableStateFlow<Video?>(null)
-    val currentChannelVideo: StateFlow<Video?> = combine(_currentChannelVideo, repository.getSavedVideosOnly()) { activeChannel, savedList ->
-        if (activeChannel == null) return@combine null
-        val saved = savedList.firstOrNull { it.id == activeChannel.id }
-        val progress = saved?.let {
-            if (it.lastDuration > 0L) {
-                (it.lastProgress.toFloat() / it.lastDuration.toFloat()).coerceIn(0f, 1f)
-            } else 0f
-        } ?: 0f
-        activeChannel.copy(
-            isDownloaded = saved?.isDownloaded ?: false,
-            isBookmarked = saved?.isBookmarked ?: false,
-            isWatched = progress >= 0.80f,
-            playbackProgress = progress
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    internal val _currentSubfolderVideo = MutableStateFlow<Video?>(null)
-    val currentSubfolderVideo: StateFlow<Video?> = combine(_currentSubfolderVideo, repository.getSavedVideosOnly()) { activeFolder, savedList ->
-        if (activeFolder == null) return@combine null
-        val saved = savedList.firstOrNull { it.id == activeFolder.id }
-        val progress = saved?.let {
-            if (it.lastDuration > 0L) {
-                (it.lastProgress.toFloat() / it.lastDuration.toFloat()).coerceIn(0f, 1f)
-            } else 0f
-        } ?: 0f
-        activeFolder.copy(
-            isDownloaded = saved?.isDownloaded ?: false,
-            isBookmarked = saved?.isBookmarked ?: false,
-            isWatched = progress >= 0.80f,
-            playbackProgress = progress
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    internal val _channelVideos = MutableStateFlow<List<Video>>(emptyList())
-    val channelVideos: StateFlow<List<Video>> = combine(_channelVideos, repository.getSavedVideosOnly()) { videos, savedList ->
-        val savedMap = savedList.associateBy { it.id }
-        videos.map { vid ->
-            val saved = savedMap[vid.id]
-            val progress = saved?.let {
-                if (it.lastDuration > 0L) {
-                    (it.lastProgress.toFloat() / it.lastDuration.toFloat()).coerceIn(0f, 1f)
-                } else 0f
-            } ?: 0f
-            vid.copy(
-                isDownloaded = saved?.isDownloaded ?: false,
-                isBookmarked = saved?.isBookmarked ?: false,
-                isWatched = progress >= 0.80f,
-                playbackProgress = progress
-            )
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    internal val _channelPlaylists = MutableStateFlow<List<Video>>(emptyList())
-    val channelPlaylists: StateFlow<List<Video>> = combine(_channelPlaylists, repository.getSavedVideosOnly()) { playlists, savedList ->
-        val savedMap = savedList.associateBy { it.id }
-        playlists.map { pl ->
-            val saved = savedMap[pl.id]
-            val progress = saved?.let {
-                if (it.lastDuration > 0L) {
-                    (it.lastProgress.toFloat() / it.lastDuration.toFloat()).coerceIn(0f, 1f)
-                } else 0f
-            } ?: 0f
-            pl.copy(
-                isDownloaded = saved?.isDownloaded ?: false,
-                isBookmarked = saved?.isBookmarked ?: false,
-                isWatched = progress >= 0.80f,
-                playbackProgress = progress
-            )
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    internal val _isLoadingPlaylists = MutableStateFlow(false)
-    val isLoadingPlaylists = _isLoadingPlaylists.asStateFlow()
+    // Delegated Flow States from feedManager
+    val dynamicVideos = feedManager.dynamicVideos
+    val searchSource = feedManager.searchSource
+    val isLoading = feedManager.isLoading
+    val realCategories = feedManager.realCategories
+    val isCategoriesLoading = feedManager.isCategoriesLoading
+    val feedTabs = feedManager.feedTabs
+    val currentChannelVideo = feedManager.currentChannelVideo
+    val currentSubfolderVideo = feedManager.currentSubfolderVideo
+    val channelVideos = feedManager.channelVideos
+    val channelPlaylists = feedManager.channelPlaylists
+    val isLoadingPlaylists = feedManager.isLoadingPlaylists
+    val isMoreLoading = feedManager.isMoreLoading
 
     fun setChannelActiveTab(tab: String) {
         navigationManager.setChannelActiveTab(tab)
@@ -396,17 +296,17 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             searchQuery = navigationManager.searchQuery.value,
             selectedVideo = playerManager.currentSelectedVideo.value,
             isChannelView = navigationManager.isChannelView.value,
-            currentChannelVideo = _currentChannelVideo.value,
-            channelVideos = _channelVideos.value,
-            channelPlaylists = _channelPlaylists.value,
+            currentChannelVideo = currentChannelVideo.value,
+            channelVideos = channelVideos.value,
+            channelPlaylists = channelPlaylists.value,
             channelActiveTab = navigationManager.channelActiveTab.value,
-            dynamicVideos = _dynamicVideos.value,
+            dynamicVideos = dynamicVideos.value,
             currentPage = currentPage,
             isEndReached = isEndReached,
             currentQuery = currentQuery,
             currentCategory = currentCategory,
             currentActiveApiEndpoint = currentActiveApiEndpoint,
-            currentSubfolderVideo = _currentSubfolderVideo.value,
+            currentSubfolderVideo = currentSubfolderVideo.value,
             channelVideosPage = channelVideosPage,
             channelVideosEndReached = channelVideosEndReached,
             channelPlaylistsPage = channelPlaylistsPage,
@@ -437,23 +337,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             val last = navigationManager.navigateBack()
             if (last != null) {
                 navigationManager.restoreFromSnapshot(last)
-                _currentChannelVideo.value = last.currentChannelVideo
-                _currentSubfolderVideo.value = last.currentSubfolderVideo
-                _channelVideos.value = last.channelVideos
-                _channelPlaylists.value = last.channelPlaylists
-                _dynamicVideos.value = last.dynamicVideos
-                
-                currentPage = last.currentPage
-                isEndReached = last.isEndReached
-                currentQuery = last.currentQuery
-                currentCategory = last.currentCategory
-                currentActiveApiEndpoint = last.currentActiveApiEndpoint
-
-                channelVideosPage = last.channelVideosPage
-                channelVideosEndReached = last.channelVideosEndReached
-                channelPlaylistsPage = last.channelPlaylistsPage
-                channelPlaylistsEndReached = last.channelPlaylistsEndReached
-
+                feedManager.restoreFeedState(last)
                 return true
             }
         }
@@ -467,23 +351,7 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
             val last = navigationManager.navigateBack()
             if (last != null) {
                 navigationManager.restoreFromSnapshot(last)
-                _currentChannelVideo.value = last.currentChannelVideo
-                _currentSubfolderVideo.value = last.currentSubfolderVideo
-                _channelVideos.value = last.channelVideos
-                _channelPlaylists.value = last.channelPlaylists
-                _dynamicVideos.value = last.dynamicVideos
-                
-                currentPage = last.currentPage
-                isEndReached = last.isEndReached
-                currentQuery = last.currentQuery
-                currentCategory = last.currentCategory
-                currentActiveApiEndpoint = last.currentActiveApiEndpoint
-
-                channelVideosPage = last.channelVideosPage
-                channelVideosEndReached = last.channelVideosEndReached
-                channelPlaylistsPage = last.channelPlaylistsPage
-                channelPlaylistsEndReached = last.channelPlaylistsEndReached
-
+                feedManager.restoreFeedState(last)
                 return true
             }
         }
@@ -496,8 +364,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
-
-
     // Expose active loading source: Rutube API Live, Offline database, Built-in hits
     val apiSource = flow {
         while (true) {
@@ -506,23 +372,48 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Инициализация...")
 
-    internal var currentPage = 1
-    internal var isEndReached = false
-    val isEndReachedPublic: Boolean get() = isEndReached
-    internal var channelVideosPage = 1
-    internal var channelVideosEndReached = false
-    internal var channelPlaylistsPage = 1
-    internal var channelPlaylistsEndReached = false
-    internal var currentQuery: String? = null
-    internal var currentCategory: String? = "Фильмы"
-    internal var currentActiveApiEndpoint: String? = null
+    // Delegated Properties to feedManager
+    var currentPage: Int
+        get() = feedManager.currentPage
+        set(value) { feedManager.currentPage = value }
 
-    internal val _isMoreLoading = MutableStateFlow(false)
-    val isMoreLoading = _isMoreLoading.asStateFlow()
+    var isEndReached: Boolean
+        get() = feedManager.isEndReached
+        set(value) { feedManager.isEndReached = value }
+
+    val isEndReachedPublic: Boolean get() = feedManager.isEndReachedPublic
+
+    var channelVideosPage: Int
+        get() = feedManager.channelVideosPage
+        set(value) { feedManager.channelVideosPage = value }
+
+    var channelVideosEndReached: Boolean
+        get() = feedManager.channelVideosEndReached
+        set(value) { feedManager.channelVideosEndReached = value }
+
+    var channelPlaylistsPage: Int
+        get() = feedManager.channelPlaylistsPage
+        set(value) { feedManager.channelPlaylistsPage = value }
+
+    var channelPlaylistsEndReached: Boolean
+        get() = feedManager.channelPlaylistsEndReached
+        set(value) { feedManager.channelPlaylistsEndReached = value }
+
+    var currentQuery: String?
+        get() = feedManager.currentQuery
+        set(value) { feedManager.currentQuery = value }
+
+    var currentCategory: String?
+        get() = feedManager.currentCategory
+        set(value) { feedManager.currentCategory = value }
+
+    var currentActiveApiEndpoint: String?
+        get() = feedManager.currentActiveApiEndpoint
+        set(value) { feedManager.currentActiveApiEndpoint = value }
 
     init {
         viewModelScope.launch {
-            _dynamicVideos.collect { list ->
+            dynamicVideos.collect { list ->
                 playerManager.currentPlaylist = list
                 val currentVid = playerManager.currentSelectedVideo.value
                 if (currentVid != null) {
@@ -538,7 +429,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         val savedStartPageCategory = settingsManager.startPageCategory.value
         val savedStartPageCustomUrl = settingsManager.startPageCustomUrl.value
         val savedStartPageFavoriteId = settingsManager.startPageFavoriteId.value
-        val savedStartPageFavoriteTitle = settingsManager.startPageFavoriteTitle.value
 
         if (savedStartPageType == "favorite" && savedStartPageFavoriteId.isNotBlank()) {
             viewModelScope.launch {
@@ -579,36 +469,25 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         fetchRealCategories()
 
         viewModelScope.launch {
-            _dynamicVideos.collect { videos ->
+            dynamicVideos.collect { videos ->
                 resolveMissingPosters(videos)
             }
         }
         viewModelScope.launch {
-            _channelPlaylists.collect { videos ->
+            channelPlaylists.collect { videos ->
                 resolveMissingPosters(videos)
             }
         }
         viewModelScope.launch {
-            _channelVideos.collect { videos ->
+            channelVideos.collect { videos ->
                 resolveMissingPosters(videos)
             }
         }
     }
 
-
-
-
-
-
-    internal var fetchJob: Job? = null
-    internal var requestId = 0
-
-
-    internal var searchDebounceJob: Job? = null
-
     // Base video feed matching state changes recursively
     val allVideos: StateFlow<List<Video>> = combine(
-        _dynamicVideos,
+        dynamicVideos,
         repository.getSavedVideosOnly()
     ) { dynamicList, savedList ->
         val savedMap = savedList.associateBy { it.id }
@@ -691,14 +570,12 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun importBackupFromJson(jsonStr: String): Result<String> = backupRestoreManager.importBackupFromJson(jsonStr)
 
-
-
-
-
-
-
-    internal fun startPlaybackTicker() {
-        // Disabled fake playback ticker because real ExoPlayer handles its own state
+    fun setSearchSource(source: String) {
+        feedManager.setSearchSource(source)
+        val q = navigationManager.searchQuery.value
+        if (q.isNotEmpty()) {
+            triggerDebouncedSearch(q, navigationManager.selectedCategory.value)
+        }
     }
 
     internal fun stopPlaybackTicker() {
@@ -717,15 +594,6 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
     // Helper functions to convert string duration parsed values (e.g. "12:44") to elapsed playback string
     fun getFormattedElapsedTime(durationStr: String, progress: Float): String {
         return com.example.utils.VideoDurationFormatter.getFormattedElapsedTime(durationStr, progress)
-    }
-
-    internal fun formatDurationMs(ms: Long): String {
-        if (ms <= 0) return ""
-        val totalSecs = ms / 1000
-        val h = totalSecs / 3600
-        val m = (totalSecs % 3600) / 60
-        val s = totalSecs % 60
-        return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%d:%02d", m, s)
     }
 
     override fun onCleared() {
@@ -749,169 +617,36 @@ class VideoViewModel(application: Application) : AndroidViewModel(application) {
         return mediaResolver.masterUrlCache[videoId + "_page"]
     }
 
-
-
-    internal fun mapResourceToVideo(resource: com.example.data.rutube.parser.ResourceInfo, tabId: Int, categoryName: String): Video {
-        val url = resource.url ?: ""
-        val extractedId = "\\d+".toRegex().find(url)?.value ?: ""
-        
-        return when (resource.type) {
-            com.example.data.rutube.parser.EntityType.CHANNEL -> {
-                Video(
-                    id = "channel_${extractedId}__$url",
-                    title = resource.name,
-                    channel = "Авторский канал",
-                    views = "Открыть канал",
-                    timeAgo = "Автор",
-                    duration = com.example.utils.VideoType.CHANNEL,
-                    isPro = false,
-                    category = categoryName,
-                    description = "Официальный канал: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-            com.example.data.rutube.parser.EntityType.TV_SERIES -> {
-                Video(
-                    id = "tv_${extractedId}__$url",
-                    title = resource.name,
-                    channel = "Телешоу / Передача",
-                    views = "Смотреть выпуски",
-                    timeAgo = "Шоу",
-                    duration = com.example.utils.VideoType.SERIES,
-                    isPro = false,
-                    category = categoryName,
-                    description = "Смотрите оригинальные сезоны: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-            com.example.data.rutube.parser.EntityType.PLAYLIST -> {
-                Video(
-                    id = "playlist_${extractedId}__$url",
-                    title = resource.name,
-                    channel = "Плейлист • Подборка",
-                    views = "Смотреть плейлист",
-                    timeAgo = "Плейлист",
-                    duration = com.example.utils.VideoType.PLAYLIST,
-                    isPro = false,
-                    category = categoryName,
-                    description = "Смотрите полную подборку видео из плейлиста: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-            else -> {
-                Video(
-                    id = "unknown_res_${tabId}_${resource.name.hashCode()}__$url",
-                    title = resource.name,
-                    channel = "Папка каталога",
-                    views = "Подраздел",
-                    timeAgo = "Открыть",
-                    duration = com.example.utils.VideoType.FOLDER,
-                    isPro = false,
-                    category = categoryName,
-                    description = "Коллекция контента из раздела: ${resource.name}",
-                    thumbnailUrl = null
-                )
-            }
-        }
+    // Delegated functions
+    fun fetchRealVideos(query: String? = null, category: String? = null, targetUrl: String? = null) {
+        feedManager.fetchRealVideos(query, category, targetUrl)
     }
 
-    internal val resolvedPostersCache = java.util.concurrent.ConcurrentHashMap<String, String>()
-    internal val resolvingVideoIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    fun loadNextPage() = feedManager.loadNextPage()
 
-    internal fun cleanUrl(url: String?): String {
-        if (url.isNullOrBlank()) return ""
-        var u = url.trim()
-        if (u.startsWith("//")) {
-            u = "https:" + u
+    fun triggerDebouncedSearch(query: String, category: String) = feedManager.triggerDebouncedSearch(query, category)
+
+    fun fetchRealCategories() = feedManager.fetchRealCategories()
+
+    fun selectCategory(category: String, targetUrl: String? = null) = feedManager.selectCategory(category, targetUrl)
+
+    fun selectFeedTab(tab: com.example.data.rutube.parser.TabInfo) = feedManager.selectFeedTab(tab)
+
+    fun selectVideo(video: Video?) {
+        if (video != null) {
+            libraryManager.addToRecentHistory(video, currentPage)
         }
-        return u
+        feedManager.selectVideo(video)
     }
 
-    internal fun resolveMissingPosters(videos: List<Video>) {
-        videos.forEach { video ->
-            if (video.thumbnailUrl.isNullOrBlank()) {
-                if (resolvingVideoIds.add(video.id)) {
-                    val actionUrl = video.id.substringAfter("__")
-                    val match = Regex("/metainfo/tv/(\\d+)").find(actionUrl)
-                    val objectId = match?.groupValues?.get(1)
-                    if (objectId != null) {
-                        val cached = resolvedPostersCache[objectId]
-                        if (cached != null) {
-                            updateVideoThumbnail(video.id, cached)
-                        } else {
-                            viewModelScope.launch(Dispatchers.IO) {
-                                try {
-                                    val metainfoUrl = "https://rutube.ru/api/metainfo/tv/$objectId/"
-                                    val response = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(metainfoUrl)
-                                    val body = response.string()
-                                    val json = org.json.JSONObject(body)
-                                    
-                                    val verticalPosterUrl = json.optString("vertical_poster_url").takeIf { it.isNotBlank() }
-                                    val posterUrl = json.optString("poster_url").takeIf { it.isNotBlank() }
-                                    val appearance = json.optJSONObject("appearance")
-                                    val coverImage = appearance?.optString("cover_image")?.takeIf { it.isNotBlank() }
-                                    val picture = json.optString("picture").takeIf { it.isNotBlank() }
-                                    
-                                    val resolvedUrl = verticalPosterUrl ?: posterUrl ?: coverImage ?: picture
-                                    if (!resolvedUrl.isNullOrBlank()) {
-                                        val clean = cleanUrl(resolvedUrl)
-                                        resolvedPostersCache[objectId] = clean
-                                        withContext(Dispatchers.Main) {
-                                            updateVideoThumbnail(video.id, clean)
-                                        }
-                                    }
-                                } catch (e: java.lang.Exception) {
-                                    android.util.Log.e("VideoViewModel", "Failed to fetch metainfo for $objectId", e)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    fun loadVideoByUrlOrId(urlOrId: String) = feedManager.loadVideoByUrlOrId(urlOrId)
 
-    internal fun updateVideoThumbnail(videoId: String, thumbnailUrl: String) {
-        val updater = { list: List<Video> ->
-            list.map { if (it.id == videoId) it.copy(thumbnailUrl = thumbnailUrl) else it }
-        }
-        _dynamicVideos.value = updater(_dynamicVideos.value)
-        _channelVideos.value = updater(_channelVideos.value)
-        _channelPlaylists.value = updater(_channelPlaylists.value)
-        
-        // Also update the single current selection or current channel video if matched
-        val currentActive = playerManager.currentSelectedVideo.value
-        if (currentActive != null && currentActive.id == videoId) {
-            playerManager.selectVideo(currentActive.copy(thumbnailUrl = thumbnailUrl))
-        }
-        val currentChanVid = _currentChannelVideo.value
-        if (currentChanVid != null && currentChanVid.id == videoId) {
-            _currentChannelVideo.value = currentChanVid.copy(thumbnailUrl = thumbnailUrl)
-        }
+    fun resolveMissingPosters(videos: List<Video>) = feedManager.resolveMissingPosters(videos)
 
-        // Persistent update in database for bookmarked/history items
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val saved = repository.getVideoById(videoId)
-                if (saved != null && saved.thumbnailUrl.isNullOrBlank()) {
-                    repository.insertOrUpdate(saved.copy(thumbnailUrl = thumbnailUrl))
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("VideoViewModel", "Failed to update db thumbnail for $videoId", e)
-                viewModelScope.launch { com.example.manager.ErrorHandler.reportError("Failed to update database: ${e.message}") }
-            }
-        }
-    }
+    fun updateVideoThumbnail(videoId: String, thumbnailUrl: String) = feedManager.updateVideoThumbnail(videoId, thumbnailUrl)
 
-    // Factory helper in case we instantiate standard lifecycle
-    class Factory(internal val application: Application) : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(VideoViewModel::class.java)) {
-                @Suppress("UNCHECKED_CAST")
-                return VideoViewModel(application) as T
-            }
-            throw IllegalArgumentException("Unknown ViewModel class")
-        }
+    fun mapResourceToVideo(resource: com.example.data.rutube.parser.ResourceInfo, tabId: Int, categoryName: String): Video {
+        return feedManager.mapResourceToVideo(resource, tabId, categoryName)
     }
 }
 
@@ -926,4 +661,3 @@ data class YtDlpDownload(
     val status: String,
     val logs: List<String>
 )
-

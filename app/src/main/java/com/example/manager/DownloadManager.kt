@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -27,6 +29,8 @@ class DownloadManager(
     private val scope: CoroutineScope
 ) {
     val activeDownloads = DownloadManager.activeDownloads
+    val downloadCompleted = DownloadManager.downloadCompleted
+    val savingProgress = DownloadManager.savingProgress
 
     fun startDownload(video: Video, quality: String, onCompleted: (String) -> Unit) {
         // Save to persistent queue
@@ -36,12 +40,6 @@ class DownloadManager(
             saveQueue(application, currentQueue)
         }
 
-        // Setup the complete listener
-        onDownloadCompletedListener = { completedId ->
-            if (completedId == video.id) {
-                onCompleted(completedId)
-            }
-        }
 
         // Start background service
         val intent = Intent(application, DownloadService::class.java).apply {
@@ -102,16 +100,34 @@ class DownloadManager(
                 
                 val destFile = File(publicDownloads, "${video.title.filter { it.isLetterOrDigit() || it == ' ' }}.mp4")
                 
+                val totalBytes = sourceFile.length()
+                var bytesCopied = 0L
+                val buffer = ByteArray(8192)
+                
                 sourceFile.inputStream().use { input ->
                     destFile.outputStream().use { output ->
-                        input.copyTo(output)
+                        var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            bytesCopied += bytesRead
+                            val progress = bytesCopied.toFloat() / totalBytes
+                            DownloadManager._savingProgress.value = DownloadManager._savingProgress.value.toMutableMap().apply {
+                                put(video.id, progress)
+                            }
+                        }
                     }
+                }
+                DownloadManager._savingProgress.value = DownloadManager._savingProgress.value.toMutableMap().apply {
+                    remove(video.id)
                 }
 
                 withContext(Dispatchers.Main) {
                     onResult(true, "Файл успешно сохранен в папку Загрузки: ${destFile.name}")
                 }
             } catch (e: Exception) {
+                DownloadManager._savingProgress.value = DownloadManager._savingProgress.value.toMutableMap().apply {
+                    remove(video.id)
+                }
                 withContext(Dispatchers.Main) {
                     onResult(false, "Ошибка сохранения: ${e.message}")
                 }
@@ -120,8 +136,17 @@ class DownloadManager(
     }
 
     companion object {
+        private val _downloadCompleted = MutableSharedFlow<String>()
+        val downloadCompleted = _downloadCompleted.asSharedFlow()
+
+        suspend fun emitDownloadCompleted(videoId: String) {
+            _downloadCompleted.emit(videoId)
+        }
+
         val _activeDownloads = MutableStateFlow<Map<String, YtDlpDownload>>(emptyMap())
         val activeDownloads = _activeDownloads.asStateFlow()
+        val _savingProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+        val savingProgress = _savingProgress.asStateFlow()
         val downloadJobs = ConcurrentHashMap<String, Job>()
 
         fun updateActiveDownload(id: String, download: YtDlpDownload) {

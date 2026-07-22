@@ -5,27 +5,27 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class RutubeSearchResponse(
-    @Json(name = "results") val results: List<RutubeVideoItem>? = null
+    @field:Json(name = "results") val results: List<RutubeVideoItem>? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class RutubeVideoItem(
-    @Json(name = "id") val id: String? = null,
-    @Json(name = "video_id") val videoId: String? = null,
-    @Json(name = "code") val code: String? = null,
-    @Json(name = "title") val title: String? = null,
-    @Json(name = "description") val description: String? = null,
-    @Json(name = "thumbnail_url") val thumbnailUrl: String? = null,
-    @Json(name = "duration") val duration: Int? = null,
-    @Json(name = "views") val views: Int? = null,
-    @Json(name = "hits") val hits: Int? = null,
-    @Json(name = "created_ts") val createdTs: String? = null,
-    @Json(name = "author") val author: RutubeAuthor? = null
+    @field:Json(name = "id") val id: String? = null,
+    @field:Json(name = "video_id") val videoId: String? = null,
+    @field:Json(name = "code") val code: String? = null,
+    @field:Json(name = "title") val title: String? = null,
+    @field:Json(name = "description") val description: String? = null,
+    @field:Json(name = "thumbnail_url") val thumbnailUrl: String? = null,
+    @field:Json(name = "duration") val duration: Int? = null,
+    @field:Json(name = "views") val views: Int? = null,
+    @field:Json(name = "hits") val hits: Int? = null,
+    @field:Json(name = "created_ts") val createdTs: String? = null,
+    @field:Json(name = "author") val author: RutubeAuthor? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class RutubeAuthor(
-    @Json(name = "name") val name: String? = null,
-    @Json(name = "username") val username: String? = null,
-    @Json(name = "avatar_url") val avatarUrl: String? = null
+    @field:Json(name = "name") val name: String? = null,
+    @field:Json(name = "username") val username: String? = null,
+    @field:Json(name = "avatar_url") val avatarUrl: String? = null
 )

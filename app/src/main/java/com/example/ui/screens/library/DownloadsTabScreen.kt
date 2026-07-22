@@ -44,6 +44,7 @@ fun DownloadsTabScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val downloadedVideos by viewModel.downloadedSavedVideos.collectAsStateWithLifecycle()
     val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+    val savingProgress by viewModel.downloadManager.savingProgress.collectAsStateWithLifecycle()
     val activeList = remember(activeDownloads) { activeDownloads.values.toList() }
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
@@ -253,6 +254,7 @@ fun DownloadsTabScreen(
                                             android.widget.Toast.makeText(context, "Эта функция требует Android 10 и выше.", android.widget.Toast.LENGTH_SHORT).show()
                                         }
                                     },
+                                    savingProgress = savingProgress,
                                     isDark = isDarkTheme,
                                     isTvOptimized = isTvOptimized,
                                     modifier = Modifier.weight(1f)
@@ -280,6 +282,7 @@ fun DownloadsTabScreen(
                                         android.widget.Toast.makeText(context, "Эта функция требует Android 10 и выше.", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 },
+                                savingProgress = savingProgress,
                                 isDark = isDarkTheme,
                                 isTvOptimized = isTvOptimized,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
@@ -302,6 +305,7 @@ fun DownloadsTabScreen(
                                         android.widget.Toast.makeText(context, "Эта функция требует Android 10 и выше.", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 },
+                                savingProgress = savingProgress,
                                 isDark = isDarkTheme,
                                 isTvOptimized = isTvOptimized,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,7 +33,7 @@ import com.example.ui.theme.Primary
 import com.example.ui.theme.PrimaryContainer
 import com.example.ui.theme.SurfaceVariant
 import com.example.ui.theme.liquidGlass
-
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlayerDetailsPanel(
@@ -285,6 +286,86 @@ fun PlayerDetailsPanel(
                             )
                         }
                     }
+                }
+            }
+
+            // External Player Action Trigger
+            val coroutineScope = rememberCoroutineScope()
+            var isFetchingExternal by remember { mutableStateOf(false) }
+
+            if (!isContainer && !isVkOrDzen && !video.isDownloaded) {
+                IconButton(
+                    onClick = {
+                        if (isFetchingExternal) return@IconButton
+                        isFetchingExternal = true
+                        coroutineScope.launch {
+                            try {
+                                val url = viewModel.fetchHlsStreamUrl(video.id, "Авто")
+                                if (url != null && url.isNotBlank()) {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                        setDataAndType(android.net.Uri.parse(url), "video/*")
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(intent, "Открыть через..."))
+                                } else {
+                                    android.widget.Toast.makeText(context, "Не удалось получить ссылку на поток", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "Ошибка открытия внешнего плеера", android.widget.Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isFetchingExternal = false
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(SurfaceVariant, CircleShape)
+                        .sleekTvFocus(CircleShape)
+                ) {
+                    if (isFetchingExternal) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Primary, strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = "Открыть во внешнем плеере",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            } else if (video.isDownloaded) {
+                IconButton(
+                    onClick = {
+                        val downloadFolder = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        val offlineFile = java.io.File(downloadFolder, "${video.id}.mp4")
+                        if (offlineFile.exists()) {
+                            try {
+                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.provider",
+                                    offlineFile
+                                )
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "video/mp4")
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(intent, "Открыть через..."))
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "Ошибка открытия скачанного файла", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(SurfaceVariant, CircleShape)
+                        .sleekTvFocus(CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = "Открыть во внешнем плеере",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 

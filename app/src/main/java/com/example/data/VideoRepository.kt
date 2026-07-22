@@ -7,8 +7,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import org.json.JSONArray
 import com.example.data.rutube.parser.RutubeParser
 import com.example.manager.RutubeCategoryManager
 
@@ -343,14 +341,13 @@ class VideoRepository(private val dao: SavedVideoDao) {
                 val showcaseUrl = "https://rutube.ru/api/feeds/$categorySlug/?format=json&page=$page"
                 val feedResponse = com.example.data.rutube.RutubeRetrofitClient.apiService.getDynamicUrl(showcaseUrl)
                 val feedJsonStr = feedResponse.string()
-                val feedObj = JSONObject(feedJsonStr)
-                val parsedFeed = com.example.data.rutube.parser.ResponseAnalyzer.parse(feedObj, showcaseUrl)
+                val parsedFeed = rutubeParser.parseResponse(feedJsonStr, showcaseUrl)
 
                 val resourceUrls = mutableListOf<String>()
                 for (tab in parsedFeed.tabs) {
                     for (res in tab.resources) {
                         val urlVal = res.url
-                        if (urlVal != null && urlVal.isNotBlank() && !resourceUrls.contains(urlVal)) {
+                        if (urlVal.isNotBlank() && !resourceUrls.contains(urlVal)) {
                             resourceUrls.add(urlVal)
                         }
                     }
@@ -497,8 +494,7 @@ class VideoRepository(private val dao: SavedVideoDao) {
             val apiService = com.example.data.rutube.RutubeRetrofitClient.apiService
             val url = "https://rutube.ru/api/v1/feeds/promogroup/382/?format=json&limit=100"
             val bodyStr = apiService.getDynamicUrl(url).string()
-            val jsonObj = JSONObject(bodyStr)
-            val parsed = com.example.data.rutube.parser.ResponseAnalyzer.parse(jsonObj, url)
+            val parsed = rutubeParser.parseResponse(bodyStr, url)
 
             for (card in parsed.items) {
                 var title = ""
@@ -643,12 +639,15 @@ class VideoRepository(private val dao: SavedVideoDao) {
             }
         }
 
+        val progressRatio = if (finalDuration > 0L) position.toFloat() / finalDuration.toFloat() else 0f
+        val isWatchedVal = (saved?.isWatched == true) || video.isWatched || (progressRatio >= 0.85f)
+
         dao.insertOrUpdate(SavedVideo(
             id = video.id, title = video.title, channel = video.channel,
             views = video.views, timeAgo = video.timeAgo, duration = video.duration,
             isPro = video.isPro, category = video.category,
             isDownloaded = termDownload, isBookmarked = termBookmark,
-            thumbnailUrl = video.thumbnailUrl, isWatched = true,
+            thumbnailUrl = video.thumbnailUrl, isWatched = isWatchedVal,
             savedAt = System.currentTimeMillis(),
             lastProgress = position,
             lastDuration = finalDuration,
@@ -672,7 +671,10 @@ class VideoRepository(private val dao: SavedVideoDao) {
         } else {
             0L
         }
+        val progressRatio = if (finalDuration > 0L) position.toFloat() / finalDuration.toFloat() else 0f
+        val isWatchedVal = saved.isWatched || (progressRatio >= 0.85f)
         dao.insertOrUpdate(saved.copy(
+            isWatched = isWatchedVal,
             lastProgress = position,
             lastDuration = finalDuration,
             savedAt = System.currentTimeMillis()

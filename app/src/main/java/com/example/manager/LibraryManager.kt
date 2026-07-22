@@ -27,7 +27,18 @@ class LibraryManager(
         .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val recentVideos: StateFlow<List<SavedVideo>> = repository.getSavedVideosOnly()
-        .map { list -> list.filter { it.isWatched } }
+        .map { list ->
+            list.filter { saved ->
+                (saved.isWatched || saved.lastProgress > 0) &&
+                saved.duration != com.example.utils.VideoType.CHANNEL &&
+                saved.duration != "КАНАЛ" &&
+                !saved.id.startsWith("channel_") &&
+                saved.duration != com.example.utils.VideoType.FOLDER &&
+                saved.duration != "ПАПКА" &&
+                saved.duration != com.example.utils.VideoType.CATALOG &&
+                saved.duration != "КАТАЛОГ"
+            }
+        }
         .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun toggleBookmark(video: Video) {
@@ -43,8 +54,36 @@ class LibraryManager(
     }
 
     fun addToRecentHistory(video: Video, page: Int = 1) {
+        if (video.duration == com.example.utils.VideoType.CHANNEL ||
+            video.duration == "КАНАЛ" ||
+            video.id.startsWith("channel_") ||
+            video.duration == com.example.utils.VideoType.FOLDER ||
+            video.duration == "ПАПКА" ||
+            video.duration == com.example.utils.VideoType.CATALOG ||
+            video.duration == "КАТАЛОГ"
+        ) {
+            return
+        }
         scope.launch(Dispatchers.IO) {
             val existing = repository.getVideoById(video.id)
+            if (video.duration == com.example.utils.VideoType.PLAYLIST ||
+                video.duration == "ПЛЕЙЛИСТ" ||
+                video.duration == com.example.utils.VideoType.SERIES ||
+                video.duration == "СЕРИАЛ"
+            ) {
+                val hasProgress = (existing != null && (existing.isWatched || existing.lastProgress > 0L)) ||
+                        video.isWatched || video.lastProgress > 0L
+                if (!hasProgress) {
+                    return@launch
+                }
+            }
+            val progressRatio = if ((existing?.lastDuration ?: 0L) > 0L) {
+                (existing?.lastProgress ?: 0L).toFloat() / (existing?.lastDuration ?: 1L).toFloat()
+            } else if (video.lastDuration > 0L) {
+                video.lastProgress.toFloat() / video.lastDuration.toFloat()
+            } else 0f
+            val isWatchedValue = (existing?.isWatched == true) || video.isWatched || (progressRatio >= 0.85f)
+
             val toSave = SavedVideo(
                 id = video.id,
                 title = video.title,
@@ -58,7 +97,7 @@ class LibraryManager(
                 isDownloaded = existing?.isDownloaded ?: false,
                 isBookmarked = existing?.isBookmarked ?: false,
                 savedAt = System.currentTimeMillis(),
-                isWatched = true,
+                isWatched = isWatchedValue,
                 lastProgress = existing?.lastProgress ?: 0L,
                 lastDuration = existing?.lastDuration ?: 0L,
                 originType = video.originType ?: existing?.originType,

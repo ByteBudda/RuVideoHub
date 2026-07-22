@@ -23,7 +23,9 @@ data class Video(
     val pageUrl: String? = null,
     val originType: String? = null,
     val originId: String? = null,
-    val originTitle: String? = null
+    val originTitle: String? = null,
+    val lastProgress: Long = 0L,
+    val lastDuration: Long = 0L
 ) : Serializable {
     fun getShareUrl(): String {
         if (!pageUrl.isNullOrBlank()) {

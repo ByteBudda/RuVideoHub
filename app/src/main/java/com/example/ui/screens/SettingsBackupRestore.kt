@@ -169,7 +169,7 @@ fun FullBackupRestoreDialog(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .sleekTvFocus(RoundedCornerShape(8.dp))
+                            .sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.02f)
                     ) {
                         Icon(imageVector = Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -211,7 +211,7 @@ fun FullBackupRestoreDialog(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .sleekTvFocus(RoundedCornerShape(8.dp))
+                            .sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.02f)
                     ) {
                         Icon(imageVector = Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -223,7 +223,7 @@ fun FullBackupRestoreDialog(
         confirmButton = {
             TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.sleekTvFocus()
+                modifier = Modifier.sleekTvFocus(scaleAmount = 1.02f)
             ) {
                 Text("Закрыть", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }

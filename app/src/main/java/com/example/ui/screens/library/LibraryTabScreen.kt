@@ -45,11 +45,59 @@ fun LibraryTabScreen(
     val bookmarkedVideos by viewModel.bookmarkedSavedVideos.collectAsStateWithLifecycle()
     val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isTvOptimized by viewModel.isTvOptimized.collectAsStateWithLifecycle()
+    val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
+
+    val mobileColsSetting = com.example.ui.screens.LocalMobileGridColumns.current
+    val tvVideoColsSetting = com.example.ui.screens.LocalTvVideoGridColumns.current
+    val cols = if (isTvOptimized) tvVideoColsSetting else mobileColsSetting
 
     var searchQuery by remember { mutableStateOf("") }
     var sortOrder by remember { mutableStateOf(BookmarkSort.DATE_ADDED) }
     var showSortMenu by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
+
+    val totalDurationText = remember(bookmarkedVideos) {
+        var totalSeconds = 0
+        for (video in bookmarkedVideos) {
+            val durationStr = video.duration.trim()
+            if (durationStr.isEmpty()) continue
+            try {
+                val parts = durationStr.split(":")
+                if (parts.size == 3) {
+                    val hours = parts[0].toIntOrNull() ?: 0
+                    val minutes = parts[1].toIntOrNull() ?: 0
+                    val seconds = parts[2].toIntOrNull() ?: 0
+                    totalSeconds += hours * 3600 + minutes * 60 + seconds
+                } else if (parts.size == 2) {
+                    val minutes = parts[0].toIntOrNull() ?: 0
+                    val seconds = parts[1].toIntOrNull() ?: 0
+                    totalSeconds += minutes * 60 + seconds
+                } else {
+                    val clean = durationStr.replace(Regex("[^0-9]"), "")
+                    val num = clean.toIntOrNull() ?: 0
+                    if (durationStr.contains("ч", ignoreCase = true) || durationStr.contains("h", ignoreCase = true)) {
+                        totalSeconds += num * 3600
+                    } else {
+                        totalSeconds += num * 60
+                    }
+                }
+            } catch (e: Exception) {
+                totalSeconds += 30 * 60
+            }
+        }
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        if (hours > 0) {
+            if (minutes > 0) {
+                "$hours ч $minutes мин"
+            } else {
+                "$hours ч"
+            }
+        } else {
+            "$minutes мин"
+        }
+    }
 
     Column(
         modifier = modifier
@@ -59,7 +107,7 @@ fun LibraryTabScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -71,88 +119,12 @@ fun LibraryTabScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Просмотр сохраненного контента и избранных видео",
+                    text = "Всего закладок: ${bookmarkedVideos.size}  •  Длительность: $totalDurationText",
                     fontSize = 12.sp,
-                    color = GreyText,
+                    fontWeight = FontWeight.Medium,
+                    color = Primary,
                     modifier = Modifier.padding(top = 2.dp)
                 )
-            }
-
-
-        }
-
-        // Simple Stats Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(RoundedCornerShape(16.dp), borderWidth = 1.dp, isDark = isDarkTheme, isTvOptimized = isTvOptimized)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "${bookmarkedVideos.size}",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary
-                )
-                Text(text = "Закладок", fontSize = 10.sp, color = GreyText)
-            }
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(28.dp)
-                    .background(SurfaceVariant)
-            )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val totalDurationText = remember(bookmarkedVideos) {
-                    var totalSeconds = 0
-                    for (video in bookmarkedVideos) {
-                        val durationStr = video.duration.trim()
-                        if (durationStr.isEmpty()) continue
-                        try {
-                            val parts = durationStr.split(":")
-                            if (parts.size == 3) {
-                                val hours = parts[0].toIntOrNull() ?: 0
-                                val minutes = parts[1].toIntOrNull() ?: 0
-                                val seconds = parts[2].toIntOrNull() ?: 0
-                                totalSeconds += hours * 3600 + minutes * 60 + seconds
-                            } else if (parts.size == 2) {
-                                val minutes = parts[0].toIntOrNull() ?: 0
-                                val seconds = parts[1].toIntOrNull() ?: 0
-                                totalSeconds += minutes * 60 + seconds
-                            } else {
-                                val clean = durationStr.replace(Regex("[^0-9]"), "")
-                                val num = clean.toIntOrNull() ?: 0
-                                if (durationStr.contains("ч", ignoreCase = true) || durationStr.contains("h", ignoreCase = true)) {
-                                    totalSeconds += num * 3600
-                                } else {
-                                    totalSeconds += num * 60
-                                }
-                            }
-                        } catch (e: Exception) {
-                            totalSeconds += 30 * 60
-                        }
-                    }
-                    val hours = totalSeconds / 3600
-                    val minutes = (totalSeconds % 3600) / 60
-                    if (hours > 0) {
-                        if (minutes > 0) {
-                            "$hours ч $minutes мин"
-                        } else {
-                            "$hours ч"
-                        }
-                    } else {
-                        "$minutes мин"
-                    }
-                }
-                Text(
-                    text = totalDurationText,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary
-                )
-                Text(text = "Время просмотра", fontSize = 10.sp, color = GreyText)
             }
         }
 
@@ -288,191 +260,234 @@ fun LibraryTabScreen(
                     it.duration != "ПАПКА" && 
                     it.duration != "КАТАЛОГ" && 
                     it.duration != "СЕРИАЛ" && 
-                    it.duration != "ПЛЕЙЛИСТ" 
-                }
-            }
-            val channels = remember(filteredAndSorted) {
-                filteredAndSorted.filter { it.duration == "КАНАЛ" }
-            }
-            val tvSeries = remember(filteredAndSorted) {
-                filteredAndSorted.filter { it.duration == "СЕРИАЛ" }
-            }
-            val subcategories = remember(filteredAndSorted) {
-                filteredAndSorted.filter { 
-                    it.duration == "ПАПКА" || 
-                    it.duration == "КАТАЛОГ"
+                    it.duration != "ПЛЕЙЛИСТ" &&
+                    it.duration != com.example.utils.VideoType.CHANNEL &&
+                    it.duration != com.example.utils.VideoType.FOLDER &&
+                    it.duration != com.example.utils.VideoType.SERIES &&
+                    it.duration != com.example.utils.VideoType.PLAYLIST
                 }
             }
             val playlists = remember(filteredAndSorted) {
-                filteredAndSorted.filter { it.duration == "ПЛЕЙЛИСТ" }
+                filteredAndSorted.filter { 
+                    it.duration == "ПЛЕЙЛИСТ" || it.duration == com.example.utils.VideoType.PLAYLIST 
+                }
+            }
+            val tvSeries = remember(filteredAndSorted) {
+                filteredAndSorted.filter { 
+                    it.duration == "СЕРИАЛ" || it.duration == com.example.utils.VideoType.SERIES 
+                }
+            }
+            val channels = remember(filteredAndSorted) {
+                filteredAndSorted.filter { 
+                    it.duration == "КАНАЛ" || it.duration == com.example.utils.VideoType.CHANNEL 
+                }
+            }
+            val subcategories = remember(filteredAndSorted) {
+                filteredAndSorted.filter { 
+                    it.duration == "ПАПКА" || it.duration == "КАТАЛОГ" || it.duration == com.example.utils.VideoType.FOLDER 
+                }
             }
 
-            var videosExpanded by remember { mutableStateOf(true) }
-            var channelsExpanded by remember { mutableStateOf(true) }
-            var tvSeriesExpanded by remember { mutableStateOf(true) }
-            var subcategoriesExpanded by remember { mutableStateOf(true) }
-            var playlistsExpanded by remember { mutableStateOf(true) }
+            val tabsList = listOf(
+                "Видео" to videos,
+                "Плейлисты" to playlists,
+                "Сериалы" to tvSeries,
+                "Каналы" to channels,
+                "Подкатегории" to subcategories
+            )
 
-            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-            LazyColumn(
-                state = listState,
+            // Horizontal Tab Chips
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .mouseDragScrollable(listState, isVertical = true),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // 1. VIDEOS
-                if (videos.isNotEmpty()) {
-                    item {
-                        BookmarkSectionHeader(
-                            title = "Видео",
-                            count = videos.size,
-                            icon = Icons.Default.VideoLibrary,
-                            isExpanded = videosExpanded,
-                            onClick = { videosExpanded = !videosExpanded }
-                        )
-                    }
-                    if (videosExpanded) {
-                        items(videos, key = { "vid_" + it.id }) { saved ->
-                            BookmarkItemRow(
-                                saved = saved,
-                                viewModel = viewModel,
-                                isDarkTheme = isDarkTheme,
-                                isTvOptimized = isTvOptimized,
-                                onDelete = {
-                                    val videoRuntime = Video(
-                                        id = saved.id, title = saved.title, channel = saved.channel,
-                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                    )
-                                    viewModel.toggleBookmark(videoRuntime)
-                                }
+                tabsList.forEachIndexed { index, (title, items) ->
+                    val isSelected = selectedTab == index
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (isSelected) Primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             )
-                        }
+                            .clickable { selectedTab = index }
+                            .sleekTvFocus(RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "$title (${items.size})",
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
+            }
 
-                // 2. CHANNELS
-                if (channels.isNotEmpty()) {
-                    item {
-                        BookmarkSectionHeader(
-                            title = "Каналы",
-                            count = channels.size,
-                            icon = Icons.Default.Tv,
-                            isExpanded = channelsExpanded,
-                            onClick = { channelsExpanded = !channelsExpanded }
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val currentTabItems = tabsList.getOrNull(selectedTab)?.second ?: emptyList()
+
+            if (currentTabItems.isEmpty()) {
+                val (emptyTitle, emptyHint) = when (selectedTab) {
+                    0 -> "Нет избранных видео" to "Вы можете добавить видео в закладки, нажав на иконку закладок."
+                    1 -> "Нет сохраненных плейлистов" to "Добавляйте плейлисты в избранное для быстрого доступа."
+                    2 -> "Нет сохраненных сериалов" to "Здесь будут отображаться избранные сериалы и телешоу."
+                    3 -> "Нет отслеживаемых каналов" to "Добавляйте интересные каналы в избранное."
+                    else -> "Нет сохраненных подкатегорий" to "Здесь будут сохраненные разделы и папки каталога."
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Text(
+                            text = emptyTitle,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                    }
-                    if (channelsExpanded) {
-                        items(channels, key = { "chan_" + it.id }) { saved ->
-                            BookmarkItemRow(
-                                saved = saved,
-                                viewModel = viewModel,
-                                isDarkTheme = isDarkTheme,
-                                isTvOptimized = isTvOptimized,
-                                onDelete = {
-                                    val videoRuntime = Video(
-                                        id = saved.id, title = saved.title, channel = saved.channel,
-                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                    )
-                                    viewModel.toggleBookmark(videoRuntime)
-                                }
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = emptyHint,
+                            fontSize = 13.sp,
+                            color = GreyText,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
-
-                // 3. TV SERIES
-                if (tvSeries.isNotEmpty()) {
-                    item {
-                        BookmarkSectionHeader(
-                            title = "Сериалы",
-                            count = tvSeries.size,
-                            icon = Icons.Default.Tv,
-                            isExpanded = tvSeriesExpanded,
-                            onClick = { tvSeriesExpanded = !tvSeriesExpanded }
-                        )
-                    }
-                    if (tvSeriesExpanded) {
-                        items(tvSeries, key = { "series_" + it.id }) { saved ->
-                            BookmarkItemRow(
-                                saved = saved,
-                                viewModel = viewModel,
-                                isDarkTheme = isDarkTheme,
-                                isTvOptimized = isTvOptimized,
-                                onDelete = {
+            } else {
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .mouseDragScrollable(listState, isVertical = true),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    if (cols > 1) {
+                        val chunked = currentTabItems.chunked(cols)
+                        items(chunked, key = { row -> row.firstOrNull()?.id ?: row.hashCode() }) { rowItems ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowItems.forEach { saved ->
                                     val videoRuntime = Video(
-                                        id = saved.id, title = saved.title, channel = saved.channel,
-                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
+                                        id = saved.id,
+                                        title = saved.title,
+                                        channel = saved.channel,
+                                        views = saved.views,
+                                        timeAgo = saved.timeAgo,
+                                        duration = saved.duration,
+                                        isPro = saved.isPro,
+                                        category = saved.category,
+                                        description = saved.description ?: "",
+                                        thumbnailUrl = saved.thumbnailUrl,
+                                        isDownloaded = saved.isDownloaded,
+                                        isBookmarked = true,
+                                        pageUrl = saved.pageUrl,
+                                        originType = saved.originType,
+                                        originId = saved.originId,
+                                        originTitle = saved.originTitle,
+                                        authorId = saved.authorId,
+                                        authorAvatarUrl = saved.authorAvatarUrl
                                     )
-                                    viewModel.toggleBookmark(videoRuntime)
+                                    com.example.ui.screens.home.components.SleekVideoGridItem(
+                                        video = videoRuntime,
+                                        onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                        onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                        isDark = isDarkTheme,
+                                        isTvOptimized = isTvOptimized,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
-                            )
+                                repeat(cols - rowItems.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
                         }
-                    }
-                }
-
-                // 4. SUBCATEGORIES
-                if (subcategories.isNotEmpty()) {
-                    item {
-                        BookmarkSectionHeader(
-                            title = "Подкатегории",
-                            count = subcategories.size,
-                            icon = Icons.Default.Folder,
-                            isExpanded = subcategoriesExpanded,
-                            onClick = { subcategoriesExpanded = !subcategoriesExpanded }
-                        )
-                    }
-                    if (subcategoriesExpanded) {
-                        items(subcategories, key = { "sub_" + it.id }) { saved ->
-                            BookmarkItemRow(
-                                saved = saved,
-                                viewModel = viewModel,
-                                isDarkTheme = isDarkTheme,
-                                isTvOptimized = isTvOptimized,
-                                onDelete = {
-                                    val videoRuntime = Video(
-                                        id = saved.id, title = saved.title, channel = saved.channel,
-                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                    )
-                                    viewModel.toggleBookmark(videoRuntime)
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // 5. PLAYLISTS
-                if (playlists.isNotEmpty()) {
-                    item {
-                        BookmarkSectionHeader(
-                            title = "Плейлисты",
-                            count = playlists.size,
-                            icon = Icons.AutoMirrored.Filled.PlaylistPlay,
-                            isExpanded = playlistsExpanded,
-                            onClick = { playlistsExpanded = !playlistsExpanded }
-                        )
-                    }
-                    if (playlistsExpanded) {
-                        items(playlists, key = { "play_" + it.id }) { saved ->
-                            BookmarkItemRow(
-                                saved = saved,
-                                viewModel = viewModel,
-                                isDarkTheme = isDarkTheme,
-                                isTvOptimized = isTvOptimized,
-                                onDelete = {
-                                    val videoRuntime = Video(
-                                        id = saved.id, title = saved.title, channel = saved.channel,
-                                        views = saved.views, timeAgo = saved.timeAgo, duration = saved.duration,
-                                        isPro = saved.isPro, category = saved.category, description = saved.description ?: "", thumbnailUrl = saved.thumbnailUrl, isDownloaded = saved.isDownloaded, isBookmarked = true
-                                    )
-                                    viewModel.toggleBookmark(videoRuntime)
-                                }
-                            )
+                    } else {
+                        if (isLargeCardsMode) {
+                            items(currentTabItems, key = { it.id }) { saved ->
+                                val videoRuntime = Video(
+                                    id = saved.id,
+                                    title = saved.title,
+                                    channel = saved.channel,
+                                    views = saved.views,
+                                    timeAgo = saved.timeAgo,
+                                    duration = saved.duration,
+                                    isPro = saved.isPro,
+                                    category = saved.category,
+                                    description = saved.description ?: "",
+                                    thumbnailUrl = saved.thumbnailUrl,
+                                    isDownloaded = saved.isDownloaded,
+                                    isBookmarked = true,
+                                    pageUrl = saved.pageUrl,
+                                    originType = saved.originType,
+                                    originId = saved.originId,
+                                    originTitle = saved.originTitle,
+                                    authorId = saved.authorId,
+                                    authorAvatarUrl = saved.authorAvatarUrl
+                                )
+                                com.example.ui.screens.home.components.HeroVideoCard(
+                                    video = videoRuntime,
+                                    onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                    onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                    isDark = isDarkTheme,
+                                    isTvOptimized = isTvOptimized,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                                )
+                            }
+                        } else {
+                            items(currentTabItems, key = { it.id }) { saved ->
+                                val videoRuntime = Video(
+                                    id = saved.id,
+                                    title = saved.title,
+                                    channel = saved.channel,
+                                    views = saved.views,
+                                    timeAgo = saved.timeAgo,
+                                    duration = saved.duration,
+                                    isPro = saved.isPro,
+                                    category = saved.category,
+                                    description = saved.description ?: "",
+                                    thumbnailUrl = saved.thumbnailUrl,
+                                    isDownloaded = saved.isDownloaded,
+                                    isBookmarked = true,
+                                    pageUrl = saved.pageUrl,
+                                    originType = saved.originType,
+                                    originId = saved.originId,
+                                    originTitle = saved.originTitle,
+                                    authorId = saved.authorId,
+                                    authorAvatarUrl = saved.authorAvatarUrl
+                                )
+                                com.example.ui.screens.home.components.SecondaryVideoItemRow(
+                                    video = videoRuntime,
+                                    onVideoClick = { viewModel.selectVideo(videoRuntime) },
+                                    onDownloadToggle = { viewModel.toggleDownload(videoRuntime) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(videoRuntime) },
+                                    isDark = isDarkTheme,
+                                    isTvOptimized = isTvOptimized,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp)
+                                )
+                            }
                         }
                     }
                 }

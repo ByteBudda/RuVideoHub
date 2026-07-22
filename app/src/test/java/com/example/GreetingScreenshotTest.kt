@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.koin.core.context.GlobalContext
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -26,9 +27,11 @@ class GreetingScreenshotTest {
   @Test
   fun greeting_screenshot() {
     val application = ApplicationProvider.getApplicationContext<Application>()
-    val viewModel = VideoViewModel(application)
+    val viewModel = GlobalContext.get().get<VideoViewModel>()
+    
     composeTestRule.setContent { 
       MyApplicationTheme { 
+        @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
         SleekVideoHubApp(viewModel = viewModel) 
       } 
     }

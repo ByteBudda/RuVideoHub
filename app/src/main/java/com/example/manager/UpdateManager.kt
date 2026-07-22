@@ -103,20 +103,110 @@ object UpdateManager {
         return false
     }
 
+    private const val UPDATE_CHANNEL_ID = "update_channel"
+    private const val UPDATE_NOTIFICATION_ID = 9991
+
+    private fun showUpdateNotification(context: Context, title: String, content: String, progress: Int = -1, finishedFile: File? = null) {
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager ?: return
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    UPDATE_CHANNEL_ID,
+                    "Обновления приложения",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+                )
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val builder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                android.app.Notification.Builder(context, UPDATE_CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                android.app.Notification.Builder(context)
+            }
+
+            builder.setContentTitle(title)
+                .setContentText(content)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+
+            if (progress >= 0) {
+                builder.setProgress(100, progress, false)
+            } else if (progress == -2) {
+                builder.setProgress(100, 0, true)
+            }
+
+            if (finishedFile != null) {
+                try {
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.provider",
+                        finishedFile
+                    )
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    val pendingIntent = android.app.PendingIntent.getActivity(
+                        context,
+                        0,
+                        intent,
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                    )
+                    builder.setContentIntent(pendingIntent)
+                        .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                        .setAutoCancel(true)
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Failed to create pending intent for update notification", e)
+                }
+            }
+
+            notificationManager.notify(UPDATE_NOTIFICATION_ID, builder.build())
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to show update notification", e)
+        }
+    }
+
     fun startDownloadAndInstall(context: Context, urlString: String, version: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 downloadState.value = DownloadState.Downloading(0f)
-                val url = URL(urlString)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) RuVideoHub")
-                connection.connect()
+                showUpdateNotification(context, "Обновление RuVideoHub v$version", "Подключение...", -2)
 
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    downloadState.value = DownloadState.Error("HTTP error: ${connection.responseCode}")
+                var currentUrl = urlString
+                var connection: HttpURLConnection? = null
+                var redirectCount = 0
+                while (redirectCount < 10) {
+                    val url = URL(currentUrl)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.instanceFollowRedirects = false
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 15000
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36")
+                    conn.connect()
+
+                    val status = conn.responseCode
+                    if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        status == HttpURLConnection.HTTP_MOVED_PERM ||
+                        status == HttpURLConnection.HTTP_SEE_OTHER ||
+                        status == 307 || status == 308
+                    ) {
+                        val newUrl = conn.getHeaderField("Location")
+                        conn.disconnect()
+                        if (!newUrl.isNullOrEmpty()) {
+                            currentUrl = newUrl
+                            redirectCount++
+                            continue
+                        }
+                    }
+                    connection = conn
+                    break
+                }
+
+                if (connection == null || connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    val errCode = connection?.responseCode ?: -1
+                    downloadState.value = DownloadState.Error("HTTP error: $errCode")
+                    showUpdateNotification(context, "Ошибка обновления", "Код ошибки: $errCode")
                     delay(3000)
                     downloadState.value = DownloadState.Idle
                     return@launch
@@ -136,10 +226,18 @@ object UpdateManager {
                 val data = ByteArray(8192)
                 var total: Long = 0
                 var count: Int
+                var lastNotifyTime = 0L
                 while (input.read(data).also { count = it } != -1) {
                     total += count
                     if (fileLength > 0) {
-                        downloadState.value = DownloadState.Downloading(total.toFloat() / fileLength.toFloat())
+                        val progressFloat = total.toFloat() / fileLength.toFloat()
+                        downloadState.value = DownloadState.Downloading(progressFloat)
+                        val now = System.currentTimeMillis()
+                        if (now - lastNotifyTime > 800L) {
+                            lastNotifyTime = now
+                            val pct = (progressFloat * 100).toInt()
+                            showUpdateNotification(context, "Загрузка обновления v$version", "$pct%", pct)
+                        }
                     }
                     output.write(data, 0, count)
                 }
@@ -148,7 +246,33 @@ object UpdateManager {
                 output.close()
                 input.close()
 
+                // Validate APK signature (PK header) and file length
+                var isValidApk = false
+                if (apkFile.exists() && apkFile.length() > 100_000L) {
+                    try {
+                        java.io.FileInputStream(apkFile).use { fis ->
+                            val b1 = fis.read()
+                            val b2 = fis.read()
+                            if (b1 == 0x50 && b2 == 0x4B) { // 'P' 'K'
+                                isValidApk = true
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "Error validating APK signature", e)
+                    }
+                }
+
+                if (!isValidApk) {
+                    if (apkFile.exists()) apkFile.delete()
+                    downloadState.value = DownloadState.Error("Скачанный файл поврежден или не является APK")
+                    showUpdateNotification(context, "Ошибка обновления", "Скачанный файл не является корректным APK пакетом")
+                    delay(3000)
+                    downloadState.value = DownloadState.Idle
+                    return@launch
+                }
+
                 downloadState.value = DownloadState.Finished
+                showUpdateNotification(context, "Обновление скачано", "Нажмите для установки v$version", 100, apkFile)
                 
                 // Trigger install
                 installApk(context, apkFile)
@@ -159,6 +283,7 @@ object UpdateManager {
             } catch (e: Throwable) {
                 Log.e(TAG, "Download failed", e)
                 downloadState.value = DownloadState.Error(e.message ?: "Download failed")
+                showUpdateNotification(context, "Ошибка скачивания обновления", e.message ?: "Неизвестная ошибка")
                 delay(3000)
                 downloadState.value = DownloadState.Idle
             }
@@ -167,6 +292,17 @@ object UpdateManager {
 
     private fun installApk(context: Context, file: File) {
         try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val settingsIntent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(settingsIntent)
+                    android.widget.Toast.makeText(context, "Разрешите установку обновлений из неизвестных источников", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+
             val uri = androidx.core.content.FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.provider",
@@ -179,6 +315,7 @@ object UpdateManager {
             context.startActivity(intent)
         } catch (e: Throwable) {
             Log.e(TAG, "Install failed", e)
+            android.widget.Toast.makeText(context, "Ошибка установки APK: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 }

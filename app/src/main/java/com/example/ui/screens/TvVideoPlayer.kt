@@ -98,7 +98,7 @@ fun TvRutubeVideoPlayer(
         }
     }
 
-    var currentPos by remember { mutableStateOf(0L) }
+    var currentPos by remember(videoId) { mutableStateOf(viewModel.getVideoPosition(videoId)) }
     var totalDuration by remember { mutableStateOf(0L) }
     val playPauseFocusRequester = remember { FocusRequester() }
     val playerFocusRequester = remember { FocusRequester() }
@@ -367,7 +367,7 @@ fun TvRutubeVideoPlayer(
                                 }
                             } else false
                         }
-                } else Modifier
+                } else Modifier.focusProperties { canFocus = false }
             )
     ) {
         // Если это стрим и мы ещё не получили HLS — показываем индикатор загрузки
@@ -1086,6 +1086,10 @@ fun TvRutubeVideoPlayer(
                         }
                     },
                     update = { webView ->
+                        if (isMiniPlayer) {
+                            webView.isFocusable = false
+                            webView.isFocusableInTouchMode = false
+                        }
                         webView.layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT

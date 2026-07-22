@@ -674,6 +674,7 @@ fun LinkifiedText(
         }
     }
     
+    @Suppress("DEPRECATION")
     ClickableText(
         text = annotatedString,
         style = MaterialTheme.typography.bodyMedium.copy(

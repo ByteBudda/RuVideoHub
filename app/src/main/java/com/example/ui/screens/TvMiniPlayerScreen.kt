@@ -79,15 +79,36 @@ fun TvMiniPlayerScreen(
         }
     }
     
-    // Auto-scroll to current video in list when shown or changed
-    LaunchedEffect(currentVideo, playableVideos) {
-        val index = playableVideos.indexOfFirst { it.id == currentVideo?.id }
-        if (index >= 0) {
+    var lastFullscreenState by remember { mutableStateOf(localIsFullscreen) }
+    var lastScrolledVideoId by remember { mutableStateOf<String?>(null) }
+
+    // Auto-scroll to current video in list when shown, changed, or returning from fullscreen
+    LaunchedEffect(currentVideo?.id, playableVideos, localIsFullscreen) {
+        val currentId = currentVideo?.id
+        val index = playableVideos.indexOfFirst { it.id == currentId }
+        val exitedFullscreen = lastFullscreenState && !localIsFullscreen
+
+        if (index >= 0 && (currentId != lastScrolledVideoId || exitedFullscreen)) {
             try {
                 listState.scrollToItem(index)
+                lastScrolledVideoId = currentId
             } catch (e: Throwable) {
                 // Fail-safe
             }
+        }
+        lastFullscreenState = localIsFullscreen
+    }
+
+    val lastVisibleItemIndex by remember {
+        derivedStateOf {
+            listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        }
+    }
+
+    LaunchedEffect(lastVisibleItemIndex, playableVideos.size) {
+        val total = listState.layoutInfo.totalItemsCount
+        if (total > 0 && lastVisibleItemIndex >= total - 8) {
+            viewModel.loadNextPage()
         }
     }
     
@@ -306,6 +327,7 @@ fun TvMiniPlayerScreen(
                                     )
                                 }
                                 .background(Color.Transparent)
+                                .focusProperties { canFocus = false }
                         )
                         
                         // TV Optimized Control Buttons
@@ -592,7 +614,7 @@ fun TvMiniPlayerScreen(
             }
 
             Box(
-                modifier = playerModifier,
+                modifier = playerModifier.then(if (!localIsFullscreen) Modifier.focusProperties { canFocus = false } else Modifier),
                 contentAlignment = Alignment.Center
             ) {
                 TvRutubeVideoPlayer(

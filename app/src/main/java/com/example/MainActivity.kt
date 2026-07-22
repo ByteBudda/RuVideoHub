@@ -5,19 +5,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.ui.screens.SleekVideoHubApp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.VideoViewModel
+import org.koin.androidx.viewmodel.ext.android.viewModel
+import kotlinx.coroutines.*
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
 
-  private val viewModel: VideoViewModel by viewModels {
-    VideoViewModel.Factory(application)
-  }
+  private val viewModel: VideoViewModel by viewModel()
 
   private val handler = android.os.Handler(android.os.Looper.getMainLooper())
   private val exitRunnable = Runnable { finishAndRemoveTask() }
@@ -99,8 +98,17 @@ class MainActivity : ComponentActivity() {
     // Handle incoming intent (deep link or shared content)
     handleIntent(intent)
 
+    // Request runtime notification permission on Android 13+ if needed
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+        }
+    }
+
     // Automatically resume any interrupted/pending downloads in the background
-    com.example.manager.DownloadManager.resumeAll(this)
+    MainScope().launch(Dispatchers.IO) {
+        com.example.manager.DownloadManager.resumeAll(this@MainActivity)
+    }
   }
 
   private fun handleIntent(intent: android.content.Intent?) {

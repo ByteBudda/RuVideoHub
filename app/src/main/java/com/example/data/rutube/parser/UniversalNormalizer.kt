@@ -16,9 +16,9 @@ object UniversalNormalizer {
             json.optJSONObject("object")!! else json
 
         val signature = SchemaAnalyzer.buildSignature(data)
-        val objectUrl = data.optString("url", null)?.takeIf { it.isNotBlank() }
-            ?: data.optString("absolute_url", null)?.takeIf { it.isNotBlank() }
-            ?: data.optString("video_url", null)?.takeIf { it.isNotBlank() }
+        val objectUrl = data.optString("url").takeIf { it.isNotBlank() }
+            ?: data.optString("absolute_url").takeIf { it.isNotBlank() }
+            ?: data.optString("video_url").takeIf { it.isNotBlank() }
         
         // Only use endpointHint for type detection if the item doesn't have its own URL
         // AND the model is completely unknown. But we must be careful not to label
@@ -77,10 +77,10 @@ object UniversalNormalizer {
             inner.optJSONObject("type")?.optString("name"),
             outer.optJSONObject("type")?.optString("code"),
             inner.optJSONObject("type")?.optString("code"),
-            outer.optString("type", null),
-            inner.optString("type", null),
-            outer.optString("model", null),
-            inner.optString("model", null)
+            outer.optString("type").takeIf { it.isNotEmpty() },
+            inner.optString("type").takeIf { it.isNotEmpty() },
+            outer.optString("model").takeIf { it.isNotEmpty() },
+            inner.optString("model").takeIf { it.isNotEmpty() }
         )
         return sources.filterNotNull().firstOrNull { it.isNotBlank() } ?: ""
     }
@@ -209,8 +209,8 @@ object UniversalNormalizer {
         val obj = data.optJSONObject("object")
         val target = obj ?: data
 
-        val id = target.optString("id", null)?.takeIf { it.isNotBlank() }
-            ?: data.optString("object_id", null)?.takeIf { it.isNotBlank() }
+        val id = target.optString("id").takeIf { it.isNotBlank() }
+            ?: data.optString("object_id").takeIf { it.isNotBlank() }
             ?: AdaptiveExtractor.getString(data, "id", endpointHint).takeIf { it.isNotBlank() }
             ?: AdaptiveExtractor.getString(target, "id", endpointHint).takeIf { it.isNotBlank() }
             ?: makeId("playlist", data, endpointHint) ?: ""
@@ -225,17 +225,17 @@ object UniversalNormalizer {
             .takeIf { it > 0 }
             ?: data.optInt("videos_count", data.optInt("video_count", 0))
 
-        val contentUrl = target.optString("absolute_url", null)?.takeIf { it.isNotBlank() }
-            ?: target.optString("content", null)?.takeIf { it.isNotBlank() }
-            ?: data.optString("url", null)?.takeIf { it.isNotBlank() }
+        val contentUrl = target.optString("absolute_url").takeIf { it.isNotBlank() }
+            ?: target.optString("content").takeIf { it.isNotBlank() }
+            ?: data.optString("url").takeIf { it.isNotBlank() }
             ?: "https://rutube.ru/api/playlist/custom/$id/videos/" ?: ""
 
-        val title = target.optString("name", null)?.takeIf { it.isNotBlank() }
-            ?: target.optString("title", null)?.takeIf { it.isNotBlank() } ?: ""
+        val title = target.optString("name").takeIf { it.isNotBlank() }
+            ?: target.optString("title").takeIf { it.isNotBlank() } ?: ""
             ?: AdaptiveExtractor.getString(data, "title", endpointHint, "Untitled") ?: ""
 
-        val thumbnail = target.optString("picture", null)?.takeIf { it.isNotBlank() }
-            ?: target.optString("thumbnail", null)?.takeIf { it.isNotBlank() }
+        val thumbnail = target.optString("picture").takeIf { it.isNotBlank() }
+            ?: target.optString("thumbnail").takeIf { it.isNotBlank() }
             ?: AdaptiveExtractor.getString(data, "thumbnail", endpointHint).takeIf { it.isNotBlank() } ?: ""
             ?: AdaptiveExtractor.getString(data, "picture", endpointHint).takeIf { it.isNotBlank() } ?: ""
             ?: AdaptiveExtractor.getString(data, "image", endpointHint) ?: "".takeIf { it.isNotBlank() } ?: ""

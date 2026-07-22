@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.android.ext.android.inject
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -29,12 +30,10 @@ class DownloadService : Service() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
-    private lateinit var repository: VideoRepository
+    private val repository: VideoRepository by inject()
 
     override fun onCreate() {
         super.onCreate()
-        val db = AppDatabase.getDatabase(applicationContext)
-        repository = VideoRepository(db.savedVideoDao())
         createNotificationChannel()
     }
 
@@ -84,7 +83,8 @@ class DownloadService : Service() {
                         val queue = DownloadManager.loadQueue(this@DownloadService).toMutableList()
                         queue.removeAll { it.first.id == completedId }
                         DownloadManager.saveQueue(this@DownloadService, queue)
-                        DownloadManager.onDownloadCompletedListener?.invoke(completedId)
+                        serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
+                        showResultNotification(video.title, true)
                     }
                 } else if (video.id.startsWith("vk_")) {
                     downloadVkVideoDirect(video) { completedId ->
@@ -93,7 +93,8 @@ class DownloadService : Service() {
                         queue.removeAll { it.first.id == completedId }
                         DownloadManager.saveQueue(this@DownloadService, queue)
 
-                        DownloadManager.onDownloadCompletedListener?.invoke(completedId)
+                        serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
+                        showResultNotification(video.title, true)
                     }
                 } else {
                     YtDlpDownloader.startYtDlpDownload(
@@ -108,18 +109,21 @@ class DownloadService : Service() {
                         queue.removeAll { it.first.id == completedId }
                         DownloadManager.saveQueue(this@DownloadService, queue)
 
-                        DownloadManager.onDownloadCompletedListener?.invoke(completedId)
+                        serviceScope.launch { DownloadManager.emitDownloadCompleted(completedId) }
+                        showResultNotification(video.title, true)
                     }
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Download failed for ${video.id}", e)
+                showResultNotification(video.title, false)
             } finally {
                 DownloadManager.downloadJobs.remove(video.id)
                 DownloadManager.removeActiveDownload(video.id)
                 
                 // If there are no more active downloads, stop the foreground service
                 if (DownloadManager.downloadJobs.isEmpty()) {
-                    stopForeground(true)
+                    @Suppress("DEPRECATION")
+                stopForeground(true)
                     stopSelf()
                 } else {
                     updateNotification()
@@ -154,7 +158,8 @@ class DownloadService : Service() {
         }
 
         if (DownloadManager.downloadJobs.isEmpty()) {
-            stopForeground(true)
+            @Suppress("DEPRECATION")
+                stopForeground(true)
             stopSelf()
         } else {
             updateNotification()
@@ -360,6 +365,35 @@ class DownloadService : Service() {
             channel.description = "Отображает ход выполнения фонового скачивания видео"
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showResultNotification(videoTitle: String, success: Boolean) {
+        try {
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            val intent = Intent(this, MainActivity::class.java)
+            val pendingIntent = android.app.PendingIntent.getActivity(
+                this, 0, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+            val title = if (success) "Загрузка завершена" else "Ошибка загрузки"
+            val icon = if (success) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error
+            val notification = builder
+                .setContentTitle(title)
+                .setContentText(videoTitle)
+                .setSmallIcon(icon)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build()
+            notificationManager.notify(videoTitle.hashCode(), notification)
+        } catch (e: Throwable) {
+            android.util.Log.e(TAG, "Failed to show result notification", e)
         }
     }
 

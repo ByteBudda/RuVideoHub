@@ -5,6 +5,7 @@ import com.example.data.SubtitleTrack
 import com.example.data.rutube.HlsParser
 import com.example.data.rutube.HlsStream
 import com.example.data.rutube.RutubeRetrofitClient
+import com.example.data.rutube.parser.RutubeParser
 import com.example.data.vk.VkVideoLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,13 +13,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class RutubeMediaResolver(
     private val playerManager: PlayerManager,
     private val coroutineScope: CoroutineScope
 ) {
+    private val parser = RutubeParser()
+
     val streamUrlCache = LruCache<String, String>(100)
     val masterUrlCache = LruCache<String, String>(100)
     val parsedStreamsCache = LruCache<String, List<HlsStream>>(100)
@@ -26,68 +28,6 @@ class RutubeMediaResolver(
     fun clearHlsCache(videoId: String) {
         streamUrlCache.remove(videoId)
         masterUrlCache.remove(videoId)
-    }
-
-    /**
-     * Извлекает прямую ссылку на HLS-поток из JSON-ответа /api/play/options/
-     * Поддерживает обычные видео, стримы (live_streams) и видео с video_balancer
-     */
-    fun extractStreamUrlFromPlayOptions(json: JSONObject): String? {
-        // 1. Проверяем live_streams (для прямых эфиров)
-        json.optJSONObject("live_streams")?.let { liveStreams ->
-            // Пробуем hls массив
-            liveStreams.optJSONArray("hls")?.let { hlsArray ->
-                if (hlsArray.length() > 0) {
-                    val firstHls = hlsArray.getJSONObject(0)
-                    firstHls.optString("url").takeIf { it.isNotBlank() }?.let { return it }
-                }
-            }
-            // Пробуем прямые поля
-            listOf("hls", "m3u8", "url", "default").forEach { key ->
-                liveStreams.optString(key).takeIf { it.isNotBlank() }?.let { return it }
-            }
-        }
-
-        // 2. Проверяем live_balancer (альтернативный формат)
-        json.optJSONObject("live_balancer")?.let { liveBalancer ->
-            listOf("hls", "m3u8", "url", "default").forEach { key ->
-                liveBalancer.optString(key).takeIf { it.isNotBlank() }?.let { return it }
-            }
-        }
-
-        // 3. Проверяем video_balancer (для обычных видео)
-        json.optJSONObject("video_balancer")?.let { vb ->
-            listOf("m3u8", "hls", "default", "url").forEach { key ->
-                vb.optString(key).takeIf { it.isNotBlank() }?.let { return it }
-            }
-        }
-
-        // 4. Проверяем корневые поля
-        listOf("hls_url", "stream_url", "m3u8", "url", "video_url").forEach { key ->
-            json.optString(key).takeIf { it.isNotBlank() }?.let { return it }
-        }
-
-        // 5. Рекурсивный поиск по всем полям JSON (запасной вариант)
-        fun searchInJson(obj: JSONObject, depth: Int = 0): String? {
-            if (depth > 3) return null
-            val keys = obj.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val value = obj.opt(key)
-                when (value) {
-                    is String -> {
-                        if (value.contains(".m3u8") && value.startsWith("http")) {
-                            return value
-                        }
-                    }
-                    is JSONObject -> {
-                        searchInJson(value, depth + 1)?.let { return it }
-                    }
-                }
-            }
-            return null
-        }
-        return searchInJson(json)
     }
 
     suspend fun fetchSubtitles(videoId: String): List<SubtitleTrack> {
@@ -100,19 +40,7 @@ class RutubeMediaResolver(
                 
                 val response = RutubeRetrofitClient.apiService.getSubtitles(videoId)
                 val bodyStr = response.string()
-                val jsonObject = JSONObject(bodyStr)
-                val list = jsonObject.optJSONArray("list") ?: return@withContext emptyList()
-                val result = mutableListOf<SubtitleTrack>()
-                for (i in 0 until list.length()) {
-                    val subObj = list.optJSONObject(i) ?: continue
-                    val lang = subObj.optString("langTitle", "Unknown")
-                    val format = subObj.optString("format", "srt")
-                    val url = subObj.optString("file", "")
-                    if (url.isNotBlank()) {
-                        result.add(SubtitleTrack(lang, format, url))
-                    }
-                }
-                result
+                parser.parseSubtitles(bodyStr)
             } catch (e: Exception) {
                 android.util.Log.e("RutubeMediaResolver", "Error fetching subtitles", e)
                 emptyList()
@@ -201,10 +129,9 @@ class RutubeMediaResolver(
                     okHttpClient.newCall(req).execute().use { resp ->
                         if (!resp.isSuccessful) return@withContext null
                         val bodyString = resp.body?.string() ?: return@withContext null
-                        val jsonObject = JSONObject(bodyString)
 
                         // Используем улучшенную функцию извлечения
-                        var extractedStreamUrl = extractStreamUrlFromPlayOptions(jsonObject)
+                        val extractedStreamUrl = parser.extractStreamUrlFromPlayOptions(bodyString)
 
                         if (extractedStreamUrl.isNullOrBlank()) {
                             android.util.Log.w("RutubeMediaResolver", "No stream URL found in play options for $videoId")

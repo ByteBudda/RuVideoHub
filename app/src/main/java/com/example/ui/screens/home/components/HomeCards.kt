@@ -32,6 +32,7 @@ import com.example.ui.theme.Primary
 import com.example.ui.theme.PrimaryContainer
 import com.example.ui.theme.liquidGlass
 import com.example.ui.screens.sleekTvFocus
+import com.example.ui.screens.player.formatMillis
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -44,6 +45,7 @@ fun HeroVideoCard(
     onChannelClick: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null,
     onSaveToDeviceClick: (() -> Unit)? = null,
+    savingProgress: Map<String, Float> = emptyMap(),
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -59,6 +61,7 @@ fun HeroVideoCard(
             video.duration == com.example.utils.VideoType.PROMO ||
             video.duration == "ПЛЕЙЛИСТ" ||
             video.id.startsWith("channel_")
+    val saving = savingProgress[video.id]
 
     Card(
         shape = cardShape,
@@ -80,6 +83,10 @@ fun HeroVideoCard(
     ) {
         Column {
             // Thumbnail
+            val progressTimestamp = if (video.lastProgress > 0 && video.lastDuration > 0) {
+                "${formatMillis(video.lastProgress)} / ${formatMillis(video.lastDuration)}"
+            } else null
+
             VideoThumbnail(
                 id = video.id,
                 duration = video.duration,
@@ -93,11 +100,20 @@ fun HeroVideoCard(
                     bottomStart = 0.dp,
                     bottomEnd = 0.dp
                 ),
+                progressTimestamp = progressTimestamp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
                     .aspectRatio(16f / 9f)
             )
+            if (saving != null) {
+                LinearProgressIndicator(
+                    progress = { saving },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
 
             // Info Details
             Row(
@@ -195,7 +211,7 @@ fun HeroVideoCard(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Опции", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
                     
-                    val btnModifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                    val btnModifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.02f)
                     
                     if (onChannelClick != null) {
                         Button(
@@ -276,6 +292,7 @@ fun SleekVideoGridItem(
     onChannelClick: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null,
     onSaveToDeviceClick: (() -> Unit)? = null,
+    savingProgress: Map<String, Float> = emptyMap(),
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -291,6 +308,7 @@ fun SleekVideoGridItem(
             video.duration == com.example.utils.VideoType.PROMO ||
             video.duration == "ПЛЕЙЛИСТ" ||
             video.id.startsWith("channel_")
+    val saving = savingProgress[video.id]
 
     Card(
         shape = cardShape,
@@ -311,6 +329,10 @@ fun SleekVideoGridItem(
     ) {
         Column {
             // Thumbnail
+            val progressTimestamp = if (video.lastProgress > 0 && video.lastDuration > 0) {
+                "${formatMillis(video.lastProgress)} / ${formatMillis(video.lastDuration)}"
+            } else null
+
             VideoThumbnail(
                 id = video.id,
                 duration = video.duration,
@@ -323,10 +345,19 @@ fun SleekVideoGridItem(
                     bottomStart = 0.dp,
                     bottomEnd = 0.dp
                 ),
+                progressTimestamp = progressTimestamp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
             )
+            if (saving != null) {
+                LinearProgressIndicator(
+                    progress = { saving },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
 
             // Info Details
             Column(
@@ -412,7 +443,7 @@ fun SleekVideoGridItem(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Опции", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
                     
-                    val btnModifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).sleekTvFocus(RoundedCornerShape(8.dp))
+                    val btnModifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).sleekTvFocus(RoundedCornerShape(8.dp), scaleAmount = 1.02f)
                     
                     if (onChannelClick != null) {
                         Button(
@@ -492,6 +523,7 @@ fun SecondaryVideoItemRow(
     onChannelClick: (() -> Unit)? = null,
     onDeleteClick: (() -> Unit)? = null,
     onSaveToDeviceClick: (() -> Unit)? = null,
+    savingProgress: Map<String, Float> = emptyMap(),
     isTvOptimized: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -506,12 +538,13 @@ fun SecondaryVideoItemRow(
             video.duration == com.example.utils.VideoType.PROMO ||
             video.duration == "ПЛЕЙЛИСТ" ||
             video.id.startsWith("channel_")
+    val saving = savingProgress[video.id]
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .sleekTvFocus(shape = cardShape, onEnter = onVideoClick)
+            .sleekTvFocus(shape = cardShape, scaleAmount = 1.02f, onEnter = onVideoClick)
             .clickable(onClick = onVideoClick)
             .liquidGlass(cardShape, borderWidth = 1.dp, isDark = isDark, isTvOptimized = isTvOptimized)
             .padding(8.dp),
@@ -519,16 +552,31 @@ fun SecondaryVideoItemRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Thumbnail Left
-        VideoThumbnail(
-            id = video.id,
-            duration = video.duration,
-            thumbnailUrl = video.thumbnailUrl,
-            isWatched = video.isWatched,
-            playbackProgress = video.playbackProgress,
-            modifier = Modifier
-                .width(128.dp)
-                .height(78.dp)
-        )
+        val progressTimestamp = if (video.lastProgress > 0 && video.lastDuration > 0) {
+            "${formatMillis(video.lastProgress)} / ${formatMillis(video.lastDuration)}"
+        } else null
+
+        Column {
+            VideoThumbnail(
+                id = video.id,
+                duration = video.duration,
+                thumbnailUrl = video.thumbnailUrl,
+                isWatched = video.isWatched,
+                playbackProgress = video.playbackProgress,
+                progressTimestamp = progressTimestamp,
+                modifier = Modifier
+                    .width(128.dp)
+                    .height(78.dp)
+            )
+            if (saving != null) {
+                LinearProgressIndicator(
+                    progress = { saving },
+                    modifier = Modifier.width(128.dp).height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
 
         // Text Right
         Column(

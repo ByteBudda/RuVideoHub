@@ -32,7 +32,7 @@ fun SettingsRow(
             .then(
                 if (onClick != null) {
                     Modifier
-                        .sleekTvFocus(shape = RoundedCornerShape(12.dp))
+                        .sleekTvFocus(shape = RoundedCornerShape(12.dp), scaleAmount = 1.02f)
                         .clickable(onClick = onClick)
                 } else {
                     Modifier

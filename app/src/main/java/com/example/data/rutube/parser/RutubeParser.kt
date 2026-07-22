@@ -1,6 +1,7 @@
 package com.example.data.rutube.parser
 
 import com.example.data.Video
+import com.example.data.SubtitleTrack
 import com.example.data.rutube.parser.NormalizedCard
 import org.json.JSONObject
 
@@ -230,6 +231,238 @@ class RutubeParser {
                     thumbnailUrl = card.thumbnail
                 )
             }
+        }
+    }
+
+    data class ParsedChannelProfile(
+        val name: String,
+        val description: String,
+        val subscribersCount: Int,
+        val avatarUrl: String,
+        val coverImage: String
+    )
+
+    fun parseChannelProfile(body: String, fallbackName: String, fallbackDescription: String, fallbackAvatarUrl: String, fallbackCoverUrl: String): ParsedChannelProfile {
+        try {
+            val jsonObject = JSONObject(body)
+            val name = jsonObject.optString("name", fallbackName) ?: ""
+            val description = jsonObject.optString("description", fallbackDescription) ?: ""
+            val subCount = jsonObject.optInt("subscribers_count", 0)
+            val avatarUrl = jsonObject.optString("avatar_url", fallbackAvatarUrl) ?: ""
+            val appearance = jsonObject.optJSONObject("appearance")
+            val coverImage = appearance?.optString("cover_image", fallbackCoverUrl) ?: fallbackCoverUrl
+            return ParsedChannelProfile(name, description, subCount, avatarUrl, coverImage)
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing channel profile", e)
+            return ParsedChannelProfile(fallbackName, fallbackDescription, 0, fallbackAvatarUrl, fallbackCoverUrl)
+        }
+    }
+
+    data class ParsedTvSeriesMeta(
+        val description: String,
+        val year: String,
+        val bannerUrl: String,
+        val posterUrl: String
+    )
+
+    fun parseTvSeriesMeta(body: String, fallbackDescription: String, fallbackThumbnailUrl: String?): ParsedTvSeriesMeta {
+        try {
+            val infoObj = JSONObject(body)
+            val description = infoObj.optString("description", fallbackDescription) ?: ""
+            val year = infoObj.optString("year") ?: ""
+            val picture = infoObj.optString("picture") ?: ""
+            val appearance = infoObj.optJSONObject("appearance")
+            val coverImage = appearance?.optString("cover_image")?.takeIf { it.isNotBlank() && it != "null" }
+            val verticalPoster = infoObj.optString("vertical_poster_url").takeIf { it.isNotBlank() && it != "null" }
+            
+            val bannerUrl = coverImage ?: picture.takeIf { it.isNotBlank() && it != "null" } ?: fallbackThumbnailUrl ?: ""
+            val posterUrl = verticalPoster ?: fallbackThumbnailUrl ?: ""
+            return ParsedTvSeriesMeta(description, year, bannerUrl, posterUrl)
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing tv series meta", e)
+            return ParsedTvSeriesMeta(fallbackDescription, "", fallbackThumbnailUrl ?: "", fallbackThumbnailUrl ?: "")
+        }
+    }
+
+    data class ParsedPlaylistMeta(
+        val title: String,
+        val description: String,
+        val thumbnailUrl: String,
+        val videoCount: Int
+    )
+
+    fun parsePlaylistMeta(body: String, fallbackTitle: String, fallbackDescription: String, fallbackThumbnailUrl: String?): ParsedPlaylistMeta {
+        try {
+            val infoObj = JSONObject(body)
+            val description = infoObj.optString("description", fallbackDescription) ?: ""
+            val appearance = infoObj.optJSONObject("appearance")
+            val coverImage = appearance?.optString("cover_image")?.takeIf { it.isNotBlank() && it != "null" }
+            val picture = infoObj.optString("picture").takeIf { it.isNotBlank() && it != "null" }
+            val thumbnailUrl = infoObj.optString("thumbnail_url").takeIf { it.isNotBlank() && it != "null" }
+            val nameFallback = infoObj.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: fallbackTitle
+            val name = infoObj.optString("name", nameFallback).takeIf { it.isNotBlank() && it != "null" } ?: nameFallback
+            var videoCount = infoObj.optInt("video_count", -1)
+            if (videoCount <= 0) videoCount = infoObj.optInt("videos_count", -1)
+            
+            val resolvedThumbnail = coverImage ?: picture ?: thumbnailUrl ?: fallbackThumbnailUrl ?: ""
+            return ParsedPlaylistMeta(name, description, resolvedThumbnail, videoCount)
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing playlist meta", e)
+            return ParsedPlaylistMeta(fallbackTitle, fallbackDescription, fallbackThumbnailUrl ?: "", -1)
+        }
+    }
+
+    fun parseSingleVideo(body: String, videoId: String): Video? {
+        try {
+            val jsonObj = JSONObject(body)
+            
+            val authorObj = jsonObj.optJSONObject("author")
+            val authorName = authorObj?.optString("name") ?: "Rutube"
+            val authorIdRaw = authorObj?.optString("id") ?: ""
+            
+            val isLive = jsonObj.optBoolean("is_livestream", false)
+            val durationSec = jsonObj.optInt("duration", 0)
+            val durStr = if (isLive) {
+                "трансляция"
+            } else if (durationSec >= 3600) {
+                String.format("%d:%02d:%02d", durationSec / 3600, (durationSec % 3600) / 60, durationSec % 60)
+            } else if (durationSec > 0) {
+                String.format("%02d:%02d", durationSec / 60, durationSec % 60)
+            } else {
+                "00:00"
+            }
+            
+            val title = jsonObj.optString("title", "Видео")
+            val desc = jsonObj.optString("description", "Импортировано из ссылки Rutube.")
+            val thumb = jsonObj.optString("thumbnail_url", "")
+            
+            return Video(
+                id = videoId,
+                title = title,
+                channel = authorName,
+                views = "",
+                timeAgo = "",
+                duration = durStr,
+                category = jsonObj.optJSONObject("category")?.optString("name") ?: "Разное",
+                description = desc,
+                thumbnailUrl = thumb,
+                authorId = authorIdRaw,
+                authorAvatarUrl = authorObj?.optString("avatar_url", "") ?: "",
+                authorActionUrl = authorObj?.optString("site_url", "") ?: ""
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing single video", e)
+            return null
+        }
+    }
+
+    fun parseMissingPosterUrl(body: String): String? {
+        try {
+            val json = JSONObject(body)
+            val verticalPosterUrl = json.optString("vertical_poster_url").takeIf { it.isNotBlank() }
+            val posterUrl = json.optString("poster_url").takeIf { it.isNotBlank() }
+            val appearance = json.optJSONObject("appearance")
+            val coverImage = appearance?.optString("cover_image")?.takeIf { it.isNotBlank() }
+            val picture = json.optString("picture").takeIf { it.isNotBlank() }
+            
+            return verticalPosterUrl ?: posterUrl ?: coverImage ?: picture
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing missing poster url", e)
+            return null
+        }
+    }
+
+    fun parseResponse(bodyString: String, url: String? = null): ParsedResponse {
+        val jsonObj = JSONObject(bodyString)
+        return ResponseAnalyzer.parse(jsonObj, url)
+    }
+
+    fun extractStreamUrlFromPlayOptions(body: String): String? {
+        try {
+            val json = JSONObject(body)
+            return extractStreamUrlFromPlayOptions(json)
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing play options JSON", e)
+            return null
+        }
+    }
+
+    fun extractStreamUrlFromPlayOptions(json: JSONObject): String? {
+        // 1. Проверяем live_streams (для прямых эфиров)
+        json.optJSONObject("live_streams")?.let { liveStreams ->
+            // Пробуем hls массив
+            liveStreams.optJSONArray("hls")?.let { hlsArray ->
+                if (hlsArray.length() > 0) {
+                    val firstHls = hlsArray.getJSONObject(0)
+                    firstHls.optString("url").takeIf { it.isNotBlank() }?.let { return it }
+                }
+            }
+            // Пробуем прямые поля
+            listOf("hls", "m3u8", "url", "default").forEach { key ->
+                liveStreams.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 2. Проверяем live_balancer (альтернативный формат)
+        json.optJSONObject("live_balancer")?.let { liveBalancer ->
+            listOf("hls", "m3u8", "url", "default").forEach { key ->
+                liveBalancer.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 3. Проверяем video_balancer (для обычных видео)
+        json.optJSONObject("video_balancer")?.let { vb ->
+            listOf("m3u8", "hls", "default", "url").forEach { key ->
+                vb.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+
+        // 4. Проверяем корневые поля
+        listOf("hls_url", "stream_url", "m3u8", "url", "video_url").forEach { key ->
+            json.optString(key).takeIf { it.isNotBlank() }?.let { return it }
+        }
+
+        // 5. Рекурсивный поиск по всем полям JSON (запасной вариант)
+        fun searchInJson(obj: JSONObject, depth: Int = 0): String? {
+            if (depth > 3) return null
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = obj.opt(key)
+                when (value) {
+                    is String -> {
+                        if (value.contains(".m3u8") && value.startsWith("http")) {
+                            return value
+                        }
+                    }
+                    is JSONObject -> {
+                        searchInJson(value, depth + 1)?.let { return it }
+                    }
+                }
+            }
+            return null
+        }
+        return searchInJson(json)
+    }
+
+    fun parseSubtitles(body: String): List<SubtitleTrack> {
+        try {
+            val jsonObject = JSONObject(body)
+            val list = jsonObject.optJSONArray("list") ?: return emptyList()
+            val result = mutableListOf<SubtitleTrack>()
+            for (i in 0 until list.length()) {
+                val subObj = list.optJSONObject(i) ?: continue
+                val lang = subObj.optString("langTitle", "Unknown")
+                val format = subObj.optString("format", "srt")
+                val url = subObj.optString("file", "")
+                if (url.isNotBlank()) {
+                    result.add(SubtitleTrack(lang, format, url))
+                }
+            }
+            return result
+        } catch (e: Exception) {
+            android.util.Log.e("RutubeParser", "Error parsing subtitles JSON", e)
+            return emptyList()
         }
     }
 }

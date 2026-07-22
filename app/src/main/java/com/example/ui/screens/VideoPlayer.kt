@@ -89,7 +89,7 @@ fun RutubeVideoPlayer(
         viewModel.setPlayingState(isPlayingState)
     }
 
-    var currentPos by remember { mutableLongStateOf(0L) }
+    var currentPos by remember(videoId) { mutableLongStateOf(viewModel.getVideoPosition(videoId)) }
     var totalDuration by remember { mutableLongStateOf(0L) }
     var isTimelineDragging by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -1115,6 +1115,45 @@ fun RutubeVideoPlayer(
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
+                            }
+                            // External Player link
+                            if (hlsUrl != null && !isLive) {
+                                IconButton(
+                                    onClick = {
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        try {
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                                if (hlsUrl!!.startsWith("/")) {
+                                                    val offlineFile = java.io.File(hlsUrl!!)
+                                                    if (offlineFile.exists()) {
+                                                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                            context,
+                                                            "${context.packageName}.provider",
+                                                            offlineFile
+                                                        )
+                                                        setDataAndType(uri, "video/mp4")
+                                                    } else {
+                                                        setDataAndType(android.net.Uri.parse(hlsUrl), "video/*")
+                                                    }
+                                                } else {
+                                                    setDataAndType(android.net.Uri.parse(hlsUrl), "video/*")
+                                                }
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(intent, "Открыть через..."))
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(context, "Ошибка открытия", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp).sleekTvFocus(CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = "Открыть во внешнем плеере",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }

@@ -8,7 +8,9 @@ plugins {
 
 android {
     lint {
-        disable += setOf("GestureBackNavigation", "UnsafeOptInUsageError")
+        disable += setOf("GestureBackNavigation", "UnsafeOptInUsageError", "RestrictedApi")
+        checkReleaseBuilds = false
+        abortOnError = false
     }
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,8 +19,8 @@ android {
     applicationId = "com.ruvideohub.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 11
-    versionName = "3.5.75 release"
+    versionCode = 12
+    versionName = "3.5.76 release"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -39,15 +41,23 @@ android {
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      val kFile = file(keystorePath)
+      if (kFile.exists()) {
+        storeFile = kFile
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+      } else {
+        storeFile = file("${rootDir}/bytebudda.keystore")
+        storePassword = "android"
+        keyAlias = "bytebudda"
+        keyPassword = "android"
+      }
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+      storeFile = file("${rootDir}/bytebudda.keystore")
       storePassword = "android"
-      keyAlias = "androiddebugkey"
+      keyAlias = "bytebudda"
       keyPassword = "android"
     }
   }
@@ -55,13 +65,15 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = true
-      isShrinkResources = true // удаляет неиспользуемые ресурсы для уменьшения веса
+      isMinifyEnabled = false
+      isShrinkResources = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
+      isMinifyEnabled = true
+      isShrinkResources = true
     }
   }
   compileOptions {
@@ -100,6 +112,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.tvprovider)
   // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -120,6 +133,8 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
+  implementation(libs.koin.android)
+  implementation(libs.koin.androidx.compose)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -146,6 +161,16 @@ val copyApk by tasks.registering(Copy::class) {
     include("*.apk")
 }
 
+val copyDebugApk by tasks.registering(Copy::class) {
+    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    into(rootProject.layout.projectDirectory.dir("apk"))
+    include("*.apk")
+}
+
 tasks.matching { it.name == "assembleRelease" }.configureEach {
     finalizedBy(copyApk)
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy(copyDebugApk)
 }

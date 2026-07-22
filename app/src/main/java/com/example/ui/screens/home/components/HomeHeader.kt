@@ -391,7 +391,7 @@ fun CategoryRow(
                     .sleekTvFocus(
                         shape = RoundedCornerShape(12.dp), 
                         enabled = true, 
-                        scaleAmount = 1.05f, 
+                        scaleAmount = 1.08f, 
                         onEnter = { onCategorySelected(cat) }
                     )
                     .clip(RoundedCornerShape(12.dp))
@@ -438,7 +438,7 @@ fun FeedTabRow(
                     .sleekTvFocus(
                         shape = RoundedCornerShape(100.dp), 
                         enabled = isTvOptimized, 
-                        scaleAmount = 1.05f, 
+                        scaleAmount = 1.08f, 
                         onEnter = { onTabSelected(tab) }
                     )
                     .then(

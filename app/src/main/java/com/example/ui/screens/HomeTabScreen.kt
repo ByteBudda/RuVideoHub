@@ -47,6 +47,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import androidx.compose.runtime.snapshotFlow
 
 // Home Component & Utility Imports
 import com.example.ui.screens.home.components.*
@@ -109,15 +113,17 @@ fun HomeTabScreen(
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
         val isLargeCardsMode by viewModel.isLargeCardsMode.collectAsStateWithLifecycle()
         
-        val lastVisibleItemIndex by remember {
-            derivedStateOf {
-                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        // Pagination trigger
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val layoutInfo = listState.layoutInfo
+                val total = layoutInfo.totalItemsCount
+                val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                total > 0 && lastVisibleItemIndex >= total - 12
             }
-        }
-
-        LaunchedEffect(lastVisibleItemIndex, channelActiveTab, selectedFeedTab, selectedSubfolderName) {
-            val total = listState.layoutInfo.totalItemsCount
-            if (total > 0 && lastVisibleItemIndex >= total - 12) {
+            .distinctUntilChanged()
+            .filter { it }
+            .collect {
                 viewModel.loadNextPage()
             }
         }

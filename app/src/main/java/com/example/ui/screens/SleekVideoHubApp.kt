@@ -1,4 +1,5 @@
 package com.example.ui.screens
+import androidx.compose.ui.zIndex
 
 import com.example.ui.screens.player.*
 
@@ -61,7 +62,7 @@ val LocalMobileGridColumns = androidx.compose.runtime.compositionLocalOf { 2 }
 fun Modifier.sleekTvFocus(
     shape: Shape = RoundedCornerShape(12.dp),
     focusColor: Color = MaterialTheme.colorScheme.primary,
-    scaleAmount: Float = 1.06f,
+    scaleAmount: Float = 1.1f,
     onEnter: (() -> Unit)? = null,
     onLongEnter: (() -> Unit)? = null,
     enabled: Boolean = true
@@ -75,7 +76,7 @@ fun Modifier.sleekTvFocus(
     val focusStyle = LocalFocusStyle.current
     val scale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isFocused) {
-            if (focusStyle == "scale" || focusStyle == "scale_glow") scaleAmount else 1.00f
+            if (focusStyle == "scale" || focusStyle == "scale_glow" || focusStyle == "glow") scaleAmount else 1.00f
         } else {
             1.0f
         },
@@ -83,19 +84,32 @@ fun Modifier.sleekTvFocus(
         label = "focus_scale"
     )
 
+    val backgroundColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isFocused) focusColor.copy(alpha = 0.3f) else Color.Transparent,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "focus_background"
+    )
+
     val focusModifier = Modifier
+        .zIndex(if (isFocused) 1f else 0f)
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
+            if (isFocused && (focusStyle == "scale_glow" || focusStyle == "glow")) {
+                shadowElevation = 32f
+                ambientShadowColor = focusColor
+                spotShadowColor = focusColor
+            }
         }
         .then(
             if (isFocused) {
                 when (focusStyle) {
-                    "scale" -> Modifier
-                    "scale_glow" -> Modifier.border(2.5.dp, focusColor, shape)
-                    "classic" -> Modifier.border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f), shape)
-                    "tint" -> Modifier.background(focusColor.copy(alpha = 0.12f), shape).border(1.5.dp, focusColor.copy(alpha = 0.6f), shape)
-                    else -> Modifier.border(2.5.dp, focusColor.copy(alpha = 0.85f), shape)
+                    "scale" -> Modifier.background(backgroundColor, shape).border(1.5.dp, focusColor.copy(alpha = 0.3f), shape)
+                    "glow" -> Modifier.background(backgroundColor, shape).border(2.0.dp, focusColor.copy(alpha = 0.6f), shape)
+                    "scale_glow" -> Modifier.background(backgroundColor, shape).border(3.0.dp, focusColor, shape)
+                    "classic" -> Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f), shape)
+                    "tint" -> Modifier.background(focusColor.copy(alpha = 0.3f), shape).border(2.dp, focusColor, shape)
+                    else -> Modifier.background(backgroundColor, shape).border(3.0.dp, focusColor.copy(alpha = 0.85f), shape)
                 }
             } else {
                 Modifier
