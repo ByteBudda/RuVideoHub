@@ -282,26 +282,14 @@ object YtDlpDownloader {
                     var totalBytesDownloaded = 0L
                     val startMs = System.currentTimeMillis()
                     
-                    val segmentsDir = File(downloadFolder, ".segments_$id")
-                    if (!segmentsDir.exists()) {
-                        segmentsDir.mkdirs()
-                    }
-                    
-                    for (index in segments.indices) {
-                        if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
-                            throw kotlinx.coroutines.CancellationException("Cancelled by user")
-                        }
-                        val segmentFile = File(segmentsDir, "seg_$index.ts")
-                        val segmentUrl = segments[index]
-                        val seq = startSequence + index
-                        
-                        var alreadyDownloaded = false
-                        if (segmentFile.exists() && segmentFile.length() > 0) {
-                            totalBytesDownloaded += segmentFile.length()
-                            alreadyDownloaded = true
-                        }
-                        
-                        if (!alreadyDownloaded) {
+                    FileOutputStream(targetFile).use { outputStream ->
+                        for (index in segments.indices) {
+                            if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                throw kotlinx.coroutines.CancellationException("Cancelled by user")
+                            }
+                            val segmentUrl = segments[index]
+                            val seq = startSequence + index
+                            
                             var segmentBytes: ByteArray? = null
                             var retryCount = 0
                             val maxRetries = 5
@@ -350,65 +338,49 @@ object YtDlpDownloader {
                                 segmentBytes!!
                             }
                             
-                            FileOutputStream(segmentFile).use { fs ->
-                                fs.write(finalBytes)
-                            }
+                            outputStream.write(finalBytes)
                             totalBytesDownloaded += finalBytes.size
-                        }
-                        
-                        val progressValue = 0.10f + (index.toFloat() / segments.size) * 0.80f
-                        val elapsedMs = System.currentTimeMillis() - startMs
-                        
-                        val speedStr = if (elapsedMs > 0) {
-                            val bytesSec = (totalBytesDownloaded * 1000) / elapsedMs
-                            if (bytesSec > 1024 * 1024) {
-                                String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
-                            } else {
-                                String.format("%.2f KiB/s", bytesSec / 1024.0)
+                            
+                            val progressValue = 0.10f + (index.toFloat() / segments.size) * 0.80f
+                            val elapsedMs = System.currentTimeMillis() - startMs
+                            
+                            val speedStr = if (elapsedMs > 0) {
+                                val bytesSec = (totalBytesDownloaded * 1000) / elapsedMs
+                                if (bytesSec > 1024 * 1024) {
+                                    String.format("%.2f MiB/s", bytesSec / (1024.0 * 1024.0))
+                                } else {
+                                    String.format("%.2f KiB/s", bytesSec / 1024.0)
+                                }
+                            } else "0 B/s"
+                            
+                            val etaStr = if (index > 0) {
+                                val totalEstMs = (segments.size * elapsedMs) / index
+                                val remainingSeconds = ((totalEstMs - elapsedMs) / 1000).toInt()
+                                if (remainingSeconds > 0) {
+                                    String.format("%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+                                } else "00:01"
+                            } else "--:--"
+                            
+                            if (index % 10 == 0 || index == segments.size - 1) {
+                                val sizeMBytes = totalBytesDownloaded.toDouble() / (1024 * 1024)
+                                log(String.format("[download] Fragment %d/%d (%d%%) downloaded. Size: %.2f MiB at %s ETA: %s", 
+                                    index + 1, segments.size, ((index + 1) * 100) / segments.size, sizeMBytes, speedStr, etaStr))
                             }
-                        } else "0 B/s"
-                        
-                        val etaStr = if (index > 0) {
-                            val totalEstMs = (segments.size * elapsedMs) / index
-                            val remainingSeconds = ((totalEstMs - elapsedMs) / 1000).toInt()
-                            if (remainingSeconds > 0) {
-                                String.format("%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
-                            } else "00:01"
-                        } else "--:--"
-                        
-                        if (index % 10 == 0 || index == segments.size - 1) {
-                            val sizeMBytes = totalBytesDownloaded.toDouble() / (1024 * 1024)
-                            log(String.format("[download] Fragment %d/%d (%d%%) downloaded. Size: %.2f MiB at %s ETA: %s", 
-                                index + 1, segments.size, ((index + 1) * 100) / segments.size, sizeMBytes, speedStr, etaStr))
-                        }
-                        
-                        activeDownloads.value[id]?.let { currentDl ->
-                            // Throttling: Only update if progress changed by > 1%
-                            if (Math.abs(progressValue - currentDl.progress) > 0.01f) {
-                                activeDownloads.value = activeDownloads.value.toMutableMap().apply {
-                                    this[id] = currentDl.copy(
-                                        progress = progressValue,
-                                        speed = speedStr,
-                                        eta = etaStr
-                                    )
+                            
+                            activeDownloads.value[id]?.let { currentDl ->
+                                // Throttling: Only update if progress changed by > 1%
+                                if (Math.abs(progressValue - currentDl.progress) > 0.01f) {
+                                    activeDownloads.value = activeDownloads.value.toMutableMap().apply {
+                                        this[id] = currentDl.copy(
+                                            progress = progressValue,
+                                            speed = speedStr,
+                                            eta = etaStr
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                    
-                    log("[download] Concatenating ${segments.size} fragments into target file...")
-                    FileOutputStream(targetFile).use { outputStream ->
-                        val outputChannel = outputStream.channel
-                        for (index in segments.indices) {
-                            val segmentFile = File(segmentsDir, "seg_$index.ts")
-                            if (segmentFile.exists()) {
-                                segmentFile.inputStream().use { input ->
-                                    input.channel.transferTo(0, segmentFile.length(), outputChannel)
-                                }
-                            }
-                        }
-                    }
-                    segmentsDir.deleteRecursively()
                     isFetchSuccess = true
                 } else {
                     log("[error] No video streams segments found in Rutube playlist.")
