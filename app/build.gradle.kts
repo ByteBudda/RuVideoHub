@@ -20,7 +20,7 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = 12
-    versionName = "3.5.76 release"
+    versionName = "3.5.76"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -48,16 +48,16 @@ android {
         keyAlias = "upload"
         keyPassword = System.getenv("KEY_PASSWORD")
       } else {
-        storeFile = file("${rootDir}/bytebudda.keystore")
+        storeFile = file("${rootDir}/debug.keystore")
         storePassword = "android"
-        keyAlias = "bytebudda"
+        keyAlias = "androiddebugkey"
         keyPassword = "android"
       }
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/bytebudda.keystore")
+      storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
-      keyAlias = "bytebudda"
+      keyAlias = "androiddebugkey"
       keyPassword = "android"
     }
   }
@@ -72,8 +72,8 @@ android {
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
-      isMinifyEnabled = true
-      isShrinkResources = true
+      isMinifyEnabled = false
+      isShrinkResources = false
     }
   }
   compileOptions {
@@ -153,24 +153,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
-}
-
-val copyApk by tasks.registering(Copy::class) {
-    from(layout.buildDirectory.dir("outputs/apk/release"))
-    into(rootProject.layout.projectDirectory.dir("apk"))
-    include("*.apk")
-}
-
-val copyDebugApk by tasks.registering(Copy::class) {
-    from(layout.buildDirectory.dir("outputs/apk/debug"))
-    into(rootProject.layout.projectDirectory.dir("apk"))
-    include("*.apk")
-}
-
-tasks.matching { it.name == "assembleRelease" }.configureEach {
-    finalizedBy(copyApk)
-}
-
-tasks.matching { it.name == "assembleDebug" }.configureEach {
-    finalizedBy(copyDebugApk)
 }
