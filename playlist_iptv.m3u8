@@ -1,0 +1,709 @@
+#EXTM3U name="Мои эфиры Rutube — чистые названия"
+
+# =========================
+# ФЕДЕРАЛЬНЫЕ
+# =========================
+
+#EXTINF:-1 tvg-name="МИР" tvg-logo="https://pic.rtbcdn.ru/video/2025-11-14/39/9b/399b50d8d10a5751fd794666b688a720.jpg" group-title="Федеральные" rutube-id="afef67d151b5a607dee1ef0aa299a52c", МИР
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/afef67d151b5a607dee1ef0aa299a52c/index.m3u8?s=AApCx0CWOPq85fRJvGhwug&e=2094087811&scheme=https
+
+#EXTINF:-1 tvg-name="Россия 24" tvg-logo="https://pic.rtbcdn.ru/video/90/69/9069d08eacc53aebc47b47a27605a808.jpg" group-title="Федеральные" rutube-id="eb4d996b3fd82fb942e83c0ab3ce50cf", Россия 24
+#EXTGRP:Федеральные
+https://bl.rutube.ru/route/eb4d996b3fd82fb942e83c0ab3ce50cf.m3u8?guids=69d73e1b-56f4-4cd4-ab29-d0c1d5964dbb_1920x1080_6446874_D20772011_B6054718A128000_F25A48000_avc1.640028_mp4a.40.2,c8180669-1da7-4bbe-ab80-4631b2f96c86_1280x720_4137523_D20772011_B3836817A128000_F25A48000_avc1.64001f_mp4a.40.2,0a1e5625-6541-4066-b2bd-cace36549133_640x360_1135737_D20772011_B953902A128000_F25A48000_avc1.4d401e_mp4a.40.2,fbb3d8a8-f895-4bea-8b41-166a50c57b6d_416x240_540513_D20772011_B382249A128000_F25A48000_avc1.4d400d_mp4a.40.2,de8029c4-4edf-4216-834b-6da0e8e0da00_256x144_296198_D20772011_B147609A128000_F25A48000_avc1.4d400c_mp4a.40.2&sign=c-NyTyMvpnXpPWCkcAgFcA&expire=1794174222&guarantee=5&scheme=https
+
+#EXTINF:-1 tvg-name="Первый канал" tvg-logo="https://pic.rtbcdn.ru/video/2025-09-21/24/95/2495f5c3038d85c003c2c5a69f874407.jpg" group-title="Федеральные" rutube-id="c58f502c7bb34a8fcdd976b221fca292", Первый канал
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/c58f502c7bb34a8fcdd976b221fca292/index.m3u8?s=YnodGbsKttkn-zmxSxkA_Q&e=2094087867&scheme=https
+
+#EXTINF:-1 tvg-name="Россия 1" tvg-logo="https://pic.rtbcdn.ru/video/2026-08-14/d7/e9/d7e9c01ffa07f4dbdade91c7a8743a23.jpg" group-title="Федеральные" rutube-id="2742a3c42be661ea732705f80adb7bdd", Россия 1
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/2742a3c42be661ea732705f80adb7bdd/index.m3u8?s=pub05BRLXWNwEJHwH0F5Eg&e=2094087870&scheme=https
+
+#EXTINF:-1 tvg-name="НТВ" tvg-logo="https://pic.rtbcdn.ru/video/2025-05-12/6c/65/6c65cb6ac729445b1a81407f6ce2ebe4.jpg" group-title="Федеральные" rutube-id="c37cd74192c6bc3d6cd6077c0c4fd686", НТВ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/c37cd74192c6bc3d6cd6077c0c4fd686/index.m3u8?s=gBn6RLU5tbRI_6sCE8rd2g&e=2094087875&scheme=https
+
+#EXTINF:-1 tvg-name="Россия Культура" tvg-logo="https://pic.rtbcdn.ru/video/2026-08-14/c9/cc/c9cc506de874ecf22cbc2005ecc2891a.jpg" group-title="Федеральные" rutube-id="d0c0d69362edfbe706cb82d973439bb5", Россия Культура
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/d0c0d69362edfbe706cb82d973439bb5/index.m3u8?s=6RJRlXMTN6mt2HLNo9XprA&e=2094087882&scheme=https
+
+#EXTINF:-1 tvg-name="ОТР" tvg-logo="https://pic.rtbcdn.ru/video/2025-05-19/fc/b8/fcb82e30908bf6798bcb087070c6b367.jpg" group-title="Федеральные" rutube-id="faa934385b83f9e8a92f5484defae5fa", ОТР
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/faa934385b83f9e8a92f5484defae5fa/index.m3u8?s=xyQ-Ybo8FkB49x-Qe8T8LQ&e=2094087890&scheme=https
+
+#EXTINF:-1 tvg-name="ТВЦ" tvg-logo="https://pic.rtbcdn.ru/video/2026-05-25/e5/c2/e5c254da8196c37b58c14668fef7bb8a.jpg" group-title="Федеральные" rutube-id="7015ad3690d4ef70d75a6e26d0e58565", ТВЦ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/7015ad3690d4ef70d75a6e26d0e58565/index.m3u8?s=PJus_9kRz8D9FwyBE9jDwg&e=2094087894&scheme=https
+
+#EXTINF:-1 tvg-name="РЕН ТВ" tvg-logo="https://pic.rtbcdn.ru/video/2026-07-07/32/87/3287686195a6bb3e0f0308ef4f84148e.jpg" group-title="Федеральные" rutube-id="67938d3536450ae8d10f12acee7ffde6", РЕН ТВ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/67938d3536450ae8d10f12acee7ffde6/index.m3u8?s=T8rfUz6GFoVhdX-dMeIE4w&e=2094087900&scheme=https
+
+#EXTINF:-1 tvg-name="СПАС" tvg-logo="https://pic.rtbcdn.ru/video/bf/51/bf513262303215470fac8c043a8f2008.jpg" group-title="Федеральные" rutube-id="2bbfa9ebf9d79ade480d7281fcef1008", СПАС
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/2bbfa9ebf9d79ade480d7281fcef1008/index.m3u8?s=faZEKHxvbE4zMNf0EsBwxg&e=2094087905&scheme=https
+
+#EXTINF:-1 tvg-name="СТС" tvg-logo="https://pic.rtbcdn.ru/video/2026-07-07/3a/5c/3a5ce846da55dbfd34c6be9360a343cd.jpg" group-title="Федеральные" rutube-id="895f3379ab9fee679eb088215263b8d7", СТС
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/895f3379ab9fee679eb088215263b8d7/index.m3u8?s=d1n1Wp041l42wm1cjmlpSA&e=2094087910&scheme=https
+
+#EXTINF:-1 tvg-name="Домашний" tvg-logo="https://pic.rtbcdn.ru/video/2026-07-07/da/3e/da3e8a35e096cdbb003965ee21be279a.jpg" group-title="Федеральные" rutube-id="4befbf3628d34d93517dfec377743837", Домашний
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/4befbf3628d34d93517dfec377743837/index.m3u8?s=qCr6Lm_UAALXlUCAp6WjmA&e=2094087914&scheme=https
+
+#EXTINF:-1 tvg-name="ТВ-3" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-09/5a/e3/5ae3b120b997425ba32a14a81a403582.jpg" group-title="Федеральные" rutube-id="7bf12d9c050f9a7ef3728db5730432ae", ТВ-3
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/7bf12d9c050f9a7ef3728db5730432ae/index.m3u8?s=nIAeSmt5BDWxu-zHZ9-zGQ&e=2094087919&scheme=https
+
+#EXTINF:-1 tvg-name="Пятница" tvg-logo="https://pic.rtbcdn.ru/video/f6/30/f63059849e2cfee5b73ec6f73d2c16e6.jpg" group-title="Федеральные" rutube-id="9f87a9a0cecbe773be6fddcbd93585ac", Пятница
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/9f87a9a0cecbe773be6fddcbd93585ac/index.m3u8?s=1eiU9-zRL3NYszThtqVXIQ&e=2094087923&scheme=https
+
+#EXTINF:-1 tvg-name="Звезда" tvg-logo="https://pic.rtbcdn.ru/video/6b/6b/6b6be08b028b7698add5ded5887bda22.jpg" group-title="Федеральные" rutube-id="5ab908fccfac5bb43ef2b1e4182256b0", Звезда
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/5ab908fccfac5bb43ef2b1e4182256b0/index.m3u8?s=Fmyl1DbftFFzIAFjTKdkNw&e=2094087928&scheme=https
+
+#EXTINF:-1 tvg-name="ТНТ" tvg-logo="https://pic.rtbcdn.ru/video/2024-10-10/65/9e/659ec429122b04b1b4a4e16c08d6fb4e.jpg" group-title="Федеральные" rutube-id="546602986e6a424d74d594876ddb3f04", ТНТ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/546602986e6a424d74d594876ddb3f04/index.m3u8?s=I5U3ojWk4fHMKyU1sA3T4w&e=2094087935&scheme=https
+
+#EXTINF:-1 tvg-name="МУЗ-ТВ" tvg-logo="https://pic.rtbcdn.ru/video/fa/54/fa548936c1ce92980af6a4960c2a68ca.jpg" group-title="Федеральные" rutube-id="df6fe73494a26f74da51573fd97b9baa", МУЗ-ТВ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/df6fe73494a26f74da51573fd97b9baa/index.m3u8?s=xeoPz_X23Kf8Bn1tSRZEPA&e=2094087941&scheme=https
+
+#EXTINF:-1 tvg-name="РБК" tvg-logo="https://pic.rtbcdn.ru/video/2025-04-24/73/c1/73c1d0ea5bfe8d9d77cb9861bae5e7e1.jpg" group-title="Федеральные" rutube-id="88f6485ee28d56daf13302ac6fe3d931", РБК
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/88f6485ee28d56daf13302ac6fe3d931/index.m3u8?s=vl0Vr9PzEC3_pzJ5MxPfOQ&e=2094088020&scheme=https
+
+#EXTINF:-1 tvg-name="МИР 24" tvg-logo="https://pic.rtbcdn.ru/video/2025-11-14/b3/08/b308de226cafcc361936f6174fe15422.jpg" group-title="Федеральные" rutube-id="43269ba8fb179e298b1e497f557e8d2d", МИР 24
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/43269ba8fb179e298b1e497f557e8d2d/index.m3u8?s=XNoxAF3DFqzxRwJNTE2Piw&e=2094088025&scheme=https
+
+#EXTINF:-1 tvg-name="Известия" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-16/48/78/48785ecbf870c73f9854a6e3d2625f53.jpg" group-title="Федеральные" rutube-id="3c47861a8b4b51639e41be092053b966", Известия
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/3c47861a8b4b51639e41be092053b966/index.m3u8?s=aaChKLTwWzHR6l76_zPnoQ&e=2094088029&scheme=https
+
+#EXTINF:-1 tvg-name="ТНТ4" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-10/26/a8/26a8d8f87da8dc7c90d68a90c1b8fe93.jpg" group-title="Федеральные" rutube-id="c801a7087e29a097192d74c270fbc6c1", ТНТ4
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/c801a7087e29a097192d74c270fbc6c1/index.m3u8?s=H68dvSvE5W6w3z_UfdbBNw&e=2094088187&scheme=https
+
+#EXTINF:-1 tvg-name="ЧЕ" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-16/ee/70/ee7072db0a94c2016da77b850b47516e.jpg" group-title="Федеральные" rutube-id="5bbff90167d1b1d88fda92376ec7a651", ЧЕ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/5bbff90167d1b1d88fda92376ec7a651/index.m3u8?s=X7_8EFiS4HebBQ-hXV1oPA&e=2094088191&scheme=https
+
+#EXTINF:-1 tvg-name="Солнце" tvg-logo="https://pic.rtbcdn.ru/video/00/10/0010ae131e65cb5a06a89b751f92df47.jpg" group-title="Федеральные" rutube-id="2dba20a8405e57935827cb5721c2b759", Солнце
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/2dba20a8405e57935827cb5721c2b759/index.m3u8?s=LuEdGeLRfDoLuXFbYxa67g&e=2094088194&scheme=https
+
+#EXTINF:-1 tvg-name="Ю-ТВ" tvg-logo="https://pic.rtbcdn.ru/video/60/53/6053fe6304d237123289660ee0a7cb62.jpg" group-title="Федеральные" rutube-id="5c9327074e25ca86f3111d4085cbbb65", Ю-ТВ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/5c9327074e25ca86f3111d4085cbbb65/index.m3u8?s=8wmjozL2JmyPW9Giyv-snQ&e=2094088198&scheme=https
+
+#EXTINF:-1 tvg-name="2х2" tvg-logo="https://pic.rtbcdn.ru/video/8f/81/8f81d6eee5dd79054a3559dea18c1175.jpg" group-title="Федеральные" rutube-id="392b4686b770bae2da6bf5ac4574add5", 2х2
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/392b4686b770bae2da6bf5ac4574add5/index.m3u8?s=SnRVo3TLTWQfNeh0YEJtOA&e=2094088203&scheme=https
+
+#EXTINF:-1 tvg-name="СТС Love" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-27/47/cb/47cb5901b0c450795bd1f80a98518ea1.jpg" group-title="Федеральные" rutube-id="32dc45cf878497abe1c9695e228f039b", СТС Love
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/32dc45cf878497abe1c9695e228f039b/index.m3u8?s=hjeO9QacsUfe6K2BM9H3WA&e=2094088212&scheme=https
+
+#EXTINF:-1 tvg-name="Суббота!" tvg-logo="https://pic.rtbcdn.ru/video/a1/0f/a10ff527628e438ac6c231ab39701fd6.jpg" group-title="Федеральные" rutube-id="310744c10a5809da38aa445c952976da", Суббота!
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/310744c10a5809da38aa445c952976da/index.m3u8?s=w1bRjMFA_Zo-lW-sekGyZw&e=2094088217&scheme=https
+
+#EXTINF:-1 tvg-name="Среда" tvg-logo="https://pic.rtbcdn.ru/video/b8/9e/b89e98f39e9cd39ef53e1c4e738d0798.jpg" group-title="Федеральные" rutube-id="5fa486bf465c8735fff9f41b372610cc", Среда
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/5fa486bf465c8735fff9f41b372610cc/index.m3u8?s=LkSCi0aSC1XdxOOCY1bUYQ&e=2094088221&scheme=https
+
+#EXTINF:-1 tvg-name="TV BRICS" tvg-logo="https://pic.rtbcdn.ru/video/2026-07-22/01/f9/01f9ab22c9be70a16681ea4fc7707a50.jpg" group-title="Федеральные" rutube-id="a1c6118e24a6bf79003e6da3ed4f1eea", TV BRICS
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/a1c6118e24a6bf79003e6da3ed4f1eea/index.m3u8?s=QylvWWUyBP4mCkkNBhX_2w&e=2094088044&scheme=https
+
+#EXTINF:-1 tvg-name="ВМЕСТЕ-РФ" tvg-logo="https://pic.rtbcdn.ru/video/b6/3e/b63edf4969c8d795d3b0da83713ff8c8.jpg" group-title="Федеральные" rutube-id="f6a6d5c955180d0d0f80c66d0b6150d3", ВМЕСТЕ-РФ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/f6a6d5c955180d0d0f80c66d0b6150d3/index.m3u8?s=uNi8rql7SqbreDQ6JPnjnw&e=2094088054&scheme=https
+
+#EXTINF:-1 tvg-name="Царьград" tvg-logo="https://pic.rtbcdn.ru/video/59/f3/59f30518fabc2e0145c2e6d27cbc23df.jpg" group-title="Федеральные" rutube-id="91815da4edb167b5bd617bae490e57da", Царьград
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/91815da4edb167b5bd617bae490e57da/index.m3u8?s=-4cJrIl_23T8HBKTo9YffQ&e=2094088058&scheme=https
+
+#EXTINF:-1 tvg-name="СОЮЗНЫЙ" tvg-logo="https://pic.rtbcdn.ru/video/2026-03-31/30/e9/30e92f54c6582d333864f946e49673c9.jpg" group-title="Федеральные" rutube-id="46c03b7f1a7255326900f4a60a9b44e0", СОЮЗНЫЙ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/46c03b7f1a7255326900f4a60a9b44e0/index.m3u8?s=naiBRfZCY0IU1fUbpR4qXQ&e=2094088066&scheme=https
+
+#EXTINF:-1 tvg-name="Соловьёв LIVE" tvg-logo="https://pic.rtbcdn.ru/video/30/13/3013f4e56c3e91c55be5de3927d25e3f.jpg" group-title="Федеральные" rutube-id="c9b87c0b00cfff9b37f95b9c8e4eed42", Соловьёв LIVE
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/c9b87c0b00cfff9b37f95b9c8e4eed42/index.m3u8?s=hD6az2nUNtZ-lVgO7FIb_g&e=2094088070&scheme=https
+
+#EXTINF:-1 tvg-name="RT News" tvg-logo="https://pic.rtbcdn.ru/video/ed/ee/edee05190a88355968968bb62a6e2c04.jpg" group-title="Федеральные" rutube-id="e553770139adc990ee5f54972ff4121b", RT News
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/e553770139adc990ee5f54972ff4121b/index.m3u8?s=GEItXKsJD-vijvgoNlKJmQ&e=2094088091&scheme=https
+
+#EXTINF:-1 tvg-name="Первый канал Международный" tvg-logo="https://pic.rtbcdn.ru/video/2026-04-22/5a/04/5a0427e4dbb6f5ccb18703f7a74bb058.jpg" group-title="Федеральные" rutube-id="d0df7ad80fdc9909f9630efbdd2653f5", Первый канал Международный
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/d0df7ad80fdc9909f9630efbdd2653f5/index.m3u8?s=xyoxlwNIXpkdqObJK_q8ZQ&e=2094088500&scheme=https
+
+#EXTINF:-1 tvg-name="Первый информационный" tvg-logo="https://pic.rtbcdn.ru/video/2026-04-13/8e/a5/8ea5a0b08c6a36237f286fd786dd607c.jpg" group-title="Федеральные" rutube-id="b68e4526d60f0945b36853edee93aca8", Первый информационный
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/b68e4526d60f0945b36853edee93aca8/index.m3u8?s=21OlGBKafPYyUbOMw6nFyQ&e=2094088505&scheme=https
+
+#EXTINF:-1 tvg-name="ОСН ТВ" tvg-logo="https://pic.rtbcdn.ru/video/44/a7/44a7aef1947a73af98759ed6d8e81caa.jpg" group-title="Федеральные" rutube-id="1f550a23c44ec7f287324b0b3e4f5a29", ОСН ТВ
+#EXTGRP:Федеральные
+https://bl.rutube.ru/livestream/1f550a23c44ec7f287324b0b3e4f5a29/index.m3u8?s=X-sCvz-Ut5VKCQMMux22gQ&e=2094088011&scheme=https
+
+# =========================
+# КИНО
+# =========================
+
+#EXTINF:-1 tvg-name="Турецкие фильмы и сериалы" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-25/21/06/21063442854de9f84726f9e4520383bf.jpg" group-title="Кино" rutube-id="2814e12b4ef6c528967736441c2e2803", Турецкие фильмы и сериалы
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/2814e12b4ef6c528967736441c2e2803/index.m3u8?s=OyQkweyW5L425JjhdJo-DQ&e=2094088104&scheme=https
+
+#EXTINF:-1 tvg-name="Латиноамериканские фильмы и сериалы" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-25/3b/47/3b47709d219aefcf7946b80a3ca32cd8.jpg" group-title="Кино" rutube-id="4d06d4d152d087f3792a5b15dc729562", Латиноамериканские фильмы и сериалы
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/4d06d4d152d087f3792a5b15dc729562/index.m3u8?s=zy-hA7XUU069BTInOyWViQ&e=2094088109&scheme=https
+
+#EXTINF:-1 tvg-name="Индийские фильмы и сериалы" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-25/9b/a0/9ba0916de7dd6c488248223ac405353d.jpg" group-title="Кино" rutube-id="8b077d20877c0cd70b5bc4a090b9f37e", Индийские фильмы и сериалы
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/8b077d20877c0cd70b5bc4a090b9f37e/index.m3u8?s=4JP26ngvOPu-ADSPRkYI-w&e=2094088113&scheme=https
+
+#EXTINF:-1 tvg-name="Дорамы" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-25/a8/94/a894fa3bcad2e25253bb7f311f2da823.jpg" group-title="Кино" rutube-id="5e3edd063411550ed6b67a8c0d7c96ea", Дорамы
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/5e3edd063411550ed6b67a8c0d7c96ea/index.m3u8?s=hgSrtiWQNxnx9sRUkvl0yw&e=2094088117&scheme=https
+
+#EXTINF:-1 tvg-name="Рик и Морти" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-22/c4/b5/c4b5532615d00561704f79b6ca6ed7c1.jpg" group-title="Кино" rutube-id="478a825bfd784e1e9de08ceceb3d2121", Рик и Морти
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/478a825bfd784e1e9de08ceceb3d2121/index.m3u8?s=dm8dtyh-mqwy9IlO5Wal0w&e=2094088123&scheme=https
+
+#EXTINF:-1 tvg-name="Кино и сериалы" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-02/e0/04/e00430cb17c2537d11eb3a0bd6722afe.jpg" group-title="Кино" rutube-id="300560a65014ec501a25b1f79df9ad90", Кино и сериалы
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/300560a65014ec501a25b1f79df9ad90/index.m3u8?s=wAkGJrzFyS1Haek6VzQtMw&e=2094088127&scheme=https
+
+#EXTINF:-1 tvg-name="Наше Аниме" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-10/34/f3/34f311d0d2ef9bbc9881f7a2fef8e464.jpg" group-title="Кино" rutube-id="ec5267347fa50d03edba227906eba679", Наше Аниме
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/ec5267347fa50d03edba227906eba679/index.m3u8?s=kLDBkk83y5dcmQYZnBcOAA&e=2094088131&scheme=https
+
+#EXTINF:-1 tvg-name="Sony Cine" tvg-logo="https://pic.rtbcdn.ru/video/2025-08-08/0c/86/0c865ab946525f93ac0dda617a8abefd.jpg" group-title="Кино" rutube-id="053ac917a4334e240103ca55941f869f", Sony Cine
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/053ac917a4334e240103ca55941f869f/index.m3u8?s=Kiuj0Muhs6h02d6Fhe-DHQ&e=2094088140&scheme=https
+
+#EXTINF:-1 tvg-name="Кинолаффка" tvg-logo="https://pic.rtbcdn.ru/video/2025-03-14/87/c6/87c6d211fd30f5019ebf2bc074b5f7e5.jpg" group-title="Кино" rutube-id="3b7d1499da9396462bfd17282d758d30", Кинолаффка
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/3b7d1499da9396462bfd17282d758d30/index.m3u8?s=STDfOWyZWGyAbcxauQqizw&e=2094088144&scheme=https
+
+#EXTINF:-1 tvg-name="Кино и жизнь" tvg-logo="https://pic.rtbcdn.ru/video/c6/7b/c67be0193d077ee152d9f088f1c88775.jpg" group-title="Кино" rutube-id="09e51eefa939595a4ac67182c6fb3e4e", Кино и жизнь
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/09e51eefa939595a4ac67182c6fb3e4e/index.m3u8?s=M852UKCO02C11reb-hPmzg&e=2094088160&scheme=https
+
+#EXTINF:-1 tvg-name="Киножелезо" tvg-logo="https://pic.rtbcdn.ru/video/2025-03-25/75/f6/75f62fef88b9efbdbc55810553515d53.jpg" group-title="Кино" rutube-id="4965b7b928c4a143d708ab424be01d37", Киножелезо
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/4965b7b928c4a143d708ab424be01d37/index.m3u8?s=F5GxDIlmbTmEgWO9mPn2Lg&e=2094088169&scheme=https
+
+#EXTINF:-1 tvg-name="Детективы" tvg-logo="https://pic.rtbcdn.ru/video/2025-10-02/18/89/188980e103fe58923afd3105465c86a5.jpg" group-title="Кино" rutube-id="e05401be60a9cc719fa7075b6e77b86d", Детективы
+#EXTGRP:Кино
+https://bl.rutube.ru/livestream/e05401be60a9cc719fa7075b6e77b86d/index.m3u8?s=EcMw34q-bNLFr9nlzbrcZg&e=2094088238&scheme=https
+
+# =========================
+# ДЕТСКИЕ
+# =========================
+
+#EXTINF:-1 tvg-name="Мультфильмы" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-18/2b/54/2b542ef6e1b644244296338f14173661.jpg" group-title="Детские" rutube-id="76de13007ff82a001f786f148e9fd39a", Мультфильмы
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/76de13007ff82a001f786f148e9fd39a/index.m3u8?s=WtRj-Qoxu9o6mukfs0Is7g&e=2094088100&scheme=https
+
+#EXTINF:-1 tvg-name="Радость Моя" tvg-logo="https://pic.rtbcdn.ru/video/3a/3f/3a3fb9e313311b4e0d941dba6ac87f7a.jpg" group-title="Детские" rutube-id="9ad2099eed71b4a0e577292c3bfd0708", Радость Моя
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/9ad2099eed71b4a0e577292c3bfd0708/index.m3u8?s=J6fcUcl_NEAq-0tDniG15A&e=2094088225&scheme=https
+
+#EXTINF:-1 tvg-name="Сказка FM" tvg-logo="https://pic.rtbcdn.ru/video/2025-02-03/57/86/57862ee239eab9ff0c6bfa25a5f23079.jpg" group-title="Детские" rutube-id="3aa8bad61ee2d41d3d00528ef5c21f61", Сказка FM
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/3aa8bad61ee2d41d3d00528ef5c21f61/index.m3u8?s=8QNKYdlKEqGF5SywwCugZQ&e=2094088383&scheme=https
+
+#EXTINF:-1 tvg-name="Ключайка" tvg-logo="https://pic.rtbcdn.ru/video/2025-12-19/56/cf/56cf3398388a803e6595c3c5dceb4fd8.jpg" group-title="Детские" rutube-id="ed497bdb28846536f3928849f8f7e469", Ключайка
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/ed497bdb28846536f3928849f8f7e469/index.m3u8?s=BPhVMdil9rURFxYIVOhrGw&e=2094088386&scheme=https
+
+#EXTINF:-1 tvg-name="Moonbug Kids TV" tvg-logo="https://pic.rtbcdn.ru/video/2024-12-17/06/62/06620a34cfbdfb6b0297340d2c2d5c13.jpg" group-title="Детские" rutube-id="2b06a5c4c688fdc05014acb4cba83de0", Moonbug Kids TV
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/2b06a5c4c688fdc05014acb4cba83de0/index.m3u8?s=Kn4vw5mLiUwaqCVMQ74Tjg&e=2094088390&scheme=https
+
+#EXTINF:-1 tvg-name="Детское радио" tvg-logo="https://pic.rtbcdn.ru/video/ff/ae/ffae8e578d22efca1b88ddfbde2b77ec.jpg" group-title="Детские" rutube-id="bf296006751f4344e359b3b5dc70be25", Детское радио
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/bf296006751f4344e359b3b5dc70be25/index.m3u8?s=oIsQZ0muQqsZp9xvz4H53g&e=2094088393&scheme=https
+
+#EXTINF:-1 tvg-name="Смайлик ТВ" tvg-logo="https://pic.rtbcdn.ru/video/e6/23/e623624aa39757060dca875f4febd9d0.jpg" group-title="Детские" rutube-id="2f052691c75d72b3ed7f3c33ea956a41", Смайлик ТВ
+#EXTGRP:Детские
+https://bl.rutube.ru/livestream/2f052691c75d72b3ed7f3c33ea956a41/index.m3u8?s=-cIWKK8iZvcIEiWdQIJgPg&e=2094088398&scheme=https
+
+# =========================
+# СПОРТИВНЫЕ
+# =========================
+
+#EXTINF:-1 tvg-name="NFL Network" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/8c/19/8c1998f2d88fd0032e53008372c35d0e.jpg" group-title="Спортивные" rutube-id="179c2a4900d9f5090a66d724bab88a5b", NFL Network
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/179c2a4900d9f5090a66d724bab88a5b/index.m3u8?s=_KX1v8LMmprArBUEKdMJ5A&e=2094087950&scheme=https
+
+#EXTINF:-1 tvg-name="Sky Sports Racing" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/62/06/620695455fa918248fb0ced80b362b5c.jpg" group-title="Спортивные" rutube-id="362d68a2d5d5b48dbf23522573e64d57", Sky Sports Racing
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/362d68a2d5d5b48dbf23522573e64d57/index.m3u8?s=5W7c6Zhqtf6BuZ8i4511PQ&e=2094087954&scheme=https
+
+#EXTINF:-1 tvg-name="Sky Sports Golf" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/85/20/8520aa11f5d50842775e87fc8ae9ab32.jpg" group-title="Спортивные" rutube-id="a7a17d6b994f02a80aebd69435266b58", Sky Sports Golf
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/a7a17d6b994f02a80aebd69435266b58/index.m3u8?s=NdqddfE2BztQLiB20mnU3Q&e=2094087958&scheme=https
+
+#EXTINF:-1 tvg-name="Sky Sport Mix" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/c6/f2/c6f2814b40f2a12d8c63abdac64483e3.jpg" group-title="Спортивные" rutube-id="a8983f2de47db830f6a6977cb71a13df", Sky Sport Mix
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/a8983f2de47db830f6a6977cb71a13df/index.m3u8?s=SgOdyf98CZAVo7FsteL-yg&e=2094087962&scheme=https
+
+#EXTINF:-1 tvg-name="TNT Sports 1 HD" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/d7/f9/d7f9e1f7aca120600c38ffe2a4fe6b85.jpg" group-title="Спортивные" rutube-id="3aa782bace452e7c4b9f81d767512147", TNT Sports 1 HD
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/3aa782bace452e7c4b9f81d767512147/index.m3u8?s=4yysAlOIoXX4J2eH8YruyA&e=2094087967&scheme=https
+
+#EXTINF:-1 tvg-name="Sky Sports Tennis" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/59/a9/59a925c865a35cdc6294fd7646e84c54.jpg" group-title="Спортивные" rutube-id="5f5dc9d64b43dfc740e92f2bdf2b0d38", Sky Sports Tennis
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/5f5dc9d64b43dfc740e92f2bdf2b0d38/index.m3u8?s=vMYtPfmn4boLaIplEKIRbA&e=2094087971&scheme=https
+
+#EXTINF:-1 tvg-name="NBA TV" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/de/3b/de3bbad416ed18b4c4add5931e97a771.jpg" group-title="Спортивные" rutube-id="d01241e9fd2bc2d65dbf6d74cca02f89", NBA TV
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/d01241e9fd2bc2d65dbf6d74cca02f89/index.m3u8?s=Yx69wpWuZncBhFBDYlsOeQ&e=2094087976&scheme=https
+
+#EXTINF:-1 tvg-name="SportsGrid" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/b8/cb/b8cb72511e728f6f1656e3771f098199.jpg" group-title="Спортивные" rutube-id="afc3073ec3efc6cb70c88ce6acaf4344", SportsGrid
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/afc3073ec3efc6cb70c88ce6acaf4344/index.m3u8?s=brds_LMzWMTuGYuwHxBbrw&e=2094087979&scheme=https
+
+#EXTINF:-1 tvg-name="TVS Classic Sports" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/ff/f7/fff759bfdb2bf37e2629e57a3cd91ade.jpg" group-title="Спортивные" rutube-id="9f28acb802549828d3ce7fbd8ecc17d3", TVS Classic Sports
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/9f28acb802549828d3ce7fbd8ecc17d3/index.m3u8?s=QmAx5cL7K7H4Pp2mgzyYFA&e=2094087984&scheme=https
+
+#EXTINF:-1 tvg-name="FON TV" tvg-logo="https://pic.rtbcdn.ru/video/2026-10-26/32/b2/32b2cc6484bb0e9dcd61ab154296b4a0.jpg" group-title="Спортивные" rutube-id="73a6a9716be23b7683fb61b94f52729f", FON TV
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/73a6a9716be23b7683fb61b94f52729f/index.m3u8?s=B4ihdGTwzs6IY3ZDPTCG5Q&e=2094087988&scheme=https
+
+#EXTINF:-1 tvg-name="NHL Network" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/cf/13/cf13dfbf33cc00ca6f689e6bce98fef4.jpg" group-title="Спортивные" rutube-id="7a485ef5da9fe50ba939f36ca3e6ed96", NHL Network
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/7a485ef5da9fe50ba939f36ca3e6ed96/index.m3u8?s=JyhR5KfxwEonftvdMvw7VQ&e=2094087991&scheme=https
+
+#EXTINF:-1 tvg-name="Red Bull TV" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-15/25/7d/257dce84ec65ad254a9bac5450b57fbb.jpg" group-title="Спортивные" rutube-id="45b30eef1b89857182b03db2c25631d9", Red Bull TV
+#EXTGRP:Спортивные
+https://bl.rutube.ru/livestream/45b30eef1b89857182b03db2c25631d9/index.m3u8?s=CcEzvi8_-eow6F9y5QPiKw&e=2094087995&scheme=https
+
+# =========================
+# РЕГИОНАЛЬНЫЕ
+# =========================
+
+#EXTINF:-1 tvg-name="41 Регион" tvg-logo="https://pic.rtbcdn.ru/video/2025-09-03/23/74/2374465fa8b6e0bc1f9fc4301b77d709.jpg" group-title="Региональные" rutube-id="aff0a2b356d2e1eef55bdb868be4dcc3", 41 Регион
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/aff0a2b356d2e1eef55bdb868be4dcc3/index.m3u8?s=TNr-roxI_RQhAexAzNQr8w&e=2094087806&scheme=https
+
+#EXTINF:-1 tvg-name="Москва 24" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-18/e3/e7/e3e7dd8d32236b057fa1b40e89d69e83.jpg" group-title="Региональные" rutube-id="ca70d39eba2e8771358bbcb4bfbad860", Москва 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/ca70d39eba2e8771358bbcb4bfbad860/index.m3u8?s=LorGtyKWU_G-ePZE3-VnyQ&e=2094088007&scheme=https
+
+#EXTINF:-1 tvg-name="360 Новости" tvg-logo="https://pic.rtbcdn.ru/video/2026-03-27/9d/b0/9db0b76e2e943e6e862e26e93600fb59.jpg" group-title="Региональные" rutube-id="d14fcf59cb7d07a26c48ebc8c6565f44", 360 Новости
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/d14fcf59cb7d07a26c48ebc8c6565f44/index.m3u8?s=HMO2QxDRr9EczWywpHVTdw&e=2094088015&scheme=https
+
+#EXTINF:-1 tvg-name="360" tvg-logo="https://pic.rtbcdn.ru/video/2026-03-27/a4/31/a431e29485490fa659253294045bee27.jpg" group-title="Региональные" rutube-id="07beff61e617797db550cc3a5f6ad92b", 360
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/07beff61e617797db550cc3a5f6ad92b/index.m3u8?s=KaQt_v9BPHw9AtPZt91vBA&e=2094088038&scheme=https
+
+#EXTINF:-1 tvg-name="ЛенТВ24" tvg-logo="https://pic.rtbcdn.ru/video/2025-09-02/3e/57/3e5705b8ae012cb674df285db1ddc537.jpg" group-title="Региональные" rutube-id="dd022de9cc6c8af89409513fa0a6117a", ЛенТВ24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/dd022de9cc6c8af89409513fa0a6117a/index.m3u8?s=U9g0Yzxul7XQ6z1nG-SicQ&e=2094088075&scheme=https
+
+#EXTINF:-1 tvg-name="Евразия" tvg-logo="https://pic.rtbcdn.ru/video/1f/22/1f22641731367ae7c24df91c594ed36d.jpg" group-title="Региональные" rutube-id="ce34005d3db841e15eecb7e31749adf6", Евразия
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/ce34005d3db841e15eecb7e31749adf6/index.m3u8?s=3w4HwDGjrqzMOFq6QxcsTw&e=2094088078&scheme=https
+
+#EXTINF:-1 tvg-name="Плюс минус 16" tvg-logo="https://pic.rtbcdn.ru/video/2025-06-16/cb/75/cb75406e72b025341091f12ff51e8bff.jpg" group-title="Региональные" rutube-id="99d4597cea881a27cf7dd6e65a74dade", Плюс минус 16
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/99d4597cea881a27cf7dd6e65a74dade/index.m3u8?s=nSdWy9xB0aFss2tpdE6JIw&e=2094088243&scheme=https
+
+#EXTINF:-1 tvg-name="Сангат" tvg-logo="https://pic.rtbcdn.ru/video/2025-04-30/e4/8f/e48ff4dbc78a47d9a8d7b59faac55f97.jpg" group-title="Региональные" rutube-id="dce1080977de5e89dcbd1dd24d014b4e", Сангат
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/dce1080977de5e89dcbd1dd24d014b4e/index.m3u8?s=aPdBkIAvipkbW7sINof7WA&e=2094088324&scheme=https
+
+#EXTINF:-1 tvg-name="ЮУрГУ-ТВ" tvg-logo="https://pic.rtbcdn.ru/video/2026-10-23/c7/45/c745d46623aca55abbd274e1175de0f6.jpg" group-title="Региональные" rutube-id="f6160b4e48cb32b4d5438c66c83b69dc", ЮУрГУ-ТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/f6160b4e48cb32b4d5438c66c83b69dc/index.m3u8?s=AK_GtmoWmbme12etuy28Iw&e=2094088329&scheme=https
+
+#EXTINF:-1 tvg-name="ТБВ" tvg-logo="https://pic.rtbcdn.ru/video/2025-03-11/52/03/520345dda423bb762bcab7a9bad78572.jpg" group-title="Региональные" rutube-id="68b2533a29f7de163842baf1b9dfc17e", ТБВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/68b2533a29f7de163842baf1b9dfc17e/index.m3u8?s=YDg_BtLToToIOeXZz7xhbQ&e=2094088358&scheme=https
+
+#EXTINF:-1 tvg-name="Сейм" tvg-logo="https://pic.rtbcdn.ru/genericimage/2026-03-30/34/de/34de4aca823936fb43d067da7b1baedf.jpeg" group-title="Региональные" rutube-id="58406cad9cc435f48a62209e076e8a9b", Сейм
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/58406cad9cc435f48a62209e076e8a9b/index.m3u8?s=PRRmRm8UGofcYTBZvsViWw&e=2094088424&scheme=https
+
+#EXTINF:-1 tvg-name="TV Губерния" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-16/20/54/20546ff46b0e2c87ea3e4c37f9bbcd7f.jpg" group-title="Региональные" rutube-id="42ed85b003d36b28cd2da077e7ab0ed4", TV Губерния
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/42ed85b003d36b28cd2da077e7ab0ed4/index.m3u8?s=C4XIfYpjOyTt6xClYVQA1A&e=2094088428&scheme=https
+
+#EXTINF:-1 tvg-name="С1 Сургут" tvg-logo="https://pic.rtbcdn.ru/video/07/80/0780c036df6146b54303ef4d4c645108.jpg" group-title="Региональные" rutube-id="7a35d5186515db85144d86900ebe1daf", С1 Сургут
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/7a35d5186515db85144d86900ebe1daf/index.m3u8?s=I1ZmKQHlQTeD5ykKgAqESQ&e=2094088435&scheme=https
+
+#EXTINF:-1 tvg-name="МТВ Волгоград" tvg-logo="https://pic.rtbcdn.ru/video/2c/de/2cde73bbf30ebc3559df6e6e9caa0565.jpg" group-title="Региональные" rutube-id="1839496ed8242ed47f5c540e25d4ba3f", МТВ Волгоград
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/1839496ed8242ed47f5c540e25d4ba3f/index.m3u8?s=npFQa1xZud3svfzC0mKkbQ&e=2094088440&scheme=https
+
+#EXTINF:-1 tvg-name="Липецк 24" tvg-logo="https://pic.rtbcdn.ru/video/25/98/2598ac4a78d4a436e4d440267fa05178.jpg" group-title="Региональные" rutube-id="b04fc212802bbf7ec94768c029e54aa9", Липецк 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/b04fc212802bbf7ec94768c029e54aa9/index.m3u8?s=gpCXWj6Pm8L5DCCHLizT9Q&e=2094088446&scheme=https
+
+#EXTINF:-1 tvg-name="АРИС 24" tvg-logo="https://pic.rtbcdn.ru/video/eb/57/eb5778caddb24eca019f12ebec579df7.jpg" group-title="Региональные" rutube-id="9b482361d6c845f7d70eafc98356d8bf", АРИС 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/9b482361d6c845f7d70eafc98356d8bf/index.m3u8?s=IFmxwjGtPYSO1AU_aU7Z3g&e=2094088450&scheme=https
+
+#EXTINF:-1 tvg-name="ТИВИСИ Восточная Сибирь" tvg-logo="https://pic.rtbcdn.ru/video/2026-06-16/05/52/055251d2d022e8d4b18bb36ff10f85a9.jpg" group-title="Региональные" rutube-id="047d8b76295c88df33da226a057f2492", ТИВИСИ Восточная Сибирь
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/047d8b76295c88df33da226a057f2492/index.m3u8?s=dU_N6fOl7wFZC2F_iBFKPw&e=2094088454&scheme=https
+
+#EXTINF:-1 tvg-name="Крым 24" tvg-logo="https://pic.rtbcdn.ru/video/35/06/3506a90774ee76ccbc9a7447b05c49fd.jpg" group-title="Региональные" rutube-id="cf71a03fba2c98f47a539e0e39b9d333", Крым 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/cf71a03fba2c98f47a539e0e39b9d333/index.m3u8?s=tBzefv-aIjyFx5y5raXhTw&e=2094088459&scheme=https
+
+#EXTINF:-1 tvg-name="7 канал" tvg-logo="https://pic.rtbcdn.ru/video/d5/b0/d5b036caf4ea1911e8f18aee3bc237b9.jpg" group-title="Региональные" rutube-id="a0e83fe5c23fc219886f7d7f084a8cb4", 7 канал
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/a0e83fe5c23fc219886f7d7f084a8cb4/index.m3u8?s=qzdOD9j8inrKNr6rDV70tg&e=2094088466&scheme=https
+
+#EXTINF:-1 tvg-name="Алмазный край" tvg-logo="https://pic.rtbcdn.ru/video/2026-05-26/a5/d0/a5d0da6eff2b91beca0d2033d1a3cd1e.jpg" group-title="Региональные" rutube-id="ed40abd9d832e9f91ea0e0b0fde36e44", Алмазный край
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/ed40abd9d832e9f91ea0e0b0fde36e44/index.m3u8?s=6EWGnN2Opm3qYAJF17Ds-g&e=2094088470&scheme=https
+
+#EXTINF:-1 tvg-name="Телецентр LIVE" tvg-logo="https://pic.rtbcdn.ru/video/f5/cd/f5cd2419682f7714becbc0645514b55e.jpg" group-title="Региональные" rutube-id="e04c56c1e77111c6b0033b125ee90789", Телецентр LIVE
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/e04c56c1e77111c6b0033b125ee90789/index.m3u8?s=VrkS_fvBslnAbhDP_A1TcA&e=2094088475&scheme=https
+
+#EXTINF:-1 tvg-name="Губерния 33" tvg-logo="https://pic.rtbcdn.ru/video/2024-11-04/87/47/87476d6dbddad6f0e54245646cecb7f1.jpg" group-title="Региональные" rutube-id="52a1592710d8803b0570bfef9d2fbeff", Губерния 33
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/52a1592710d8803b0570bfef9d2fbeff/index.m3u8?s=MKRX0X8oVysqzMXDPs4vbQ&e=2094088479&scheme=https
+
+#EXTINF:-1 tvg-name="Самара 24" tvg-logo="https://pic.rtbcdn.ru/video/0b/52/0b529cb0202bee1498ebd61215d3c99b.jpg" group-title="Региональные" rutube-id="72c8f697def35b05824d3f1ac262ded2", Самара 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/72c8f697def35b05824d3f1ac262ded2/index.m3u8?s=L_bD-mtlN8INotEdMVjyCw&e=2094088482&scheme=https
+
+#EXTINF:-1 tvg-name="ИНФО 24" tvg-logo="https://pic.rtbcdn.ru/video/e0/d4/e0d43bca5dd2fb679137d56370c6ea86.jpg" group-title="Региональные" rutube-id="b8079a6e1e184643d9a17c42469a1f30", ИНФО 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/b8079a6e1e184643d9a17c42469a1f30/index.m3u8?s=nY7eww-nwoUuq3_YzqZ6uw&e=2094088486&scheme=https
+
+#EXTINF:-1 tvg-name="ТОЛПАР-ТВ" tvg-logo="https://pic.rtbcdn.ru/video/66/82/668285915c01e21e0b54defdbaad59d1.jpg" group-title="Региональные" rutube-id="d506fe68746bb96512e328d3ce4cc761", ТОЛПАР-ТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/d506fe68746bb96512e328d3ce4cc761/index.m3u8?s=b03IbFVcPUgztNXhDLpZ9Q&e=2094088491&scheme=https
+
+#EXTINF:-1 tvg-name="Новый век" tvg-logo="https://pic.rtbcdn.ru/video/2026-05-18/45/33/45338cc636ab8d6324eff604669b1947.jpg" group-title="Региональные" rutube-id="7748a2530116682fa185a156ce1d09a3", Новый век
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/7748a2530116682fa185a156ce1d09a3/index.m3u8?s=zAOJwFbJCky5XUokQMalxw&e=2094088496&scheme=https
+
+#EXTINF:-1 tvg-name="Сургут 24" tvg-logo="https://pic.rtbcdn.ru/video/2026-04-08/53/bd/53bdb0ef2d5cb36ac523df98095b82db.jpg" group-title="Региональные" rutube-id="f520a781e91c3aa90fec5790cebd3fdb", Сургут 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/f520a781e91c3aa90fec5790cebd3fdb/index.m3u8?s=qNU2I7F3WtNzuI1v5f8Msg&e=2094088513&scheme=https
+
+#EXTINF:-1 tvg-name="НВК САХА HD" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-26/ed/1b/ed1b7adbc6cb0354884adc626f2e3fa7.jpg" group-title="Региональные" rutube-id="ca9d955460e0ba17a5a4b3a9b99bb8d2", НВК САХА HD
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/ca9d955460e0ba17a5a4b3a9b99bb8d2/index.m3u8?s=TNwKR0weeNUAdslOlTXKGQ&e=2094088518&scheme=https
+
+#EXTINF:-1 tvg-name="Якутия 24" tvg-logo="https://pic.rtbcdn.ru/video/2026-02-26/ee/b0/eeb0c81fdc0cac37b7cdca3767bc45c9.jpg" group-title="Региональные" rutube-id="2d65c260e4b73ef162aca5df132e5147", Якутия 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/2d65c260e4b73ef162aca5df132e5147/index.m3u8?s=YLb3uIXeuQb_GkI0_iF9gg&e=2094088522&scheme=https
+
+#EXTINF:-1 tvg-name="Таврия" tvg-logo="https://pic.rtbcdn.ru/video/29/81/298190ebd65029f951f7426c6720d947.jpg" group-title="Региональные" rutube-id="c5a272dc23ad505667bc2b54f98a3241", Таврия
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/c5a272dc23ad505667bc2b54f98a3241/index.m3u8?s=7mVZxPGN-uhF6TPB1Akipw&e=2094088526&scheme=https
+
+#EXTINF:-1 tvg-name="UTV" tvg-logo="https://pic.rtbcdn.ru/video/2025-11-20/29/55/2955429e4d227f324756ba0487461ef3.jpg" group-title="Региональные" rutube-id="673b559e08f8b99d65a4e8fbbceb911b", UTV
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/673b559e08f8b99d65a4e8fbbceb911b/index.m3u8?s=Mc5PFALXHn23754rx8UCCg&e=2094088530&scheme=https
+
+#EXTINF:-1 tvg-name="Мир Белогорья" tvg-logo="https://pic.rtbcdn.ru/video/2025-09-03/82/d3/82d3e5c373c6228584304c21fcc3f35d.jpg" group-title="Региональные" rutube-id="31bd9a668e5dfe5feddb988c96c0998c", Мир Белогорья
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/31bd9a668e5dfe5feddb988c96c0998c/index.m3u8?s=22c3Miqr0HY-6L256lD65w&e=2094088534&scheme=https
+
+#EXTINF:-1 tvg-name="Вся Уфа" tvg-logo="https://pic.rtbcdn.ru/video/2025-05-15/26/2a/262af2238320997bcd085e3f6dce20cc.jpg" group-title="Региональные" rutube-id="5a88a8d75565c5cdebeb11d87bfc61e9", Вся Уфа
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/5a88a8d75565c5cdebeb11d87bfc61e9/index.m3u8?s=aV-mqiUh5TEm7HaF9YSyog&e=2094088543&scheme=https
+
+#EXTINF:-1 tvg-name="Ника ТВ" tvg-logo="https://pic.rtbcdn.ru/video/2026-01-12/ef/c8/efc89a4c545a22570f0a33b7646fcfcb.jpg" group-title="Региональные" rutube-id="37d722b7752cd193a3f94d71cc9d60f5", Ника ТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/37d722b7752cd193a3f94d71cc9d60f5/index.m3u8?s=igILKxNT-HoZIpq2vLRtIA&e=2094088548&scheme=https
+
+#EXTINF:-1 tvg-name="РГВК Дагестан" tvg-logo="https://pic.rtbcdn.ru/video/2025-03-24/17/df/17df88e0a6ee654f5870586272147d06.jpg" group-title="Региональные" rutube-id="fcafa0d358df671e4f7c61ca54c79bea", РГВК Дагестан
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/fcafa0d358df671e4f7c61ca54c79bea/index.m3u8?s=hJaG0Y9pu88wo_zDv4vU-g&e=2094088552&scheme=https
+
+#EXTINF:-1 tvg-name="Четвертый канал" tvg-logo="https://pic.rtbcdn.ru/video/2025-03-19/53/3b/533bb5643a13cea320228d76b8dcf61d.jpg" group-title="Региональные" rutube-id="c6f66b644424c117f41e48062719ceed", Четвертый канал
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/c6f66b644424c117f41e48062719ceed/index.m3u8?s=Ks_Z1GEEFfVf6DN85HIZvQ&e=2094088557&scheme=https
+
+#EXTINF:-1 tvg-name="ПервоуральскТВ" tvg-logo="https://pic.rtbcdn.ru/video/2024-11-07/a6/1e/a61efcc6bcac45bcb96b986da593120e.jpg" group-title="Региональные" rutube-id="59e0373a9aa587e06aeaf9009f86ded1", ПервоуральскТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/59e0373a9aa587e06aeaf9009f86ded1/index.m3u8?s=ZE5OAX0LtrDb08X9FfG-kw&e=2094088561&scheme=https
+
+#EXTINF:-1 tvg-name="ТМК" tvg-logo="https://pic.rtbcdn.ru/video/2025-01-16/54/91/5491a84433b5414ab2ef20790aeb50f1.jpg" group-title="Региональные" rutube-id="740503607d216b5d467694a1e8fb39a8", ТМК
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/740503607d216b5d467694a1e8fb39a8/index.m3u8?s=xfVumkS8x7OBei1v6QC2LQ&e=2094088567&scheme=https
+
+#EXTINF:-1 tvg-name="ЯПервый" tvg-logo="https://pic.rtbcdn.ru/video/2025-05-13/71/be/71bea9f098e193d3ded453e657661fe5.jpg" group-title="Региональные" rutube-id="b7d879feefadde4e04e516dde89012cd", ЯПервый
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/b7d879feefadde4e04e516dde89012cd/index.m3u8?s=8UJDn8g93tqFPInb21rz8Q&e=2094088574&scheme=https
+
+#EXTINF:-1 tvg-name="ТСТ" tvg-logo="https://pic.rtbcdn.ru/video/6e/9f/6e9ff76634be3198a888158c6620f859.jpg" group-title="Региональные" rutube-id="9a19dcd9b6307fcbd85af3950b988012", ТСТ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/9a19dcd9b6307fcbd85af3950b988012/index.m3u8?s=PYZE7w4-Q7aZlCxrMzya_Q&e=2094088579&scheme=https
+
+#EXTINF:-1 tvg-name="Абакан 24" tvg-logo="https://pic.rtbcdn.ru/video/1c/c0/1cc0df33e760df00b4882ba8e749ec75.jpg" group-title="Региональные" rutube-id="7c5ae60686a94e04691f6917e1dec066", Абакан 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/7c5ae60686a94e04691f6917e1dec066/index.m3u8?s=gCQpq7-PjRGbbT1U4lYOJQ&e=2094088582&scheme=https
+
+#EXTINF:-1 tvg-name="Самотлор" tvg-logo="https://pic.rtbcdn.ru/video/b7/35/b7354cf137be8780633086e47ab7ca4b.jpg" group-title="Региональные" rutube-id="695f0fdefc96b6f7f2b4a311b71f596b", Самотлор
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/695f0fdefc96b6f7f2b4a311b71f596b/index.m3u8?s=UR478mJ5zZhfs6dhEB2GTA&e=2094088597&scheme=https
+
+#EXTINF:-1 tvg-name="Магас" tvg-logo="https://pic.rtbcdn.ru/video/8f/12/8f1269d379733930da2cb454487c44bb.jpg" group-title="Региональные" rutube-id="15bb032337c7425983757d211713eb7d", Магас
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/15bb032337c7425983757d211713eb7d/index.m3u8?s=H0UYMIc3ipzYZ8ArOi2N9g&e=2094088602&scheme=https
+
+#EXTINF:-1 tvg-name="Нижний Новгород 24" tvg-logo="https://pic.rtbcdn.ru/video/5c/5c/5c5c0d536ee0e70ba886d03519933468.jpg" group-title="Региональные" rutube-id="3c86a67da5919dde328f95c7da0f6a31", Нижний Новгород 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/3c86a67da5919dde328f95c7da0f6a31/index.m3u8?s=L75O51qsGr61FUqkGukX1g&e=2094088606&scheme=https
+
+#EXTINF:-1 tvg-name="Город" tvg-logo="https://pic.rtbcdn.ru/video/35/a8/35a889675da21439bbc604861e31fa73.jpg" group-title="Региональные" rutube-id="076ef3f8a36d5d26fd040a64a3cbbc78", Город
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/076ef3f8a36d5d26fd040a64a3cbbc78/index.m3u8?s=hrRgXNfOiG_bMPF0KgY6Kw&e=2094088614&scheme=https
+
+#EXTINF:-1 tvg-name="Кузбасс 1 HD" tvg-logo="https://pic.rtbcdn.ru/video/7c/9f/7c9f502a3d84353c059a3fa04e328654.jpg" group-title="Региональные" rutube-id="9a062a48812f5d2d0d5135c6ed9e4f33", Кузбасс 1 HD
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/9a062a48812f5d2d0d5135c6ed9e4f33/index.m3u8?s=lDtLaN3zo03bj1T9iAzykg&e=2094088619&scheme=https
+
+#EXTINF:-1 tvg-name="ОРТ" tvg-logo="https://pic.rtbcdn.ru/video/52/10/5210785f59a04b3d932211db65ad230c.jpg" group-title="Региональные" rutube-id="02fb6df9e349e16a606530b25905a1f5", ОРТ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/02fb6df9e349e16a606530b25905a1f5/index.m3u8?s=8HwI5BO0N5et_vwaUsuuKw&e=2094088623&scheme=https
+
+#EXTINF:-1 tvg-name="Импульс Севера" tvg-logo="https://pic.rtbcdn.ru/video/13/7a/137a45eae1a2345ebe4e08ea452df4f0.jpg" group-title="Региональные" rutube-id="342a3e4f3c9bb0d7830a52af0d956c44", Импульс Севера
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/342a3e4f3c9bb0d7830a52af0d956c44/index.m3u8?s=VEWeyJ_myTcDKhTUYdYWKg&e=2094088629&scheme=https
+
+#EXTINF:-1 tvg-name="ОТС" tvg-logo="https://pic.rtbcdn.ru/video/7a/25/7a25f0c83aa2213086ce79b49776ebdc.jpg" group-title="Региональные" rutube-id="39c5bfe012402990e6402eded8bdc761", ОТС
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/39c5bfe012402990e6402eded8bdc761/index.m3u8?s=24X389meuX9B0mt155YU3A&e=2094088633&scheme=https
+
+#EXTINF:-1 tvg-name="ННТВ" tvg-logo="https://pic.rtbcdn.ru/video/8d/b1/8db15fbd503301efecc1e7a89e3cde0e.jpg" group-title="Региональные" rutube-id="333f94ef9af118c0ac51006243053e07", ННТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/333f94ef9af118c0ac51006243053e07/index.m3u8?s=6tw9vbw8uTDCHMLLLS6LJA&e=2094088637&scheme=https
+
+#EXTINF:-1 tvg-name="Волга" tvg-logo="https://pic.rtbcdn.ru/video/2025-12-24/fe/2f/fe2f8f9296c453800e2a073a13c7626e.jpg" group-title="Региональные" rutube-id="bed2dcda74004e4e9a61966d2848c027", Волга
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/bed2dcda74004e4e9a61966d2848c027/index.m3u8?s=9wSTy4rU7Q3XdNl2bhNRig&e=2094088640&scheme=https
+
+#EXTINF:-1 tvg-name="Волга 24" tvg-logo="https://pic.rtbcdn.ru/video/2025-12-24/9d/4e/9d4ef6dc83ebb57bea4ca1d21519226f.jpg" group-title="Региональные" rutube-id="e30732c0045af997cb7312822534522f", Волга 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/e30732c0045af997cb7312822534522f/index.m3u8?s=3NylTYZEgLBu8iePPecfsg&e=2094088643&scheme=https
+
+#EXTINF:-1 tvg-name="Башкортостан 24" tvg-logo="https://pic.rtbcdn.ru/video/2025-01-13/3f/26/3f2666e70c76884b9fee879a6143cd32.jpg" group-title="Региональные" rutube-id="cf7e6ad2c24ce743b5b60478c176037b", Башкортостан 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/cf7e6ad2c24ce743b5b60478c176037b/index.m3u8?s=8LTX26-ptmOCpxcajV1CWQ&e=2094088647&scheme=https
+
+#EXTINF:-1 tvg-name="Югра" tvg-logo="https://pic.rtbcdn.ru/video/64/92/6492ed48fbc5698e50387e931acaa762.jpg" group-title="Региональные" rutube-id="360eabf2bf139f0a97b971c4b92d09b6", Югра
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/360eabf2bf139f0a97b971c4b92d09b6/index.m3u8?s=eLVKwnWVHET0jxmN37jIAw&e=2094088655&scheme=https
+
+#EXTINF:-1 tvg-name="Своё ТВ" tvg-logo="https://pic.rtbcdn.ru/video/6e/9b/6e9b482eadeea78c7efcb78ec9b844d8.jpg" group-title="Региональные" rutube-id="1932f750f00f3a742a1d90c62d0076ad", Своё ТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/1932f750f00f3a742a1d90c62d0076ad/index.m3u8?s=8jZfgYhKeO-R-lHqsXuVRg&e=2094088662&scheme=https
+
+#EXTINF:-1 tvg-name="АСТВ LIVE HD" tvg-logo="https://pic.rtbcdn.ru/video/10/47/1047ffe078b689b5da3a27b7766b0ad2.jpg" group-title="Региональные" rutube-id="df0faa92ca3f1d7df057c202fd4b21c4", АСТВ LIVE HD
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/df0faa92ca3f1d7df057c202fd4b21c4/index.m3u8?s=KRCy5zHaaoiRc1cpn49bBA&e=2094088666&scheme=https
+
+#EXTINF:-1 tvg-name="Кубань 24" tvg-logo="https://pic.rtbcdn.ru/video/9a/c0/9ac0a66ce840a369f9ae27e9366e972b.jpg" group-title="Региональные" rutube-id="cb2f1d99b88c9b4d38df05cd7fa0a6c2", Кубань 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/cb2f1d99b88c9b4d38df05cd7fa0a6c2/index.m3u8?s=9kmxs9XL5C4YyFVPAK0FSw&e=2094088670&scheme=https
+
+#EXTINF:-1 tvg-name="Ариг Ус 24" tvg-logo="https://pic.rtbcdn.ru/video/eb/00/eb0048bb2bac1bad414dc9e2611e6fba.jpg" group-title="Региональные" rutube-id="5d9273a93631b87a3bbdc883bb3a58cb", Ариг Ус 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/5d9273a93631b87a3bbdc883bb3a58cb/index.m3u8?s=khLerrhIFsGae-LjdeM0DQ&e=2094088674&scheme=https
+
+#EXTINF:-1 tvg-name="ПРИМА" tvg-logo="https://pic.rtbcdn.ru/video/f3/e7/f3e759b3ec0349ff4c1d5a9cba7e8f00.jpg" group-title="Региональные" rutube-id="3fd26103b82508289ef7b7f60c77d9c8", ПРИМА
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/3fd26103b82508289ef7b7f60c77d9c8/index.m3u8?s=DgwYvUl4qMhT9gpqFk_k9w&e=2094088678&scheme=https
+
+#EXTINF:-1 tvg-name="БТВ" tvg-logo="https://pic.rtbcdn.ru/video/cc/6b/cc6b0d0c3499421eea3a2540b5d87ed0.jpg" group-title="Региональные" rutube-id="671239d68ada3000a154a68efa0c7813", БТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/671239d68ada3000a154a68efa0c7813/index.m3u8?s=VniD3A665wc0UFgE92-2uQ&e=2094088681&scheme=https
+
+#EXTINF:-1 tvg-name="Канал 12" tvg-logo="https://pic.rtbcdn.ru/video/d6/31/d63100c03dd2781746d124164c535daa.jpg" group-title="Региональные" rutube-id="7d6d8c8fc5c6e02d9c0b78eb451f3bd0", Канал 12
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/7d6d8c8fc5c6e02d9c0b78eb451f3bd0/index.m3u8?s=6ID-smt2gG9W5dmsOR7MDw&e=2094088685&scheme=https
+
+#EXTINF:-1 tvg-name="ВЕТТА 24" tvg-logo="https://pic.rtbcdn.ru/video/94/15/9415a016f2d64a08cf538f715b9b27a7.jpg" group-title="Региональные" rutube-id="3053eeaecc60e0adef57b81d3498fdd0", ВЕТТА 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/3053eeaecc60e0adef57b81d3498fdd0/index.m3u8?s=9JyWoHKl1jyFFQBM4M3lTw&e=2094088689&scheme=https
+
+#EXTINF:-1 tvg-name="Буряад ТВ" tvg-logo="https://pic.rtbcdn.ru/video/c1/d5/c1d5cf2df43bc3d7b6abab686f48f8b2.jpg" group-title="Региональные" rutube-id="55fec7f2c11f4decc66568fca39f26b2", Буряад ТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/55fec7f2c11f4decc66568fca39f26b2/index.m3u8?s=QwRCXtip9qTWbVQF6JpI5A&e=2094088693&scheme=https
+
+#EXTINF:-1 tvg-name="86 Сургут" tvg-logo="https://pic.rtbcdn.ru/video/8d/f1/8df1ff1cdcd8347df066aaa2e317b545.jpg" group-title="Региональные" rutube-id="813dc0c5a944559e7e52b840d09a84f6", 86 Сургут
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/813dc0c5a944559e7e52b840d09a84f6/index.m3u8?s=Im2EI6CHVLQX4alAIYhkXw&e=2094088696&scheme=https
+
+#EXTINF:-1 tvg-name="ТОЛК" tvg-logo="https://pic.rtbcdn.ru/video/3b/3f/3b3f3582412a7df41b5fbf595a9b31f0.jpg" group-title="Региональные" rutube-id="0115cdc35fb5234242a89de98137dca9", ТОЛК
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/0115cdc35fb5234242a89de98137dca9/index.m3u8?s=f3EPucD9jQktdRveGQQTjg&e=2094088700&scheme=https
+
+#EXTINF:-1 tvg-name="Липецкое время" tvg-logo="https://pic.rtbcdn.ru/video/45/8f/458f48a438a564b65beec5758b0ed3c4.png" group-title="Региональные" rutube-id="23afd7debed1cfc7a8efa0827c24d836", Липецкое время
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/23afd7debed1cfc7a8efa0827c24d836/index.m3u8?s=nXa5d05VLDJu027iTMrB6w&e=2094088704&scheme=https
+
+#EXTINF:-1 tvg-name="ДОН 24" tvg-logo="https://pic.rtbcdn.ru/video/eb/06/eb064e56518545e2a9343e1fa51ae360.jpg" group-title="Региональные" rutube-id="72ced5d533f940251e5e4bd5d61f6bc9", ДОН 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/72ced5d533f940251e5e4bd5d61f6bc9/index.m3u8?s=ELd4Q2TRm_UQXWbN8oclhg&e=2094088708&scheme=https
+
+#EXTINF:-1 tvg-name="ОмскТВ" tvg-logo="https://pic.rtbcdn.ru/video/83/7e/837ebbb052deacb5a5e463aefab36ff7.jpg" group-title="Региональные" rutube-id="9927a61345cbec5aac6558f6c5454d61", ОмскТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/9927a61345cbec5aac6558f6c5454d61/index.m3u8?s=Y1D5s8mppsTqO1zRGVQo4Q&e=2094088712&scheme=https
+
+#EXTINF:-1 tvg-name="Саратов 24" tvg-logo="https://pic.rtbcdn.ru/video/14/90/14908525e507355211ad646ecd2f1cda.jpg" group-title="Региональные" rutube-id="e07fffc5eb21f98a5ade09e825d7095a", Саратов 24
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/e07fffc5eb21f98a5ade09e825d7095a/index.m3u8?s=bCIizGApxmyhVgw1acW_eg&e=2094088715&scheme=https
+
+#EXTINF:-1 tvg-name="БАРС" tvg-logo="https://pic.rtbcdn.ru/video/c6/ff/c6ffc4676f55b1727dc8d2ae71a4e840.jpg" group-title="Региональные" rutube-id="f79ff24ad16cf5f5eb52994647596d13", БАРС
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/f79ff24ad16cf5f5eb52994647596d13/index.m3u8?s=4jiplV9dVvqSafVXrKgkyA&e=2094088722&scheme=https
+
+#EXTINF:-1 tvg-name="Рифей-ТВ" tvg-logo="https://pic.rtbcdn.ru/video/3b/81/3b81d4abdaa6a742dda888fdb904b3a8.jpg" group-title="Региональные" rutube-id="57486bf8e1c01d16a5a939c463867fab", Рифей-ТВ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/57486bf8e1c01d16a5a939c463867fab/index.m3u8?s=fv9BleJ3mYkjbthM9n3KaQ&e=2094088726&scheme=https
+
+#EXTINF:-1 tvg-name="78" tvg-logo="https://pic.rtbcdn.ru/video/9b/34/9b34b6c83859a0c55a8444c7181d0bc7.jpg" group-title="Региональные" rutube-id="bbf23277dbd0dd0e6a623526d4c3f8c9", 78
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/bbf23277dbd0dd0e6a623526d4c3f8c9/index.m3u8?s=MO31eos2iYCV_QFG4Lpztg&e=2094088731&scheme=https
+
+#EXTINF:-1 tvg-name="БСТ" tvg-logo="https://pic.rtbcdn.ru/video/f2/d4/f2d4b54f58417b239943db42690cbb99.jpg" group-title="Региональные" rutube-id="92aa15b4975d9f63c4e0b82e3b7af463", БСТ
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/92aa15b4975d9f63c4e0b82e3b7af463/index.m3u8?s=O1SrCRV8yzLY_oMDj80GUQ&e=2094088748&scheme=https
+
+#EXTINF:-1 tvg-name="Енисей" tvg-logo="https://pic.rtbcdn.ru/video/5f/7f/5f7f6542298c97375a34e666788d5ca7.jpg" group-title="Региональные" rutube-id="5835cd10c04311e400f2ed19b1b2fe8b", Енисей
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/5835cd10c04311e400f2ed19b1b2fe8b/index.m3u8?s=VljO0d4wyiYwpI4D0CKOTA&e=2094088753&scheme=https
+
+#EXTINF:-1 tvg-name="Первый крымский" tvg-logo="https://pic.rtbcdn.ru/video/eb/cb/ebcbd35ec04f20398692afce748dce95.jpg" group-title="Региональные" rutube-id="3bbbfe178e58ca0830a701e0624f20d8", Первый крымский
+#EXTGRP:Региональные
+https://bl.rutube.ru/livestream/3bbbfe178e58ca0830a701e0624f20d8/index.m3u8?s=fx6DTSD1RbH1k6ZEtOPAfA&e=2094088758&scheme=https
+
+# =========================
+# ПРОЧИЕ
+# =========================
+
+#EXTINF:-1 tvg-name="Маяк" tvg-logo="https://pic.rtbcdn.ru/video/ba/bd/babd1072011090cd4d49a0e5c1b3d44a.jpg" group-title="Прочие" rutube-id="c4021cfb3dfe887ce0a9be43274e9182", Маяк
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/c4021cfb3dfe887ce0a9be43274e9182/index.m3u8?s=pwjUoU0oqZG0YhSEE7-epQ&e=2094088032&scheme=https
+
+#EXTINF:-1 tvg-name="ПРО БИЗНЕС" tvg-logo="https://pic.rtbcdn.ru/video/2025-05-26/4d/d0/4dd0b1b359123837770b8d93de9c8dc1.jpg" group-title="Прочие" rutube-id="6cf7ef6babbb4bb2e9b97961f831034c", ПРО БИЗНЕС
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/6cf7ef6babbb4bb2e9b97961f831034c/index.m3u8?s=ySv6moOqhXiT5QnGHmefBA&e=2094088062&scheme=https
+
+#EXTINF:-1 tvg-name="ЖАР-ПТИЦА HD" tvg-logo="https://pic.rtbcdn.ru/video/2026-11-07/67/63/676300c1303a0fc47984fea36ac14c89.jpg" group-title="Прочие" rutube-id="c93be53cba8a4ba6ac311b395a00f4d5", ЖАР-ПТИЦА HD
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/c93be53cba8a4ba6ac311b395a00f4d5/index.m3u8?s=X28TYYPcqRwV-r9WOL2MPg&e=2094088250&scheme=https
+
+#EXTINF:-1 tvg-name="Музыка Мода ТВ" tvg-logo="https://pic.rtbcdn.ru/video/2026-03-30/d7/1e/d71e85006d7aea0d1fd5c90e302dea5c.jpg" group-title="Прочие" rutube-id="965a025e4ebbaf0957415f80c6de8534", Музыка Мода ТВ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/965a025e4ebbaf0957415f80c6de8534/index.m3u8?s=K7NeAmVzUXBMpLdViJJoBQ&e=2094088255&scheme=https
+
+#EXTINF:-1 tvg-name="КРИК-ТВ" tvg-logo="https://pic.rtbcdn.ru/video/dd/7d/dd7dde0345a5213af5b275d860116560.jpg" group-title="Прочие" rutube-id="f372aa2aff09518d050ecdf70956012c", КРИК-ТВ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/f372aa2aff09518d050ecdf70956012c/index.m3u8?s=vIzlwf0534LBndgSCN__oA&e=2094088259&scheme=https
+
+#EXTINF:-1 tvg-name="Продвижение" tvg-logo="https://pic.rtbcdn.ru/video/2024-10-07/68/d8/68d84c5416ebd952d281895a3dfaa584.jpg" group-title="Прочие" rutube-id="ff5c11c9a51750f5d33427762abc315c", Продвижение
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/ff5c11c9a51750f5d33427762abc315c/index.m3u8?s=ESxRlW0Ms1440lYJKEA_HQ&e=2094088264&scheme=https
+
+#EXTINF:-1 tvg-name="Документалки и познавательные шоу" tvg-logo="https://pic.rtbcdn.ru/video/2026-09-25/1c/01/1c01996f7f9f1f635ba8421a4c791e63.jpg" group-title="Прочие" rutube-id="eddcc86d1dee0b5def546ea388eb38ea", Документалки и познавательные шоу
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/eddcc86d1dee0b5def546ea388eb38ea/index.m3u8?s=kTcDJV38ZeBQQi6QyGbxEg&e=2094088271&scheme=https
+
+#EXTINF:-1 tvg-name="Discovery" tvg-logo="https://pic.rtbcdn.ru/video/2026-08-17/4e/19/4e1924755dc60b927be6f65eb92f5f6f.jpg" group-title="Прочие" rutube-id="6422d62f7e1f87bc3aec45b462cd89ea", Discovery
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/6422d62f7e1f87bc3aec45b462cd89ea/index.m3u8?s=NWJDqF6QU7Ufkb_NAyAnQw&e=2094088276&scheme=https
+
+#EXTINF:-1 tvg-name="National Geographic" tvg-logo="https://pic.rtbcdn.ru/video/2026-08-17/3a/e1/3ae1d45391549529259eaf68a0de5e98.jpg" group-title="Прочие" rutube-id="2619fc295c16585ef018041d88f14db0", National Geographic
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/2619fc295c16585ef018041d88f14db0/index.m3u8?s=ZgvJ0-4lSAJ3rOq81eo-pQ&e=2094088279&scheme=https
+
+#EXTINF:-1 tvg-name="РЖД ТВ" tvg-logo="https://pic.rtbcdn.ru/video/2025-12-20/d1/50/d150af6afc50c576581d2923dcfb5f3a.jpg" group-title="Прочие" rutube-id="fc2476d9dea912529d8b996f6d330202", РЖД ТВ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/fc2476d9dea912529d8b996f6d330202/index.m3u8?s=KWuNwuShWGUwuAnpxAYXnw&e=2094088284&scheme=https
+
+#EXTINF:-1 tvg-name="ЦТВ" tvg-logo="https://pic.rtbcdn.ru/video/2026-05-27/6e/96/6e96209443bd19b6fe451b90d95e556c.jpg" group-title="Прочие" rutube-id="d751dcb6c61658ec76461bc166d6e529", ЦТВ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/d751dcb6c61658ec76461bc166d6e529/index.m3u8?s=kg0oN3tKEPvy5rSh9OYe6A&e=2094088295&scheme=https
+
+#EXTINF:-1 tvg-name="Первый библиотечный" tvg-logo="https://pic.rtbcdn.ru/video/2025-05-27/14/62/14620142f411768ff5db1a880e6b12f5.jpg" group-title="Прочие" rutube-id="0ec51e679d76f100fc9143dca1e8a197", Первый библиотечный
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/0ec51e679d76f100fc9143dca1e8a197/index.m3u8?s=5qhsJq8tgnQzJV1VNwMm7g&e=2094088301&scheme=https
+
+#EXTINF:-1 tvg-name="АРТ" tvg-logo="https://pic.rtbcdn.ru/video/2024-10-17/fc/04/fc046f1d92fc69454ed3e364dec8bbca.jpg" group-title="Прочие" rutube-id="02e9e3d4fca0b8bec9e3eea4757f188b", АРТ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/02e9e3d4fca0b8bec9e3eea4757f188b/index.m3u8?s=s9iKo3TMZnUcGJ9kIHlqFw&e=2094088306&scheme=https
+
+#EXTINF:-1 tvg-name="СВОи" tvg-logo="https://pic.rtbcdn.ru/video/2025-11-15/7e/d8/7ed800a94f975de1154e69369c3e3bb5.jpg" group-title="Прочие" rutube-id="e3976c81c6dabee46c3a38bcddd9adcc", СВОи
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/e3976c81c6dabee46c3a38bcddd9adcc/index.m3u8?s=h0V6YoXHnQsnAQEBf4GSHw&e=2094088312&scheme=https
+
+#EXTINF:-1 tvg-name="МЫ" tvg-logo="https://pic.rtbcdn.ru/video/2026-04-06/87/30/8730c213db0d856ed1374b5f8fe08c4c.jpg" group-title="Прочие" rutube-id="ee431650738a594119c3516ceda72775", МЫ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/ee431650738a594119c3516ceda72775/index.m3u8?s=r51jcAEk1iex2905aVuH3g&e=2094088319&scheme=https
+
+#EXTINF:-1 tvg-name="Water bear" tvg-logo="https://pic.rtbcdn.ru/video/2025-08-08/dd/ca/ddca346b3a35b8d8a16f1bc3002a071e.jpg" group-title="Прочие" rutube-id="8ceccbefd972496f7c2dd5a7acc476fc", Water bear
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/8ceccbefd972496f7c2dd5a7acc476fc/index.m3u8?s=Be5G_RkCRXYQ5yBeMerxLw&e=2094088341&scheme=https
+
+#EXTINF:-1 tvg-name="HHQ" tvg-logo="https://pic.rtbcdn.ru/video/2025-02-17/bc/53/bc539df910aac0d7488fbdba3c45fe22.jpg" group-title="Прочие" rutube-id="2d7fa51716500fba52586d594201777f", HHQ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/2d7fa51716500fba52586d594201777f/index.m3u8?s=IbwL_mMEHdjoUoP3YspJ4Q&e=2094088346&scheme=https
+
+#EXTINF:-1 tvg-name="AKC.tv" tvg-logo="https://pic.rtbcdn.ru/video/2024-10-24/36/d5/36d551370ccf3a7fe75513dc2f956226.jpg" group-title="Прочие" rutube-id="89e4d6310399df1d824f861e4b312b49", AKC.tv
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/89e4d6310399df1d824f861e4b312b49/index.m3u8?s=Hx3V54aS9p_nCqN8FxOcHQ&e=2094088351&scheme=https
+
+#EXTINF:-1 tvg-name="Загородный" tvg-logo="https://pic.rtbcdn.ru/video/09/6d/096da1c750132aad8cd829a78c94c298.jpg" group-title="Прочие" rutube-id="406973c72e9d0449feef05ef7811ad01", Загородный
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/406973c72e9d0449feef05ef7811ad01/index.m3u8?s=4-B4vNrPTz4uwxwef9TLjg&e=2094088363&scheme=https
+
+#EXTINF:-1 tvg-name="РАТНИК" tvg-logo="https://pic.rtbcdn.ru/video/48/8c/488cbdf145d15b7fb5817d4334837525.jpg" group-title="Прочие" rutube-id="13b0320238d7938a2deffb4065068986", РАТНИК
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/13b0320238d7938a2deffb4065068986/index.m3u8?s=maIZrY7TATNuiZ-_5QSLKw&e=2094088368&scheme=https
+
+#EXTINF:-1 tvg-name="Nano" tvg-logo="https://pic.rtbcdn.ru/video/fa/a4/faa4d3ac577b5172e1e3a0ddd0b08526.jpg" group-title="Прочие" rutube-id="cf958b6c9ae4504be5fc2c1de358a017", Nano
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/cf958b6c9ae4504be5fc2c1de358a017/index.m3u8?s=r-FLs74ZKklBOJ43TV_STg&e=2094088372&scheme=https
+
+#EXTINF:-1 tvg-name="ВДОХ" tvg-logo="https://pic.rtbcdn.ru/video/2026-05-20/ea/a1/eaa1fe1fe39884b91604d7a57d833beb.jpg" group-title="Прочие" rutube-id="988ec7330fa38c8a1e5980ba7d02dbbe", ВДОХ
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/988ec7330fa38c8a1e5980ba7d02dbbe/index.m3u8?s=3vWs_8ceHqalGcgDwIVrZg&e=2094088136&scheme=https
+
+#EXTINF:-1 tvg-name="TLC" tvg-logo="https://pic.rtbcdn.ru/video/2026-08-17/0c/65/0c6572efdc66c6ff42521feacf1821c2.jpg" group-title="Прочие" rutube-id="7c3d1a4cc0b4dff1176aa2dbb0b90000", TLC
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/7c3d1a4cc0b4dff1176aa2dbb0b90000/index.m3u8?s=G6YJ4dfPGmDt8ifTAjU5bQ&e=2094088181&scheme=https
+
+#EXTINF:-1 tvg-name="Охотник и рыболов" tvg-logo="https://pic.rtbcdn.ru/video/e0/2f/e02f8df80c33b519473e37e361eaa834.jpg" group-title="Прочие" rutube-id="1da5d92af8c55b16241f1eb12a27f00c", Охотник и рыболов
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/1da5d92af8c55b16241f1eb12a27f00c/index.m3u8?s=KgZEaTxtMNmAS3enXf5RbQ&e=2094088208&scheme=https
+
+#EXTINF:-1 tvg-name="ТБН" tvg-logo="https://pic.rtbcdn.ru/video/25/ff/25ffabbd32f3559144befd3de0bbb554.jpg" group-title="Прочие" rutube-id="f0c302d2736a4066564b9b929b69507c", ТБН
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/f0c302d2736a4066564b9b929b69507c/index.m3u8?s=wtVOMdV-DcJkPKw9S98_qQ&e=2094088651&scheme=https
+
+#EXTINF:-1 tvg-name="Радио Хит" tvg-logo="https://pic.rtbcdn.ru/video/d9/ae/d9ae8b0366a4a35f557b5f4948ad976a.jpg" group-title="Прочие" rutube-id="18eda61a347b781dd765b410133ef33a", Радио Хит
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/18eda61a347b781dd765b410133ef33a/index.m3u8?s=9RJug-m0svoaGrOROe_4eQ&e=2094088735&scheme=https
+
+#EXTINF:-1 tvg-name="Беларусь 1" tvg-logo="https://pic.rtbcdn.ru/video/2026-04-10/98/da/98da0761d4cc10522e7c0a7f8129d64a.jpg" group-title="Прочие" rutube-id="da760ca73396be9f7bc1589dba81036b", Беларусь 1
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/da760ca73396be9f7bc1589dba81036b/index.m3u8?s=83_xlovXV4pHHpjxhR6DtA&e=2094088509&scheme=https
+
+#EXTINF:-1 tvg-name="Истоки" tvg-logo="https://pic.rtbcdn.ru/video/99/d2/99d21ecaa3a5555b0356adfe07babe0a.jpg" group-title="Прочие" rutube-id="503a8ac5ca6d738f05a147764f70215b", Истоки
+#EXTGRP:Прочие
+https://bl.rutube.ru/livestream/503a8ac5ca6d738f05a147764f70215b/index.m3u8?s=D3XIezRKLC1vYw5Nscehew&e=2094088592&scheme=https
